@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "elelem"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Unified API wrapper for OpenAI, GROQ, and DeepInfra with cost tracking and retry logic"
 readme = "README.md"
 license = {text = "MIT"}
@@ -53,6 +53,11 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 elelem = ["config.json"]
+
+[tool.setuptools_scm]
+write_to = "src/elelem/_version.py"
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

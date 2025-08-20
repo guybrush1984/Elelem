@@ -310,8 +310,18 @@ class Elelem:
         current_model_name = model_name
         current_provider_client = provider_client
         
+        # Log initial request details
+        self.logger.debug(f"🚀 Making request to {model} with temperature={api_kwargs.get('temperature', 'default')}")
+        if json_mode_requested:
+            self.logger.debug(f"📋 JSON mode requested - response_format=json_object")
+        
         for attempt in range(max_retries + 2):  # +2 for fallback attempt
             try:
+                # Log attempt start with detailed info
+                current_temp = api_kwargs.get('temperature', 'default')
+                max_attempts = max_retries + 2
+                self.logger.info(f"🔄 REQUEST START - {current_model} (attempt {attempt + 1}/{max_attempts}) - temp={current_temp}")
+                
                 # Make the API call
                 response = await current_provider_client.chat.completions.create(
                     messages=modified_messages,
@@ -381,6 +391,12 @@ class Elelem:
                 # Calculate final duration
                 duration = time.time() - start_time
                 
+                # Log successful response
+                self.logger.info(f"✅ REQUEST SUCCESS - {current_model} in {duration:.2f}s")
+                self.logger.debug(f"📊 Token usage - Input: {total_input_tokens}, Output: {total_output_tokens} tokens")
+                if total_reasoning_tokens > 0:
+                    self.logger.debug(f"🧠 Reasoning tokens used: {total_reasoning_tokens}")
+                
                 # Update statistics with accumulated tokens
                 self._update_statistics(current_model, total_input_tokens, total_output_tokens, 
                                       total_reasoning_tokens, duration, tags)
@@ -448,3 +464,30 @@ class Elelem:
             }
         
         return dict(self._tag_statistics[tag])
+        
+    def list_models(self) -> Dict[str, Any]:
+        """List all available models in OpenAI-compatible format.
+        
+        Returns a response matching OpenAI's GET /v1/models endpoint but with
+        an additional 'available' field indicating if the provider's API key is present.
+        """
+        models_list = []
+        
+        for model_key, model_config in MODELS.items():
+            provider = model_config.get("provider", "unknown")
+            # Check if API key is available for this provider
+            env_var = f"{provider.upper()}_API_KEY"
+            is_available = provider in self._providers
+            
+            models_list.append({
+                "id": model_key,
+                "object": "model", 
+                "created": 1677610602,  # Fixed timestamp like OpenAI
+                "owned_by": provider,
+                "available": is_available  # Elelem-specific field
+            })
+        
+        return {
+            "object": "list",
+            "data": sorted(models_list, key=lambda x: x["id"])
+        }

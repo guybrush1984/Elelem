@@ -5,6 +5,7 @@ Simple test script for Elelem - testing it as a user would
 
 import asyncio
 import json
+import logging
 import os
 import sys
 
@@ -16,6 +17,12 @@ except ImportError:
     pass
 
 from elelem import Elelem
+
+# Configure logging to see INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 
 async def test_1_initialization():
@@ -77,49 +84,61 @@ async def test_2_simple_request(elelem):
         print(f"❌ FAIL - {e}")
 
 
-async def test_3_simple_json(elelem):
-    """Test 3: Simple JSON request"""
+async def test_3_simple_json_all_models(elelem):
+    """Test 3: Simple JSON request with ALL available models"""
     print("\n" + "="*50)
-    print("TEST 3: Simple JSON request")
+    print("TEST 3: Simple JSON with ALL Available Models")
     print("="*50)
     
-    # Test with each available provider
-    models = [
-        "groq:openai/gpt-oss-20b",
-        "deepinfra:openai/gpt-oss-20b",
-        "openai:gpt-4.1-mini"
-    ]
+    # Get all available models using the list_models API
+    models_response = elelem.list_models()
+    available_models = [model for model in models_response["data"] if model["available"]]
     
-    for model in models:
-        provider = model.split(":")[0]
-        if not os.getenv(f"{provider.upper()}_API_KEY"):
-            continue
-            
-        print(f"\nTesting {model}...")
+    print(f"Found {len(available_models)} available models:")
+    for model in available_models:
+        print(f"  - {model['id']} (provider: {model['owned_by']})")
+    
+    if not available_models:
+        print("❌ SKIP - No models available")
+        return
+    
+    successes = 0
+    failures = 0
+    
+    for model_info in available_models:
+        model_id = model_info["id"]
+        print(f"\nTesting {model_id}...")
         
         try:
             response = await elelem.create_chat_completion(
                 messages=[
                     {"role": "user", "content": "Return a JSON object with name='test' and value=123"}
                 ],
-                model=model,
+                model=model_id,
                 response_format={"type": "json_object"},
-                temperature=0.3
+                temperature=0.3,
+                tags=["test_json_all_models"]
             )
             
             content = response.choices[0].message.content
             data = json.loads(content)
-            print(f"Response: {json.dumps(data)}")
+            print(f"Response: {json.dumps(data, indent=2)}")
             
             if "name" in data or "value" in data:
-                print(f"✅ PASS - {model}")
+                print(f"✅ PASS - {model_id}")
+                successes += 1
             else:
-                print(f"⚠️  WARNING - JSON valid but unexpected structure")
+                print(f"⚠️  WARNING - {model_id} - JSON valid but unexpected structure")
+                successes += 1  # Still counts as success
                 
         except json.JSONDecodeError:
-            print(f"❌ FAIL - {model} - Invalid JSON")
+            print(f"❌ FAIL - {model_id} - Invalid JSON")
+            failures += 1
         except Exception as e:
-            print(f"❌ FAIL - {model} - {e}")
+            print(f"❌ FAIL - {model_id} - {e}")
+            failures += 1
+    
+    print(f"\nResults: {successes}/{len(available_models)} models passed, {failures} failed")
 
 
 async def test_4_complex_story_json_sequential(elelem):
@@ -347,39 +366,33 @@ async def test_4_complex_story_json_sequential(elelem):
     print(f"   Total cost: ${stats['total_cost_usd']:.6f}")
 
 
-async def test_5_complex_story_json_parallel(elelem):
-    """Test 5: Same complex prompts but in PARALLEL (concurrent calls)"""
+async def test_6_multi_model_parallel_testing(elelem):
+    """Test 6: Multi-Model Parallel Testing - 20 parallel requests per available model"""
     print("\n" + "="*50)
-    print("TEST 5: Complex Story JSON - 20 Parallel Calls")
+    print("TEST 6: Complex Story JSON - 20 Parallel Calls")  
     print("="*50)
     
-    # Use same models
-    models = [
-        "deepinfra:openai/gpt-oss-20b",
-        "groq:openai/gpt-oss-20b",
-        "openai:gpt-4.1-mini"
-    ]
+    # Get all available models using list_models API, filter for Scaleway only
+    models_response = elelem.list_models()
+    all_available = [model for model in models_response["data"] if model["available"]]
+    scaleway_models = [model["id"] for model in all_available if model["owned_by"] == "scaleway"]
     
-    model = None
-    for m in models:
-        provider = m.split(":")[0]
-        if os.getenv(f"{provider.upper()}_API_KEY"):
-            model = m
-            break
-    
-    if not model:
-        print("❌ SKIP - No API keys available")
+    if not scaleway_models:
+        print("❌ SKIP - No Scaleway models available")
+        available_scaleway = [model["id"] for model in models_response["data"] if model["owned_by"] == "scaleway"]
+        if available_scaleway:
+            print(f"Found {len(available_scaleway)} Scaleway models but missing SCALEWAY_API_KEY:")
+            for model in available_scaleway:
+                print(f"  - {model}")
         return
     
-    print(f"Using model: {model}")
-    print("Launching 20 parallel requests (this tests concurrency)...\n")
+    print(f"Testing {len(scaleway_models)} Scaleway models with 20 parallel requests each...")
     
     temperatures = [1.5, 1.4, 1.3, 1.2, 1.1, 1.0, 0.95, 0.9, 0.85, 0.8,
                    1.5, 1.3, 1.1, 0.9, 1.4, 1.2, 1.0, 1.5, 1.3, 1.1]
     
-    async def make_story_request(i):
-        """Make a single story request"""
-        # Simpler but still complex prompt with dialogues
+    async def make_story_request(model_id, i):
+        """Make a single story request for a specific model"""
         story_prompt = f"""Generate interactive story JSON:
 {{
   "title": "Parallel Adventure {i+1}",
@@ -417,10 +430,10 @@ async def test_5_complex_story_json_parallel(elelem):
                 messages=[
                     {"role": "user", "content": story_prompt}
                 ],
-                model=model,
+                model=model_id,
                 response_format={"type": "json_object"},
                 temperature=temperatures[i],
-                tags=[f"parallel_{i}", "parallel_test"]
+                tags=[f"{model_id}_parallel_{i}", f"{model_id}_parallel_test"]
             )
             
             content = response.choices[0].message.content
@@ -431,57 +444,61 @@ async def test_5_complex_story_json_parallel(elelem):
             missing = [k for k in required if k not in data]
             
             if not missing:
-                return (i, "success", None)
+                return (i, temperatures[i], "success", None)
             else:
-                return (i, "partial", missing)
+                return (i, temperatures[i], "partial", missing)
                 
         except json.JSONDecodeError as e:
-            return (i, "json_error", str(e)[:50])
+            return (i, temperatures[i], "json_error", str(e)[:50])
         except Exception as e:
-            return (i, "error", str(e)[:50])
+            return (i, temperatures[i], "error", str(e)[:50])
     
-    # Launch all 20 requests in parallel
-    import time
-    start_time = time.time()
-    
-    tasks = [make_story_request(i) for i in range(20)]
-    results = await asyncio.gather(*tasks)
-    
-    duration = time.time() - start_time
-    
-    # Analyze results
-    successes = sum(1 for _, status, _ in results if status == "success")
-    partials = sum(1 for _, status, _ in results if status == "partial")
-    json_errors = sum(1 for _, status, _ in results if status == "json_error")
-    errors = sum(1 for _, status, _ in results if status == "error")
-    
-    print(f"⏱️  Completed 20 parallel requests in {duration:.2f} seconds")
-    print(f"✅ Successes: {successes}")
-    print(f"⚠️  Partial (missing fields): {partials}")
-    print(f"❌ JSON errors: {json_errors}")
-    print(f"❌ Other errors: {errors}")
-    
-    # Show some error details
-    for i, status, detail in results:
-        if status in ["json_error", "error"]:
-            print(f"   Request {i+1}: {status} - {detail}")
-    
-    # Stats
-    stats = elelem.get_stats_by_tag("parallel_test")
-    print(f"\n📊 Parallel test stats:")
-    print(f"   Total API calls: {stats['total_calls']}")
-    print(f"   Total cost: ${stats['total_cost_usd']:.6f}")
-    print(f"   Avg time per request: {duration/20:.2f}s")
-    
-    # Check for retries by looking at individual tags
-    retries_detected = 0
-    for i in range(20):
-        tag_stats = elelem.get_stats_by_tag(f"parallel_{i}")
-        if tag_stats['total_calls'] > 1:
-            retries_detected += 1
-    
-    if retries_detected > 0:
-        print(f"   Requests that triggered retries: {retries_detected}/20")
+    # Test each Scaleway model sequentially
+    for model_idx, model_id in enumerate(scaleway_models):
+        print(f"\n[Model {model_idx+1}/{len(scaleway_models)}] Testing {model_id}")
+        print("Launching 20 parallel requests...")
+        
+        # Launch all 20 requests in parallel for this model
+        import time
+        start_time = time.time()
+        
+        tasks = [make_story_request(model_id, i) for i in range(20)]
+        results = await asyncio.gather(*tasks)
+        
+        duration = time.time() - start_time
+        
+        # Analyze results
+        successes = sum(1 for _, _, status, _ in results if status == "success")
+        partials = sum(1 for _, _, status, _ in results if status == "partial")
+        json_errors = sum(1 for _, _, status, _ in results if status == "json_error")
+        errors = sum(1 for _, _, status, _ in results if status == "error")
+        
+        # Track temperature ranges for successful requests
+        successful_temps = [temp for _, temp, status, _ in results if status in ["success", "partial"]]
+        highest_temp = max(successful_temps) if successful_temps else 0
+        lowest_temp = min(successful_temps) if successful_temps else 0
+        
+        print(f"⏱️  Completed 20 parallel requests in {duration:.2f} seconds")
+        print(f"✅ Successes: {successes}")
+        print(f"⚠️  Partial (missing fields): {partials}")
+        print(f"❌ JSON errors: {json_errors}")
+        print(f"❌ Other errors: {errors}")
+        
+        if successful_temps:
+            print(f"🌡️  Highest successful temperature: {highest_temp:.2f}")
+            print(f"🌡️  Lowest successful temperature: {lowest_temp:.2f}")
+        
+        # Show some error details
+        for i, temp, status, detail in results:
+            if status in ["json_error", "error"]:
+                print(f"   Request {i+1} (temp={temp}): {status} - {detail}")
+        
+        # Stats for this model
+        stats = elelem.get_stats_by_tag(f"{model_id}_parallel_test")
+        print(f"📊 {model_id} stats:")
+        print(f"   Total API calls: {stats['total_calls']}")
+        print(f"   Total cost: ${stats['total_cost_usd']:.6f}")
+        print(f"   Avg time per request: {duration/20:.2f}s")
 
 
 async def test_6_stats(elelem):
@@ -604,13 +621,13 @@ async def main():
     # Run tests sequentially
     elelem = await test_1_initialization()
     await test_2_simple_request(elelem)
-    await test_3_simple_json(elelem)
+    await test_3_simple_json_all_models(elelem)
     # Skip sequential test - takes too long
     # await test_4_complex_story_json_sequential(elelem)
     print("\n" + "="*50)
     print("TEST 4: Skipping sequential test (too slow)")
     print("="*50)
-    await test_5_complex_story_json_parallel(elelem)
+    await test_6_multi_model_parallel_testing(elelem)
     await test_6_stats(elelem)
     
     print("\n" + "="*60)

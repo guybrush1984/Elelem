@@ -23,6 +23,11 @@
             "endpoint": "https://api.deepinfra.com/v1/openai",
             "fallback_model": "deepinfra:gpt-oss-120b",
             "default_params": {}
+        },
+        "scaleway": {
+            "endpoint": "https://api.scaleway.ai/v1",
+            "fallback_model": "scaleway:gpt-oss-120b",
+            "default_params": {}
         }
     },
     "timeout_seconds": 120,

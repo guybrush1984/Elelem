@@ -385,7 +385,8 @@ class Elelem:
                 self._update_statistics(current_model, total_input_tokens, total_output_tokens, 
                                       total_reasoning_tokens, duration, tags)
                 
-                # Update response with cleaned content and return original object
+                # Update response with cleaned content
+                # This modifies the original response object to have the cleaned content
                 response.choices[0].message.content = content
                 
                 # TODO: Override usage stats with accumulated tokens from all retry attempts
@@ -393,26 +394,9 @@ class Elelem:
                 # but we should show total_input_tokens, total_output_tokens, total_reasoning_tokens
                 # from ALL attempts (including failed retries)
                 
-                # Create object with .choices attribute containing dict for Fable compatibility
-                # Fable expects response.choices[0]["message"]["content"] 
-                class ResponseWrapper:
-                    def __init__(self, original_response, cleaned_content):
-                        # Copy all original attributes
-                        for attr in dir(original_response):
-                            if not attr.startswith('_'):
-                                setattr(self, attr, getattr(original_response, attr))
-                        
-                        # Override choices to be list of dicts (not objects)
-                        self.choices = [{
-                            "message": {
-                                "content": cleaned_content,
-                                "role": original_response.choices[0].message.role
-                            },
-                            "finish_reason": original_response.choices[0].finish_reason,
-                            "index": original_response.choices[0].index if hasattr(original_response.choices[0], 'index') else 0
-                        }]
-                
-                return ResponseWrapper(response, content)
+                # Return the original OpenAI-style response object
+                # Users access it like: response.choices[0].message.content
+                return response
                 
             except Exception as e:
                 # Extract tokens even from failed calls if available

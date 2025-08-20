@@ -1,10 +1,11 @@
 # Elelem
 
-Elelem is a unified API wrapper for OpenAI, GROQ, and DeepInfra APIs, specifically designed for JSON output generation with comprehensive cost tracking, retry logic, and error handling.
+Elelem is a unified API wrapper for OpenAI, GROQ, and DeepInfra APIs, specifically designed for JSON output generation with comprehensive cost tracking, retry logic, and error handling. It provides a fully OpenAI-compatible response format, making it a drop-in replacement for the OpenAI Python SDK.
 
 ## Features
 
 - 🔧 **Unified Interface**: Single API for OpenAI, GROQ, and DeepInfra models
+- 🎯 **OpenAI Compatible**: Drop-in replacement with identical response format
 - 💰 **Cost Tracking**: Precise token and cost tracking with tag-based categorization
 - 🔄 **Retry Logic**: Automatic JSON validation and retry with temperature adjustment
 - ⚡ **Rate Limit Handling**: Exponential backoff for rate limit errors
@@ -51,8 +52,8 @@ async def main():
         tags=["example"]
     )
     
-    # Access response content
-    content = response.choices[0]["message"]["content"]
+    # Access response content (OpenAI-compatible format)
+    content = response.choices[0].message.content
     print(content)
     
     # Get usage statistics

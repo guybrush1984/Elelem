@@ -69,7 +69,7 @@ async def test_2_simple_request(elelem):
             temperature=0.1
         )
         
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
         print(f"Response: {content}")
         print("✅ PASS")
         
@@ -107,7 +107,7 @@ async def test_3_simple_json(elelem):
                 temperature=0.3
             )
             
-            content = response["choices"][0]["message"]["content"]
+            content = response.choices[0].message.content
             data = json.loads(content)
             print(f"Response: {json.dumps(data)}")
             
@@ -311,7 +311,7 @@ async def test_4_complex_story_json_sequential(elelem):
             stats_after = elelem.get_stats_by_tag("sequential_test")
             attempts = stats_after['total_calls'] - stats_before['total_calls']
             
-            content = response["choices"][0]["message"]["content"]
+            content = response.choices[0].message.content
             
             # Show first 50 chars of response for debugging
             preview = content[:50] + "..." if len(content) > 50 else content
@@ -423,7 +423,7 @@ async def test_5_complex_story_json_parallel(elelem):
                 tags=[f"parallel_{i}", "parallel_test"]
             )
             
-            content = response["choices"][0]["message"]["content"]
+            content = response.choices[0].message.content
             data = json.loads(content)
             
             # Check if valid
@@ -559,7 +559,13 @@ async def test_6_stats(elelem):
         assert stats['total_tokens'] == stats['total_input_tokens'] + stats['total_output_tokens'], "Token math should be consistent"
         
         # Verify cost consistency
-        assert stats['total_cost_usd'] == stats['total_input_cost_usd'] + stats['total_output_cost_usd'], "Cost math should be consistent"
+        # Note: reasoning_cost_usd is already included in output_cost_usd (not a separate cost)
+        expected_total = stats['total_input_cost_usd'] + stats['total_output_cost_usd']
+        actual_total = stats['total_cost_usd']
+        
+        # Allow small floating point differences
+        cost_diff = abs(expected_total - actual_total)
+        assert cost_diff < 0.000001, f"Cost math should be consistent (diff: {cost_diff:.10f})"
         
         if stats.get('reasoning_tokens', 0) > 0:
             print(f"  Reasoning tokens: {stats['reasoning_tokens']}")

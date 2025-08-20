@@ -1,10 +1,10 @@
 # Elelem
 
-Elelem is a unified API wrapper for OpenAI, GROQ, and DeepInfra APIs, specifically designed for JSON output generation with comprehensive cost tracking, retry logic, and error handling. It provides a fully OpenAI-compatible response format, making it a drop-in replacement for the OpenAI Python SDK.
+Elelem is a unified API wrapper for OpenAI, GROQ, DeepInfra, and Scaleway APIs, specifically designed for JSON output generation with comprehensive cost tracking, retry logic, and error handling. It provides a fully OpenAI-compatible response format, making it a drop-in replacement for the OpenAI Python SDK.
 
 ## Features
 
-- 🔧 **Unified Interface**: Single API for OpenAI, GROQ, and DeepInfra models
+- 🔧 **Unified Interface**: Single API for OpenAI, GROQ, DeepInfra, and Scaleway models
 - 🎯 **OpenAI Compatible**: Drop-in replacement with identical response format
 - 💰 **Cost Tracking**: Precise token and cost tracking with tag-based categorization
 - 🔄 **Retry Logic**: Automatic JSON validation and retry with temperature adjustment
@@ -47,7 +47,7 @@ async def main():
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Generate a JSON object with sample data."}
         ],
-        model="openai:gpt-4.1-mini",
+        model="scaleway:gemma-3-27b-it",  # or "openai:gpt-4.1-mini"
         response_format={"type": "json_object"},
         tags=["example"]
     )
@@ -76,6 +76,7 @@ Set up your API keys as environment variables:
 export OPENAI_API_KEY="your-openai-key"
 export GROQ_API_KEY="your-groq-key"
 export DEEPINFRA_API_KEY="your-deepinfra-key"
+export SCALEWAY_API_KEY="your-scaleway-key"
 ```
 
 ## Supported Models
@@ -102,6 +103,14 @@ export DEEPINFRA_API_KEY="your-deepinfra-key"
 - `deepinfra:meta-llama/Llama-4-Scout-17B-16E-Instruct` - Llama 4 Scout
 - `deepinfra:moonshotai/Kimi-K2-Instruct` - Kimi K2 via DeepInfra
 - `deepinfra:deepseek-ai/DeepSeek-R1-0528` - DeepSeek reasoning model
+
+### Scaleway Models
+- `scaleway:gpt-oss-120b` - Large open-source GPT model (€0.15/€0.60 per 1M tokens)
+- `scaleway:gemma-3-27b-it` - Google Gemma 3 27B instruct model (€0.25/€0.50 per 1M tokens)
+- `scaleway:mistral-small-3.2-24b-instruct-2506` - Mistral Small 3.2 24B (€0.15/€0.35 per 1M tokens)
+- `scaleway:qwen3-235b-a22b-instruct-2507` - Qwen 3 235B instruct model (€0.75/€2.25 per 1M tokens)
+
+**Note:** Scaleway models are hosted in European data centers with competitive EUR pricing. Prices shown are converted to USD at ~1.07 rate for cost tracking.
 
 ## API Reference
 
@@ -136,6 +145,15 @@ Returns usage statistics filtered by a specific tag.
 
 **Returns:**
 - Dictionary with tag-specific statistics
+
+#### `list_models()`
+
+Returns all available models in OpenAI-compatible format.
+
+**Returns:**
+- Dictionary with `object: "list"` and `data` array containing model information
+- Each model includes `id`, `object`, `created`, `owned_by`, and `available` fields
+- `available` field indicates whether the provider's API key is configured
 
 ## Special Features
 

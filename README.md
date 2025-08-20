@@ -205,25 +205,6 @@ Elelem follows a modular architecture:
 - **config.py**: Configuration management
 - **config.json**: Default configuration settings
 
-## Integration Notes
-
-### Fable Integration
-Elelem is designed to be a drop-in replacement for existing LLM integrations:
-
-```python
-# Before (Fable-specific)
-from engine.elelem_singleton import get_elelem
-elelem = get_elelem()
-
-# After (standalone package)
-from elelem import Elelem
-elelem = Elelem()
-
-# API remains identical
-response = await elelem.create_chat_completion(...)
-stats = elelem.get_stats_by_tag("story_generation")
-```
-
 ### Backwards Compatibility
 - All existing API calls work without modification
 - Statistics structure matches exactly

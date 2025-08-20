@@ -37,7 +37,7 @@ MODELS = {
         "model_id": "gpt-5",
         "capabilities": {
             "supports_json_mode": True,
-            "supports_temperature": True,
+            "supports_temperature": False,  # Only supports default temperature (1)
             "supports_system": True
         },
         "cost": {
@@ -51,7 +51,7 @@ MODELS = {
         "model_id": "gpt-5-mini",
         "capabilities": {
             "supports_json_mode": True,
-            "supports_temperature": True,
+            "supports_temperature": False,  # Only supports default temperature (1)
             "supports_system": True
         },
         "cost": {
@@ -237,6 +237,64 @@ MODELS = {
         "cost": {
             "input_cost_per_1m": 0.50,
             "output_cost_per_1m": 2.15,
+            "currency": "USD"
+        }
+    },
+    
+    # Scaleway Models (European data centers, EUR pricing converted to USD ~1.07 rate)
+    "scaleway:gpt-oss-120b": {
+        "provider": "scaleway",
+        "model_id": "gpt-oss-120b",
+        "capabilities": {
+            "supports_json_mode": True,
+            "supports_temperature": True,
+            "supports_system": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.16,   # €0.15 → $0.16 USD
+            "output_cost_per_1m": 0.64,  # €0.60 → $0.64 USD
+            "currency": "USD"
+        }
+    },
+    "scaleway:gemma-3-27b-it": {
+        "provider": "scaleway",
+        "model_id": "gemma-3-27b-it",
+        "capabilities": {
+            "supports_json_mode": True,
+            "supports_temperature": True,
+            "supports_system": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.27,   # €0.25 → $0.27 USD
+            "output_cost_per_1m": 0.53,  # €0.50 → $0.53 USD
+            "currency": "USD"
+        }
+    },
+    "scaleway:mistral-small-3.2-24b-instruct-2506": {
+        "provider": "scaleway",
+        "model_id": "mistral-small-3.2-24b-instruct-2506",
+        "capabilities": {
+            "supports_json_mode": True,
+            "supports_temperature": True,
+            "supports_system": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.16,   # €0.15 → $0.16 USD
+            "output_cost_per_1m": 0.37,  # €0.35 → $0.37 USD
+            "currency": "USD"
+        }
+    },
+    "scaleway:qwen3-235b-a22b-instruct-2507": {
+        "provider": "scaleway",
+        "model_id": "qwen3-235b-a22b-instruct-2507",
+        "capabilities": {
+            "supports_json_mode": True,
+            "supports_temperature": True,
+            "supports_system": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.80,   # €0.75 → $0.80 USD
+            "output_cost_per_1m": 2.40,  # €2.25 → $2.40 USD
             "currency": "USD"
         }
     }

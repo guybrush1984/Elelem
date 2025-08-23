@@ -240,6 +240,45 @@ MODELS = {
             "currency": "USD"
         }
     },
+    "deepinfra:deepseek-ai/DeepSeek-V3.1": {
+        "provider": "deepinfra",
+        "model_id": "deepseek-ai/DeepSeek-V3.1",
+        "capabilities": {
+            "supports_json_mode": False,
+            "supports_temperature": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.30,
+            "output_cost_per_1m": 1.00,
+            "currency": "USD"
+        }
+    },
+    "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Llama-70B": {
+        "provider": "deepinfra",
+        "model_id": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
+        "capabilities": {
+            "supports_json_mode": False,
+            "supports_temperature": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.10,
+            "output_cost_per_1m": 0.40,
+            "currency": "USD"
+        }
+    },
+    "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": {
+        "provider": "deepinfra",
+        "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "capabilities": {
+            "supports_json_mode": False,
+            "supports_temperature": True
+        },
+        "cost": {
+            "input_cost_per_1m": 0.075,
+            "output_cost_per_1m": 0.15,
+            "currency": "USD"
+        }
+    },
     
     # Scaleway Models (European data centers, EUR pricing converted to USD ~1.07 rate)
     "scaleway:gpt-oss-120b": {

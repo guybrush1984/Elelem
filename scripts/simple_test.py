@@ -372,56 +372,124 @@ async def test_6_multi_model_parallel_testing(elelem):
     print("TEST 6: Complex Story JSON - 20 Parallel Calls")  
     print("="*50)
     
-    # Get all available models using list_models API, filter for Scaleway only
-    models_response = elelem.list_models()
-    all_available = [model for model in models_response["data"] if model["available"]]
-    scaleway_models = [model["id"] for model in all_available if model["owned_by"] == "scaleway"]
+    # GROQ models prone to json_validate_failed errors at high temperature
+    test_models = [
+        "groq:openai/gpt-oss-20b"
+    ]
     
-    if not scaleway_models:
-        print("❌ SKIP - No Scaleway models available")
-        available_scaleway = [model["id"] for model in models_response["data"] if model["owned_by"] == "scaleway"]
-        if available_scaleway:
-            print(f"Found {len(available_scaleway)} Scaleway models but missing SCALEWAY_API_KEY:")
-            for model in available_scaleway:
-                print(f"  - {model}")
+    # Filter for available models
+    available_models = []
+    for model in test_models:
+        if os.getenv("GROQ_API_KEY"):
+            available_models.append(model)
+    
+    if not available_models:
+        print("❌ SKIP - No GROQ models available (need GROQ_API_KEY)")
         return
     
-    print(f"Testing {len(scaleway_models)} Scaleway models with 20 parallel requests each...")
+    print(f"Testing {len(available_models)} GROQ models with 20 parallel requests each...")
     
     temperatures = [1.5, 1.4, 1.3, 1.2, 1.1, 1.0, 0.95, 0.9, 0.85, 0.8,
                    1.5, 1.3, 1.1, 0.9, 1.4, 1.2, 1.0, 1.5, 1.3, 1.1]
     
     async def make_story_request(model_id, i):
         """Make a single story request for a specific model"""
-        story_prompt = f"""Generate interactive story JSON:
+        # Complex nested JSON structure prone to validation errors at high temperature
+        story_prompt = f"""Generate this EXACT complex interactive story JSON with deeply nested dialogue and intricate character details:
 {{
-  "title": "Parallel Adventure {i+1}",
-  "dialogues": [
-    {{
-      "speaker": "Hero_{i}",
-      "text": "I can't believe we found the {['treasure', 'portal', 'crystal', 'artifact', 'secret'][i % 5]}! But wait, there's something strange about it...",
-      "emotion": "excited but worried"
+  "epic_story_title": "The Ultimate Quest #{i+1}: Chronicles of the Ancient Realm",
+  "complex_character_system": {{
+    "primary_hero": {{
+      "name": "Hero_{i}_the_Brave_Explorer",
+      "detailed_dialogue": "Listen carefully, brave companions! The ancient prophecy speaks of this moment: \\"When the crimson moon aligns with the Crystal of Infinite Power, a chosen hero shall declare these sacred words: 'I choose courage over comfort, wisdom over wealth, and friendship over fame!' But wait... do you hear those mysterious voices echoing from the forbidden caverns below? They sound like they're calling for help!\\"",
+      "emotional_complexity": {{
+        "primary_state": "determined yet frightened",
+        "internal_thoughts": "Even though I'm terrified of failing everyone who believes in me, I understand that true courage isn't about not being scared - it's about doing what's right despite the fear",
+        "voice_directions": {{
+          "tone": "whispered determination building to confident proclamation",
+          "delivery": "start softly, emphasize the prophecy quote, pause dramatically before the question",
+          "background_ambiance": "wind whistling through ancient stone corridors with distant magical chimes"
+        }}
+      }}
     }},
-    {{
-      "speaker": "Villain_{i}",
-      "text": "Ha! You think you've won? This is only the beginning! The real {['challenge', 'mystery', 'danger', 'puzzle', 'test'][i % 5]} starts now!",
-      "emotion": "menacing"
+    "primary_antagonist": {{
+      "identity": "The Misunderstood Guardian of Forbidden Secrets", 
+      "complex_speech": "Foolish mortals! You dare enter my sacred domain? For over 500 years I have protected these dangerous mysteries from those who would abuse them! Every so-called 'hero' who came before spoke the exact same words: \\"We're here to help!\\" But they ALL abandoned me when the trials became difficult. They ALL broke their sacred promises and left me alone! Tell me, young ones, why should THIS time be any different?!",
+      "hidden_vulnerability": {{
+        "true_emotion": "centuries of loneliness disguised as righteous anger",
+        "secret_desire": "desperately wants someone to understand their noble sacrifice and stay as a true friend",
+        "redemption_trigger": "when someone offers genuine companionship without expecting anything in return"
+      }}
     }},
-    {{
-      "speaker": "Sidekick_{i}",
-      "text": "Don't listen to them! We've come too far to give up now. Remember: '{['courage conquers fear', 'friendship is power', 'wisdom guides us', 'hope never dies', 'truth prevails'][i % 5]}'",
-      "emotion": "encouraging"
+    "loyal_companion": {{
+      "name": "Whiskers_the_Ancient_Wise_Cat",
+      "inspirational_wisdom": "My dearest friend, I see the doubt clouding your brave heart, but remember the words your beloved grandmother always shared: \\"The most powerful magic in all the mystical realms isn't found in ancient spells or legendary artifacts - it lives in the unbreakable bonds between true friends!\\" You possess more of that rare magic than anyone I've encountered in my many lifetimes.",
+      "special_abilities": ["can sense the deepest emotions of any living being", "sees through all illusions to reveal hidden truths", "remembers every act of kindness ever performed"]
     }}
+  }},
+  "intricate_plot_structure": {{
+    "surface_quest": "Locate the Lost Crystal of Infinite Wisdom to restore harmony to the enchanted kingdom",
+    "deeper_meaning": "Actually a journey about discovering that genuine power comes from helping others rather than controlling them",
+    "hidden_lesson": "The most dangerous enemy is often simply someone who desperately needs a friend",
+    "climactic_decision": {{
+      "moral_dilemma": "Hero must choose between taking the easy path to victory or staying to help the lonely guardian find peace",
+      "internal_struggle": "This is so much harder than I imagined. Part of me wants to just complete the quest and go home. But I know that real heroes don't abandon people who need them most.",
+      "resolution_dialogue": "\\"I understand now - you're not evil, you're just heartbroken and alone. The real treasure isn't this magical crystal - it's the friendship we could share.\\" *extends hand in genuine friendship* \\"Will you give me the chance to prove that this time really can be different?\\""
+    }}
+  }},
+  "interactive_choice_system": {{
+    "critical_moment": "Standing before the ancient guardian with destiny hanging in the balance",
+    "path_options": [
+      {{
+        "choice_name": "Courageous Compassion",
+        "description": "Step forward with an open heart and offer understanding",
+        "consequences": "Most challenging path but leads to the deepest transformation for everyone involved",
+        "character_growth": "Hero becomes a champion of the misunderstood and lonely"
+      }},
+      {{
+        "choice_name": "Strategic Wisdom", 
+        "description": "Gather more information and seek a careful, balanced solution",
+        "consequences": "Safer approach but potentially misses opportunities for profound change",
+        "character_growth": "Hero develops into a thoughtful leader who considers all perspectives"
+      }},
+      {{
+        "choice_name": "Creative Innovation",
+        "description": "Invent a completely new approach that no one has ever tried before", 
+        "consequences": "Unprecedented results that surprise everyone and reshape the entire realm",
+        "character_growth": "Hero transforms into a visionary innovator who creates new possibilities"
+      }}
+    ]
+  }},
+  "rich_world_details": {{
+    "mystical_location": "The Sanctuary of Whispering Crystal Formations",
+    "atmospheric_description": "The very air shimmers with ancient magic and untold stories, while crystalline structures hum with otherworldly melodies that respond to the emotions of visitors",
+    "sensory_experience": {{
+      "visual_elements": "Everything glows with a soft rainbow aurora that shifts and changes with the characters' feelings",
+      "audio_landscape": "Whispered conversations between ancient spirits blend with melodic chimes that echo heartbeats",
+      "emotional_atmosphere": "Simultaneously ancient and timeless, mysterious yet familiar, scary but also deeply comforting"
+    }},
+    "magical_principles": {{
+      "power_source": "Magic flows from emotional authenticity - the more genuine the feeling, the stronger the enchantment",
+      "unique_properties": "Thoughts become visible as glowing whispers, memories can be shared through crystal touch",
+      "ethical_limitations": "Selfish intentions cause the magical light to dim, while lies create painful discord in the harmony"
+    }}
+  }},
+  "educational_themes": [
+    "Empathy and understanding can transform the bitterest enemies into the truest friends",
+    "Real courage means choosing to do what's right even when it's difficult or scary",
+    "Every person has a meaningful story that explains their actions and deserves to be heard with compassion"
   ],
-  "choices": [
-    {{"id": "a{i}", "text": "Confront the villain", "risk": "high"}},
-    {{"id": "b{i}", "text": "Study the artifact", "risk": "medium"}},
-    {{"id": "c{i}", "text": "Retreat and regroup", "risk": "low"}}
-  ],
-  "metadata": {{
-    "chapter": {i+1},
-    "word_count": {150 + i * 10},
-    "difficulty_level": {0.5 + (i % 5) * 0.1}
+  "technical_metadata": {{
+    "complexity_rating": 9.7,
+    "estimated_duration": {45 + i * 3} minutes,
+    "target_audience": ["ages 8-14", "families", "educators"],
+    "narrative_themes": ["friendship", "courage", "understanding", "redemption", "personal growth"],
+    "generation_parameters": {{
+      "temperature_used": {temperatures[i]},
+      "model_tested": "{model_id}",
+      "request_number": {i+1},
+      "parallel_batch": "test_fallback_system"
+    }}
   }}
 }}"""
         
@@ -440,7 +508,7 @@ async def test_6_multi_model_parallel_testing(elelem):
             data = json.loads(content)
             
             # Check if valid
-            required = ["title", "dialogues", "choices", "metadata"]
+            required = ["epic_story_title", "complex_character_system", "intricate_plot_structure", "interactive_choice_system"]
             missing = [k for k in required if k not in data]
             
             if not missing:
@@ -453,9 +521,9 @@ async def test_6_multi_model_parallel_testing(elelem):
         except Exception as e:
             return (i, temperatures[i], "error", str(e)[:50])
     
-    # Test each Scaleway model sequentially
-    for model_idx, model_id in enumerate(scaleway_models):
-        print(f"\n[Model {model_idx+1}/{len(scaleway_models)}] Testing {model_id}")
+    # Test each GROQ model sequentially
+    for model_idx, model_id in enumerate(available_models):
+        print(f"\n[Model {model_idx+1}/{len(available_models)}] Testing {model_id}")
         print("Launching 20 parallel requests...")
         
         # Launch all 20 requests in parallel for this model
@@ -620,13 +688,13 @@ async def main():
     
     # Run tests sequentially
     elelem = await test_1_initialization()
-    await test_2_simple_request(elelem)
-    await test_3_simple_json_all_models(elelem)
+    #await test_2_simple_request(elelem)
+    #await test_3_simple_json_all_models(elelem)
     # Skip sequential test - takes too long
     # await test_4_complex_story_json_sequential(elelem)
-    print("\n" + "="*50)
-    print("TEST 4: Skipping sequential test (too slow)")
-    print("="*50)
+    #print("\n" + "="*50)
+    #print("TEST 4: Skipping sequential test (too slow)")
+    #print("="*50)
     await test_6_multi_model_parallel_testing(elelem)
     await test_6_stats(elelem)
     

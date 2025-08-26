@@ -64,7 +64,18 @@ class Elelem:
             "total_duration_seconds": 0.0,
             "avg_duration_seconds": 0.0,
             "reasoning_tokens": 0,
-            "reasoning_cost_usd": 0.0
+            "reasoning_cost_usd": 0.0,
+            "retry_analytics": {
+                "json_parse_retries": 0,
+                "json_schema_retries": 0,
+                "api_json_validation_retries": 0,
+                "rate_limit_retries": 0,
+                "total_retries": 0,
+                "temperature_reductions": 0,
+                "final_failures": 0,
+                "fallback_model_usage": 0,
+                "response_format_removals": 0
+            }
         }
         self._tag_statistics = {}
         
@@ -244,7 +255,18 @@ class Elelem:
                     "total_duration_seconds": 0.0,
                     "avg_duration_seconds": 0.0,
                     "reasoning_tokens": 0,
-                    "reasoning_cost_usd": 0.0
+                    "reasoning_cost_usd": 0.0,
+                    "retry_analytics": {
+                        "json_parse_retries": 0,
+                        "json_schema_retries": 0,
+                        "api_json_validation_retries": 0,
+                        "rate_limit_retries": 0,
+                        "total_retries": 0,
+                        "temperature_reductions": 0,
+                        "final_failures": 0,
+                        "fallback_model_usage": 0,
+                        "response_format_removals": 0
+                    }
                 }
                 
             tag_stats = self._tag_statistics[tag]
@@ -263,6 +285,26 @@ class Elelem:
             if reasoning_tokens > 0:
                 tag_stats["reasoning_tokens"] += reasoning_tokens
                 tag_stats["reasoning_cost_usd"] += costs["reasoning_cost_usd"]
+    
+    def _update_retry_analytics(self, retry_type: str, tags: List[str], count: int = 1):
+        """Update retry analytics for both overall and tag-specific statistics.
+        
+        Args:
+            retry_type: Type of retry ('json_parse_retries', 'json_schema_retries', etc.)
+            tags: List of tags to update
+            count: Number to increment by (default 1)
+        """
+        # Update overall statistics
+        if retry_type in self._statistics["retry_analytics"]:
+            self._statistics["retry_analytics"][retry_type] += count
+            self._statistics["retry_analytics"]["total_retries"] += count
+        
+        # Update tag-specific statistics
+        for tag in tags:
+            if tag in self._tag_statistics:
+                if retry_type in self._tag_statistics[tag]["retry_analytics"]:
+                    self._tag_statistics[tag]["retry_analytics"][retry_type] += count
+                    self._tag_statistics[tag]["retry_analytics"]["total_retries"] += count
     
     def _setup_request(self, model: str, request_id: str, **kwargs) -> tuple[str, str, Any, Dict, Dict, str, bool, Any]:
         """Setup and validate request parameters.
@@ -358,7 +400,7 @@ class Elelem:
     
     def _handle_json_retry(self, e: json.JSONDecodeError, attempt: int, max_retries: int, 
                           request_id: str, api_kwargs: Dict, original_temperature: float,
-                          temperature_reductions: List[float], min_temp: float) -> tuple[bool, float]:
+                          temperature_reductions: List[float], min_temp: float, tags: List[str]) -> tuple[bool, float]:
         """Handle JSON validation retry logic.
         
         Returns:
@@ -373,13 +415,22 @@ class Elelem:
                 
             api_kwargs["temperature"] = new_temp
             
-            # Log appropriate message based on error type
+            # Track temperature reduction
+            self._update_retry_analytics("temperature_reductions", tags)
+            
+            # Log appropriate message based on error type and track retry type
             if "JSON schema validation failed" in str(e):
+                self._update_retry_analytics("json_schema_retries", tags)
                 self.logger.warning(
                     f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
                     f"Retrying with temperature {new_temp}: {str(e)[:100]}..."
                 )
             else:
+                # Could be API JSON validation or client-side parse failure
+                if "API JSON validation failed" in str(e):
+                    self._update_retry_analytics("api_json_validation_retries", tags)
+                else:
+                    self._update_retry_analytics("json_parse_retries", tags)
                 self.logger.warning(
                     f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
                     f"Retrying with temperature {new_temp}: {str(e)[:50]}..."
@@ -389,7 +440,7 @@ class Elelem:
     
     def _handle_fallback_strategies(self, attempt: int, max_retries: int, request_id: str,
                                    api_kwargs: Dict, original_temperature: float,
-                                   current_model: str, provider_name: str) -> tuple[bool, str, str, Any]:
+                                   current_model: str, provider_name: str, tags: List[str]) -> tuple[bool, str, str, Any]:
         """Handle fallback strategies when retries are exhausted.
         
         Returns:
@@ -398,6 +449,7 @@ class Elelem:
         if attempt == max_retries:
             # Try removing response_format first if still present
             if "response_format" in api_kwargs:
+                self._update_retry_analytics("response_format_removals", tags)
                 self.logger.warning(
                     f"[{request_id}] JSON validation failed after {max_retries + 1} attempts with {current_model}. "
                     f"Removing response_format and retrying with text parsing."
@@ -411,6 +463,7 @@ class Elelem:
                 # Try fallback model as last resort
                 fallback_model = self.config.get_fallback_model(provider_name)
                 if fallback_model and fallback_model != current_model:
+                    self._update_retry_analytics("fallback_model_usage", tags)
                     self.logger.warning(
                         f"[{request_id}] JSON validation failed after format removal. "
                         f"Trying fallback model: {fallback_model}"
@@ -541,7 +594,7 @@ class Elelem:
                         # Handle JSON validation retry
                         should_continue, new_temp = self._handle_json_retry(
                             e, attempt, max_retries, request_id, api_kwargs, 
-                            original_temperature, temperature_reductions, min_temp)
+                            original_temperature, temperature_reductions, min_temp, tags)
                         
                         if should_continue:
                             continue
@@ -549,11 +602,13 @@ class Elelem:
                             # Try fallback strategies
                             should_continue, current_model, current_model_name, current_provider_client = self._handle_fallback_strategies(
                                 attempt, max_retries, request_id, api_kwargs, 
-                                original_temperature, current_model, provider_name)
+                                original_temperature, current_model, provider_name, tags)
                             
                             if should_continue:
                                 continue
                             else:
+                                # Track final failure
+                                self._update_retry_analytics("final_failures", tags)
                                 raise ValueError(f"Failed to generate valid JSON after all retries including fallback: {e}")
                 
                 # Calculate final duration
@@ -589,6 +644,8 @@ class Elelem:
                     max_rate_retries = self.config.retry_settings["max_rate_limit_retries"]
                     
                     if attempt < max_rate_retries:
+                        # Track rate limit retry
+                        self._update_retry_analytics("rate_limit_retries", tags)
                         wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
                         self.logger.warning(
                             f"[{request_id}] Rate limit hit (attempt {attempt + 1}/{max_rate_retries + 1}). "
@@ -621,7 +678,18 @@ class Elelem:
                 "total_duration_seconds": 0.0,
                 "avg_duration_seconds": 0.0,
                 "reasoning_tokens": 0,
-                "reasoning_cost_usd": 0.0
+                "reasoning_cost_usd": 0.0,
+                "retry_analytics": {
+                    "json_parse_retries": 0,
+                    "json_schema_retries": 0,
+                    "api_json_validation_retries": 0,
+                    "rate_limit_retries": 0,
+                    "total_retries": 0,
+                    "temperature_reductions": 0,
+                    "final_failures": 0,
+                    "fallback_model_usage": 0,
+                    "response_format_removals": 0
+                }
             }
         
         return dict(self._tag_statistics[tag])

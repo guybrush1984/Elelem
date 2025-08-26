@@ -734,15 +734,27 @@ Make this story absolutely CHAOTIC and mind-bendingly complex: featuring time-tr
         
         # Summary for this model
         stats = elelem.get_stats_by_tag(f"schema_loop_{model}")
+        retry_analytics = stats.get('retry_analytics', {})
+        
         print(f"\n📊 {model} Results:")
         print(f"   Successes: {successes}/10")
         print(f"   Total API calls: {stats['total_calls']} (avg {stats['total_calls']/10:.1f} per request)")
         print(f"   Total cost: ${stats['total_cost_usd']:.6f}")
         
-        if stats['total_calls'] > 10:
-            print(f"   🎯 Schema validation retries detected! ({stats['total_calls']} total API calls > 10 requests)")
+        # Display retry analytics
+        print(f"\n🔄 Retry Analytics:")
+        print(f"   JSON schema retries: {retry_analytics.get('json_schema_retries', 0)}")
+        print(f"   JSON parse retries: {retry_analytics.get('json_parse_retries', 0)}")
+        print(f"   API JSON validation retries: {retry_analytics.get('api_json_validation_retries', 0)}")
+        print(f"   Temperature reductions: {retry_analytics.get('temperature_reductions', 0)}")
+        print(f"   Response format removals: {retry_analytics.get('response_format_removals', 0)}")
+        print(f"   Final failures: {retry_analytics.get('final_failures', 0)}")
+        print(f"   Total retries: {retry_analytics.get('total_retries', 0)}")
+        
+        if retry_analytics.get('total_retries', 0) > 0:
+            print(f"   🎯 Retry analytics working! Detected {retry_analytics.get('total_retries', 0)} total retry events")
         else:
-            print(f"   ⚠️  All requests succeeded on first try ({stats['total_calls']} calls = 10 requests)")
+            print(f"   ⚠️  No retries detected in analytics")
         
         print(f"\n\n\n--- Intentional Schema Mismatch Test (1 attempt with {model}) ---")
         try:
@@ -842,6 +854,7 @@ async def test_6_stats(elelem):
         # Overall statistics
         print("\nOverall statistics:")
         stats = elelem.get_stats()
+        retry_analytics = stats.get('retry_analytics', {})
         
         print(f"  Total calls: {stats['total_calls']}")
         print(f"  Total input tokens: {stats['total_input_tokens']}")
@@ -849,6 +862,18 @@ async def test_6_stats(elelem):
         print(f"  Total tokens: {stats['total_tokens']}")
         print(f"  Total cost: ${stats['total_cost_usd']:.6f}")
         print(f"  Avg duration: {stats['avg_duration_seconds']:.2f}s")
+        
+        # Display overall retry analytics
+        print(f"\n  🔄 Overall Retry Analytics:")
+        print(f"    JSON schema retries: {retry_analytics.get('json_schema_retries', 0)}")
+        print(f"    JSON parse retries: {retry_analytics.get('json_parse_retries', 0)}")
+        print(f"    API JSON validation retries: {retry_analytics.get('api_json_validation_retries', 0)}")
+        print(f"    Rate limit retries: {retry_analytics.get('rate_limit_retries', 0)}")
+        print(f"    Temperature reductions: {retry_analytics.get('temperature_reductions', 0)}")
+        print(f"    Response format removals: {retry_analytics.get('response_format_removals', 0)}")
+        print(f"    Fallback model usage: {retry_analytics.get('fallback_model_usage', 0)}")
+        print(f"    Final failures: {retry_analytics.get('final_failures', 0)}")
+        print(f"    Total retries: {retry_analytics.get('total_retries', 0)}")
         
         # Verify token consistency
         assert stats['total_tokens'] == stats['total_input_tokens'] + stats['total_output_tokens'], "Token math should be consistent"
@@ -898,15 +923,15 @@ async def main():
     
     # Run tests sequentially
     elelem = await test_1_initialization()
-    await test_5_json_schema_validation(elelem)
-    #await test_2_simple_request(elelem)
-    #await test_3_simple_json_all_models(elelem)
+    await test_2_simple_request(elelem)
+    await test_3_simple_json_all_models(elelem)
     # Skip sequential test - takes too long
     # await test_4_complex_story_json_sequential(elelem)
-    #print("\n" + "="*50)
-    #print("TEST 4: Skipping sequential test (too slow)")
-    #print("="*50)
-    #await test_6_multi_model_parallel_testing(elelem)
+    print("\n" + "="*50)
+    print("TEST 4: Skipping sequential test (too slow)")
+    print("="*50)
+    await test_6_multi_model_parallel_testing(elelem)
+    await test_5_json_schema_validation(elelem)
     await test_6_stats(elelem)
     
     print("\n" + "="*60)

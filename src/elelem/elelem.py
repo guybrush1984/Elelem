@@ -264,35 +264,13 @@ class Elelem:
                 tag_stats["reasoning_tokens"] += reasoning_tokens
                 tag_stats["reasoning_cost_usd"] += costs["reasoning_cost_usd"]
     
-    async def create_chat_completion(
-        self,
-        messages: List[Dict[str, str]],
-        model: str,
-        tags: Union[str, List[str]] = [],
-        **kwargs
-    ) -> Dict:
-        """
-        Unified chat completion method matching OpenAI API signature exactly.
+    def _setup_request(self, model: str, request_id: str, **kwargs) -> tuple[str, str, Any, Dict, Dict, str, bool, Any]:
+        """Setup and validate request parameters.
         
-        Args:
-            messages: List of message dictionaries
-            model: Model string in "provider:model" format  
-            tags: Tags for cost tracking (elelem-specific parameter)
-            **kwargs: All OpenAI API parameters (response_format, temperature, etc.)
-            
         Returns:
-            OpenAI-compatible response dictionary
+            Tuple of (provider_name, model_name, provider_client, model_config, 
+                     api_kwargs, original_temperature, json_mode_requested, json_schema)
         """
-        # Generate unique request ID for tracking
-        request_id = str(uuid.uuid4())[:8]
-        start_time = time.time()
-        
-        # Normalize tags
-        if isinstance(tags, str):
-            tags = [tags]
-        elif not tags:
-            tags = []
-            
         # Parse model string
         provider_name, model_name = self._parse_model_string(model)
         provider_client = self._providers[provider_name]
@@ -324,24 +302,172 @@ class Elelem:
             api_kwargs.pop("json_schema")
         
         # Handle JSON mode - add instructions whenever response_format is JSON
-        modified_messages = messages
         json_mode_requested = response_format and response_format.get("type") == "json_object"
         
+        return (provider_name, model_name, provider_client, model_config, 
+                api_kwargs, original_temperature, json_mode_requested, json_schema)
+    
+    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool) -> List[Dict[str, str]]:
+        """Preprocess messages for the request."""
         if json_mode_requested:
             # Always add JSON instructions when JSON is requested
-            modified_messages = self._add_json_instructions_to_messages(messages, model)
-            self.logger.debug(f"[{request_id}] 🔧 Injected JSON enforcement instructions for {model} (response_format=json_object)")
-        
+            return self._add_json_instructions_to_messages(messages, model)
+        return messages
+    
+    def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
+        """Remove unsupported parameters from api_kwargs."""
         # Remove response_format if not supported by the model
         if self._should_remove_response_format(model) and "response_format" in api_kwargs:
-            self.logger.debug(f"[{request_id}] Removing response_format for {model} (not supported)")
+            self.logger.debug(f"Removing response_format for {model} (not supported)")
             api_kwargs.pop("response_format")
             
         # Remove temperature if not supported  
         if not model_config["capabilities"].get("supports_temperature", True):
             if "temperature" in api_kwargs:
-                self.logger.debug(f"[{request_id}] Removing temperature for {model} (not supported)")
+                self.logger.debug(f"Removing temperature for {model} (not supported)")
                 api_kwargs.pop("temperature")
+    
+    def _process_response_content(self, response: Any, json_mode_requested: bool) -> str:
+        """Process and clean response content."""
+        content = response.choices[0].message.content
+        
+        # Remove think tags if present
+        content = self._remove_think_tags(content)
+        
+        # Extract JSON from markdown if JSON mode was requested
+        if json_mode_requested:
+            content = self._extract_json_from_markdown(content)
+            
+        return content
+    
+    def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception) -> None:
+        """Validate JSON response content and schema."""
+        if api_error:
+            # Force JSON validation to fail so it triggers retry logic
+            raise json.JSONDecodeError(f"API JSON validation failed: {str(api_error)}", "", 0)
+        else:
+            # First parse the JSON
+            parsed_json = json.loads(content)
+            
+            # Then validate against schema if provided
+            if json_schema:
+                is_valid, schema_error = self._validate_json_schema(parsed_json, json_schema)
+                if not is_valid:
+                    # Treat schema validation failure like JSON parse failure
+                    raise json.JSONDecodeError(f"JSON schema validation failed: {schema_error}", "", 0)
+    
+    def _handle_json_retry(self, e: json.JSONDecodeError, attempt: int, max_retries: int, 
+                          request_id: str, api_kwargs: Dict, original_temperature: float,
+                          temperature_reductions: List[float], min_temp: float) -> tuple[bool, float]:
+        """Handle JSON validation retry logic.
+        
+        Returns:
+            Tuple of (should_continue, new_temperature)
+        """
+        if attempt < max_retries:
+            # Calculate new temperature for retry
+            if attempt < len(temperature_reductions):
+                new_temp = max(min_temp, original_temperature - temperature_reductions[attempt])
+            else:
+                new_temp = min_temp
+                
+            api_kwargs["temperature"] = new_temp
+            
+            # Log appropriate message based on error type
+            if "JSON schema validation failed" in str(e):
+                self.logger.warning(
+                    f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
+                    f"Retrying with temperature {new_temp}: {str(e)[:100]}..."
+                )
+            else:
+                self.logger.warning(
+                    f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
+                    f"Retrying with temperature {new_temp}: {str(e)[:50]}..."
+                )
+            return True, new_temp
+        return False, 0.0
+    
+    def _handle_fallback_strategies(self, attempt: int, max_retries: int, request_id: str,
+                                   api_kwargs: Dict, original_temperature: float,
+                                   current_model: str, provider_name: str) -> tuple[bool, str, str, Any]:
+        """Handle fallback strategies when retries are exhausted.
+        
+        Returns:
+            Tuple of (should_continue, new_model, new_model_name, new_provider_client)
+        """
+        if attempt == max_retries:
+            # Try removing response_format first if still present
+            if "response_format" in api_kwargs:
+                self.logger.warning(
+                    f"[{request_id}] JSON validation failed after {max_retries + 1} attempts with {current_model}. "
+                    f"Removing response_format and retrying with text parsing."
+                )
+                api_kwargs.pop("response_format")
+                api_kwargs["temperature"] = original_temperature  # Reset temperature
+                max_attempts = max_retries + 2
+                self.logger.info(f"[{request_id}] 🔄 RETRY (format removal) - {current_model} (attempt {attempt + 2}/{max_attempts}) - temp={original_temperature}")
+                return True, current_model, current_model.split(":", 1)[1], self._providers[provider_name]
+            else:
+                # Try fallback model as last resort
+                fallback_model = self.config.get_fallback_model(provider_name)
+                if fallback_model and fallback_model != current_model:
+                    self.logger.warning(
+                        f"[{request_id}] JSON validation failed after format removal. "
+                        f"Trying fallback model: {fallback_model}"
+                    )
+                    
+                    # Parse fallback model
+                    fallback_provider, fallback_model_name = self._parse_model_string(fallback_model)
+                    
+                    # Reset temperature for fallback
+                    api_kwargs["temperature"] = original_temperature
+                    max_attempts = max_retries + 2
+                    self.logger.info(f"[{request_id}] 🔄 RETRY (fallback model) - {fallback_model} (attempt {attempt + 2}/{max_attempts}) - temp={original_temperature}")
+                    return True, fallback_model, fallback_model_name, self._providers[fallback_provider]
+        
+        return False, current_model, current_model.split(":", 1)[1], self._providers[provider_name]
+    
+    async def create_chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        tags: Union[str, List[str]] = [],
+        **kwargs
+    ) -> Dict:
+        """
+        Unified chat completion method matching OpenAI API signature exactly.
+        
+        Args:
+            messages: List of message dictionaries
+            model: Model string in "provider:model" format  
+            tags: Tags for cost tracking (elelem-specific parameter)
+            **kwargs: All OpenAI API parameters (response_format, temperature, etc.)
+            
+        Returns:
+            OpenAI-compatible response dictionary
+        """
+        # Generate unique request ID for tracking
+        request_id = str(uuid.uuid4())[:8]
+        start_time = time.time()
+        
+        # Normalize tags
+        if isinstance(tags, str):
+            tags = [tags]
+        elif not tags:
+            tags = []
+        
+        # Setup request parameters and configurations
+        (provider_name, model_name, provider_client, model_config, 
+         api_kwargs, original_temperature, json_mode_requested, json_schema) = self._setup_request(
+            model, request_id, **kwargs)
+        
+        # Preprocess messages for JSON mode if needed
+        modified_messages = self._preprocess_messages(messages, model, json_mode_requested)
+        if json_mode_requested:
+            self.logger.debug(f"[{request_id}] 🔧 Injected JSON enforcement instructions for {model} (response_format=json_object)")
+        
+        # Clean up unsupported API parameters
+        self._cleanup_api_kwargs(api_kwargs, model, model_config)
                 
         # Implement JSON validation and retry logic with fallback
         max_retries = self.config.retry_settings["max_json_retries"]
@@ -400,90 +526,35 @@ class Elelem:
                     total_output_tokens += output_tokens
                     total_reasoning_tokens += reasoning_tokens
                     
-                    # Extract content
-                    content = response.choices[0].message.content
-                    
-                    # Remove think tags if present
-                    content = self._remove_think_tags(content)
-                    
-                    # Extract JSON from markdown if JSON mode was requested
-                    if json_mode_requested:
-                        content = self._extract_json_from_markdown(content)
+                    # Process response content
+                    content = self._process_response_content(response, json_mode_requested)
                 else:
                     # API error case - no content to process
                     content = ""
                 
                 # Validate JSON if response_format was requested
+                response_format = api_kwargs.get("response_format")
                 if response_format and response_format.get("type") == "json_object":
                     try:
-                        if api_error:
-                            # Force JSON validation to fail so it triggers retry logic
-                            raise json.JSONDecodeError(f"API JSON validation failed: {str(api_error)}", "", 0)
-                        else:
-                            # First parse the JSON
-                            parsed_json = json.loads(content)
-                            
-                            # Then validate against schema if provided
-                            if json_schema:
-                                is_valid, schema_error = self._validate_json_schema(parsed_json, json_schema)
-                                if not is_valid:
-                                    # Treat schema validation failure like JSON parse failure
-                                    raise json.JSONDecodeError(f"JSON schema validation failed: {schema_error}", "", 0)
+                        self._validate_json_response(content, json_schema, api_error)
                     except json.JSONDecodeError as e:
-                        if attempt < max_retries:
-                            # Calculate new temperature for retry
-                            if attempt < len(temperature_reductions):
-                                new_temp = max(min_temp, original_temperature - temperature_reductions[attempt])
-                            else:
-                                new_temp = min_temp
-                                
-                            api_kwargs["temperature"] = new_temp
-                            
-                            # Log appropriate message based on error type
-                            if "JSON schema validation failed" in str(e):
-                                self.logger.warning(
-                                    f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
-                                    f"Retrying with temperature {new_temp}: {str(e)[:100]}..."
-                                )
-                            else:
-                                self.logger.warning(
-                                    f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
-                                    f"Retrying with temperature {new_temp}: {str(e)[:50]}..."
-                                )
-                            # This continue will go back to the start of the retry loop with the same request_id
+                        # Handle JSON validation retry
+                        should_continue, new_temp = self._handle_json_retry(
+                            e, attempt, max_retries, request_id, api_kwargs, 
+                            original_temperature, temperature_reductions, min_temp)
+                        
+                        if should_continue:
                             continue
-                        elif attempt == max_retries:
-                            # Try removing response_format first if still present
-                            if "response_format" in api_kwargs:
-                                self.logger.warning(
-                                    f"[{request_id}] JSON validation failed after {max_retries + 1} attempts with {current_model}. "
-                                    f"Removing response_format and retrying with text parsing."
-                                )
-                                api_kwargs.pop("response_format")
-                                api_kwargs["temperature"] = original_temperature  # Reset temperature
-                                self.logger.info(f"[{request_id}] 🔄 RETRY (format removal) - {current_model} (attempt {attempt + 2}/{max_attempts}) - temp={original_temperature}")
+                        else:
+                            # Try fallback strategies
+                            should_continue, current_model, current_model_name, current_provider_client = self._handle_fallback_strategies(
+                                attempt, max_retries, request_id, api_kwargs, 
+                                original_temperature, current_model, provider_name)
+                            
+                            if should_continue:
                                 continue
                             else:
-                                # Try fallback model as last resort
-                                fallback_model = self.config.get_fallback_model(provider_name)
-                                if fallback_model and fallback_model != current_model:
-                                    self.logger.warning(
-                                        f"[{request_id}] JSON validation failed after format removal. "
-                                        f"Trying fallback model: {fallback_model}"
-                                    )
-                                    
-                                    # Parse fallback model
-                                    fallback_provider, fallback_model_name = self._parse_model_string(fallback_model)
-                                    current_model = fallback_model
-                                    current_model_name = fallback_model_name
-                                    current_provider_client = self._providers[fallback_provider]
-                                    
-                                    # Reset temperature for fallback
-                                    api_kwargs["temperature"] = original_temperature
-                                    self.logger.info(f"[{request_id}] 🔄 RETRY (fallback model) - {current_model} (attempt {attempt + 2}/{max_attempts}) - temp={original_temperature}")
-                                    continue
-                        else:
-                            raise ValueError(f"Failed to generate valid JSON after all retries including fallback: {e}")
+                                raise ValueError(f"Failed to generate valid JSON after all retries including fallback: {e}")
                 
                 # Calculate final duration
                 duration = time.time() - start_time
@@ -499,16 +570,9 @@ class Elelem:
                                       total_reasoning_tokens, duration, tags)
                 
                 # Update response with cleaned content
-                # This modifies the original response object to have the cleaned content
                 response.choices[0].message.content = content
                 
-                # TODO: Override usage stats with accumulated tokens from all retry attempts
-                # Currently response.usage only shows tokens from the final successful call
-                # but we should show total_input_tokens, total_output_tokens, total_reasoning_tokens
-                # from ALL attempts (including failed retries)
-                
                 # Return the original OpenAI-style response object
-                # Users access it like: response.choices[0].message.content
                 return response
                 
             except Exception as e:

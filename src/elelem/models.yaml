@@ -23,6 +23,17 @@ providers:
     endpoint: https://api.scaleway.ai/v1
     fallback_model: scaleway:gpt-oss-120b
     default_params: {}
+    
+  openrouter:
+    endpoint: https://openrouter.ai/api/v1
+    fallback_model: openrouter:openai/gpt-4o-mini
+    headers:
+      HTTP-Referer: https://github.com/guybrush1984/Elelem
+      X-Title: Elelem
+    default_params: {}
+    extra_body:
+      usage:
+        include: true
 
 models:
   # OpenAI Models (Standard tier pricing)
@@ -307,3 +318,33 @@ models:
       input_cost_per_1m: 0.80   # €0.75 → $0.80 USD
       output_cost_per_1m: 2.40  # €2.25 → $2.40 USD
       currency: USD
+
+  # OpenRouter Models (Automatic provider routing with runtime pricing)
+  "openrouter:openai/gpt-oss-20b":
+    provider: openrouter
+    model_id: openai/gpt-oss-20b:floor  # Use :floor suffix to enforce price-first routing
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers
+
+  # OpenRouter Models (Automatic provider routing with runtime pricing)
+  "openrouter:openai/gpt-oss-120b":
+    provider: openrouter
+    model_id: openai/gpt-oss-120b:floor  # Use :floor suffix to enforce price-first routing
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers
+
+  # OpenRouter Models (Automatic provider routing with runtime pricing)
+  "openrouter:anthropic/claude-sonnet-4":
+    provider: openrouter
+    model_id: anthropic/claude-sonnet-4:floor  # Use :floor suffix to enforce price-first routing
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers

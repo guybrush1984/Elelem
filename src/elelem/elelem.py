@@ -42,13 +42,19 @@ class Elelem:
         except (FileNotFoundError, yaml.YAMLError) as e:
             raise RuntimeError(f"Failed to load Elelem models: {e}")
     
-    def _create_provider_client(self, api_key: str, base_url: str, timeout: int = 120):
+    def _create_provider_client(self, api_key: str, base_url: str, timeout: int = 120, provider_name: str = None, default_headers: Dict = None):
         """Create an OpenAI-compatible client for any provider."""
-        return openai.AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout
-        )
+        client_kwargs = {
+            "api_key": api_key,
+            "base_url": base_url,
+            "timeout": timeout
+        }
+        
+        # Add custom headers for specific providers
+        if default_headers:
+            client_kwargs["default_headers"] = default_headers
+            
+        return openai.AsyncOpenAI(**client_kwargs)
         
     def _initialize_providers(self) -> Dict[str, Any]:
         """Initialize provider clients."""
@@ -60,10 +66,15 @@ class Elelem:
             api_key = os.getenv(env_var)
             
             if api_key:
+                # Get custom headers from provider config
+                custom_headers = provider_config.get("headers")
+                
                 providers[provider_name] = self._create_provider_client(
                     api_key=api_key,
                     base_url=provider_config["endpoint"],
-                    timeout=self.config.timeout_seconds
+                    timeout=self.config.timeout_seconds,
+                    provider_name=provider_name,
+                    default_headers=custom_headers
                 )
                 self.logger.debug(f"Initialized {provider_name} provider")
             else:
@@ -85,6 +96,7 @@ class Elelem:
             "avg_duration_seconds": 0.0,
             "reasoning_tokens": 0,
             "reasoning_cost_usd": 0.0,
+            "providers": {},  # Track which actual providers were used (e.g., "Novita": {"count": 5, "cost": 0.001})
             "retry_analytics": {
                 "json_parse_retries": 0,
                 "json_schema_retries": 0,
@@ -100,11 +112,11 @@ class Elelem:
         self._tag_statistics = {}
         
     def _parse_model_string(self, model: str) -> tuple[str, str]:
-        """Parse provider:model string."""
+        """Parse provider:model string and get actual model_id from config."""
         if ":" not in model:
             raise ValueError(f"Model must be in 'provider:model' format, got: {model}")
             
-        provider, model_name = model.split(":", 1)
+        provider, _ = model.split(":", 1)
         
         if model not in self._models:
             raise ValueError(f"Unknown model: {model}")
@@ -112,8 +124,15 @@ class Elelem:
         if provider not in self._providers:
             available_providers = list(self._providers.keys())
             raise ValueError(f"Provider '{provider}' not available. Available: {available_providers}")
+        
+        # Get the actual model_id from configuration
+        model_config = self._models.get(model, {})
+        model_id = model_config.get("model_id")
+        if not model_id:
+            # Fallback to the part after colon if no model_id is specified
+            _, model_id = model.split(":", 1)
             
-        return provider, model_name
+        return provider, model_id
         
     def _should_remove_response_format(self, model: str) -> bool:
         """Check if response_format should be removed for this model."""
@@ -219,11 +238,31 @@ class Elelem:
             
         return modified_messages
         
-    def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0) -> Dict[str, float]:
-        """Calculate costs based on model pricing."""
+    def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None) -> Dict[str, float]:
+        """Calculate costs based on model pricing or runtime data from provider."""
         model_config = self._models.get(model, {})
         cost_config = model_config.get("cost", {})
         
+        # Handle runtime cost calculation (e.g., from OpenRouter headers)
+        if runtime_costs:
+            return {
+                "input_cost_usd": runtime_costs.get("input_cost_usd", 0.0),
+                "output_cost_usd": runtime_costs.get("output_cost_usd", 0.0),
+                "reasoning_cost_usd": runtime_costs.get("reasoning_cost_usd", 0.0),
+                "total_cost_usd": runtime_costs.get("total_cost_usd", 0.0)
+            }
+        
+        # Handle runtime-priced models (cost: "runtime")
+        if cost_config == "runtime":
+            self.logger.warning(f"Runtime pricing model {model} used without runtime cost data - costs set to 0")
+            return {
+                "input_cost_usd": 0.0,
+                "output_cost_usd": 0.0,
+                "reasoning_cost_usd": 0.0,
+                "total_cost_usd": 0.0
+            }
+        
+        # Standard static pricing calculation
         input_cost_per_1m = cost_config.get("input_cost_per_1m", 0.0)
         output_cost_per_1m = cost_config.get("output_cost_per_1m", 0.0)
         
@@ -238,11 +277,78 @@ class Elelem:
             "reasoning_cost_usd": (reasoning_tokens / 1_000_000) * output_cost_per_1m,
             "total_cost_usd": input_cost + output_cost
         }
+    
+    def _extract_openrouter_costs(self, response, model: str) -> Dict[str, Any]:
+        """Extract OpenRouter cost information from response usage field."""
+        runtime_costs = None
+        
+        try:
+            # Check if this is an OpenRouter model
+            if not model.startswith("openrouter:"):
+                return runtime_costs
+            
+            # OpenRouter includes detailed usage information when requested
+            if hasattr(response, 'usage') and response.usage:
+                usage = response.usage
+                
+                # Extract cost information (OpenRouter returns cost in USD)
+                if hasattr(usage, 'cost'):
+                    total_cost_usd = usage.cost
+                    # OpenRouter cost field is already in USD, no conversion needed
+                    
+                    # For now, we'll distribute the cost proportionally between input/output
+                    # based on token counts (this is an approximation)
+                    prompt_tokens = getattr(usage, 'prompt_tokens', 0)
+                    completion_tokens = getattr(usage, 'completion_tokens', 0)
+                    total_tokens = prompt_tokens + completion_tokens
+                    
+                    if total_tokens > 0:
+                        input_cost_usd = total_cost_usd * (prompt_tokens / total_tokens)
+                        output_cost_usd = total_cost_usd * (completion_tokens / total_tokens)
+                    else:
+                        input_cost_usd = total_cost_usd / 2
+                        output_cost_usd = total_cost_usd / 2
+                    
+                    # Extract reasoning tokens if available
+                    reasoning_tokens = 0
+                    if hasattr(usage, 'completion_tokens_details'):
+                        reasoning_tokens = getattr(usage.completion_tokens_details, 'reasoning_tokens', 0)
+                    
+                    # Extract provider information (which actual provider was used)
+                    actual_provider = None
+                    if hasattr(response, 'provider'):
+                        actual_provider = response.provider
+                    else:
+                        # Try model_dump fallback
+                        try:
+                            response_dict = response.model_dump()
+                            actual_provider = response_dict.get('provider')
+                        except Exception:
+                            pass
+                    
+                    runtime_costs = {
+                        "input_cost_usd": input_cost_usd,
+                        "output_cost_usd": output_cost_usd,
+                        "reasoning_cost_usd": 0.0,  # OpenRouter includes this in output cost
+                        "total_cost_usd": total_cost_usd,
+                        "openrouter_cost_usd": total_cost_usd,  # OpenRouter cost in USD
+                        "actual_provider": actual_provider  # Which provider OpenRouter routed to
+                    }
+                    
+                    self.logger.debug(f"OpenRouter runtime costs: ${total_cost_usd:.8f} USD")
+                    
+        except Exception as e:
+            self.logger.debug(f"Could not extract OpenRouter costs: {e}")
+        
+        return runtime_costs
         
     def _update_statistics(self, model: str, input_tokens: int, output_tokens: int, 
-                          reasoning_tokens: int, duration: float, tags: List[str]):
+                          reasoning_tokens: int, duration: float, tags: List[str], runtime_costs: Dict = None):
         """Update statistics tracking."""
-        costs = self._calculate_costs(model, input_tokens, output_tokens, reasoning_tokens)
+        costs = self._calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs)
+        
+        # Track actual provider used (for OpenRouter)
+        actual_provider = runtime_costs.get("actual_provider") if runtime_costs else None
         
         # Update overall statistics
         self._statistics["total_input_tokens"] += input_tokens
@@ -260,6 +366,24 @@ class Elelem:
         if reasoning_tokens > 0:
             self._statistics["reasoning_tokens"] += reasoning_tokens
             self._statistics["reasoning_cost_usd"] += costs["reasoning_cost_usd"]
+        
+        # Track provider usage (for OpenRouter actual providers)
+        if actual_provider:
+            if actual_provider not in self._statistics["providers"]:
+                self._statistics["providers"][actual_provider] = {
+                    "count": 0,
+                    "total_cost_usd": 0.0,
+                    "total_tokens": 0,
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0
+                }
+            
+            provider_stats = self._statistics["providers"][actual_provider]
+            provider_stats["count"] += 1
+            provider_stats["total_cost_usd"] += costs["total_cost_usd"]
+            provider_stats["total_tokens"] += input_tokens + output_tokens
+            provider_stats["total_input_tokens"] += input_tokens
+            provider_stats["total_output_tokens"] += output_tokens
             
         # Update tag-specific statistics
         for tag in tags:
@@ -349,6 +473,11 @@ class Elelem:
         for key, value in provider_defaults.items():
             if key not in api_kwargs:
                 api_kwargs[key] = value
+        
+        # Add provider-specific extra_body parameters (for newer OpenAI library)
+        extra_body = provider_config.get("extra_body", {})
+        if extra_body:
+            api_kwargs["extra_body"] = {**extra_body, **api_kwargs.get("extra_body", {})}
         
         # Store original values for retry logic
         response_format = api_kwargs.get("response_format")
@@ -640,9 +769,12 @@ class Elelem:
                 if total_reasoning_tokens > 0:
                     self.logger.debug(f"[{request_id}] 🧠 Reasoning tokens used: {total_reasoning_tokens}")
                 
+                # Extract runtime costs from OpenRouter if applicable
+                runtime_costs = self._extract_openrouter_costs(response, current_model)
+                
                 # Update statistics with accumulated tokens
                 self._update_statistics(current_model, total_input_tokens, total_output_tokens, 
-                                      total_reasoning_tokens, duration, tags)
+                                      total_reasoning_tokens, duration, tags, runtime_costs)
                 
                 # Update response with cleaned content
                 response.choices[0].message.content = content

@@ -8,9 +8,10 @@ Elelem is a unified API wrapper for OpenAI, GROQ, DeepInfra, and Scaleway APIs, 
 - 🎯 **OpenAI Compatible**: Drop-in replacement with identical response format
 - 💰 **Cost Tracking**: Precise token and cost tracking with tag-based categorization
 - 🔄 **Retry Logic**: Automatic JSON validation and retry with temperature adjustment
+- 🛡️ **JSON Schema Validation**: Automatic validation with detailed error reporting and retries
+- 📊 **Retry Analytics**: Comprehensive tracking of retry events and failure patterns
 - ⚡ **Rate Limit Handling**: Exponential backoff for rate limit errors
 - 🛡️ **Error Handling**: Graceful handling of API errors and fallbacks
-- 📊 **Statistics**: Detailed usage statistics by tags and overall
 - 🧠 **Think Tag Removal**: Automatic removal of reasoning model think tags
 - 🎯 **Provider-Specific Handling**: Auto-removes unsupported parameters per provider
 
@@ -78,6 +79,127 @@ export GROQ_API_KEY="your-groq-key"
 export DEEPINFRA_API_KEY="your-deepinfra-key"
 export SCALEWAY_API_KEY="your-scaleway-key"
 ```
+
+## JSON Schema Validation
+
+Elelem supports automatic JSON schema validation to ensure LLM responses match your expected structure. Simply pass a `json_schema` parameter (JSON Schema draft-07) along with `response_format={"type": "json_object"}`:
+
+```python
+response = await elelem.create_chat_completion(
+    messages=[{"role": "user", "content": "Generate user data"}],
+    model="groq:openai/gpt-oss-20b",
+    response_format={"type": "json_object"},
+    json_schema=your_schema_dict,  # Your JSON Schema definition
+    temperature=1.5
+)
+```
+
+**Benefits:**
+- **Guaranteed Structure**: Response will match your schema or fail gracefully
+- **Automatic Retries**: On validation failure, temperature is reduced and request retried
+- **Detailed Error Logging**: Shows exactly what failed (missing fields, wrong types, invalid values)
+- **Production Ready**: Handles edge cases like malformed JSON, API rejections, and timeouts
+
+### Request Flow (State Machine)
+
+```mermaid
+graph TD
+    A[create_chat_completion] --> B[Setup Request]
+    B --> C[Preprocess Messages]
+    C --> D[Cleanup API Args]
+    D --> E[Retry Loop Start<br/>attempt=0, max=3]
+    
+    E --> F[Make API Call]
+    F --> G{API Success?}
+    
+    G -->|400 JSON Error| H[API JSON Validation Failed<br/>+api_json_validation_retries]
+    G -->|429 Rate Limit| I[Rate Limit Hit<br/>+rate_limit_retries<br/>Wait & Retry]
+    G -->|Other Error| J[Non-Retryable Error]
+    G -->|200 Success| K[Process Response Content]
+    
+    H --> L[Reduce Temperature<br/>+temperature_reductions]
+    I --> M[Exponential Backoff]
+    M --> N{Max Rate Retries?}
+    N -->|No| E
+    N -->|Yes| J
+    
+    K --> O[Remove Think Tags]
+    O --> P[Extract from Markdown]
+    P --> Q{JSON Mode?}
+    
+    Q -->|No| SUCCESS[Return Response<br/>Update Stats]
+    Q -->|Yes| R[Parse JSON]
+    
+    R --> S{Parse OK?}
+    S -->|No| T[JSON Parse Failed<br/>+json_parse_retries]
+    S -->|Yes| U{Schema Provided?}
+    
+    U -->|No| SUCCESS
+    U -->|Yes| V[Validate Schema]
+    
+    V --> W{Schema Valid?}
+    W -->|Yes| SUCCESS
+    W -->|No| X[Schema Validation Failed<br/>+json_schema_retries]
+    
+    T --> L
+    X --> L
+    L --> Y{attempt < max_retries?}
+    
+    Y -->|Yes| E
+    Y -->|No| Z[Exhaust Retries]
+    
+    Z --> AA{response_format exists?}
+    AA -->|Yes| BB[Remove response_format<br/>+response_format_removals<br/>Reset Temperature]
+    AA -->|No| CC{Fallback Model?}
+    
+    BB --> E
+    CC -->|Yes| DD[Switch to Fallback<br/>+fallback_model_usage<br/>Reset Temperature]
+    CC -->|No| EE[Final Failure<br/>+final_failures]
+    
+    DD --> E
+    J --> EE
+    EE --> FF[Throw Exception]
+    
+    style SUCCESS fill:#90EE90
+    style FF fill:#FFB6C1
+    style L fill:#FFE4B5
+    style BB fill:#E0E0E0
+    style DD fill:#E0E0E0
+```
+
+**State Descriptions:**
+- **🟢 Green**: Success paths that return valid responses
+- **🟡 Yellow**: Retry triggers that reduce temperature and loop back
+- **🔴 Red**: Final failure after all strategies exhausted
+- **⚫ Gray**: Fallback strategies (format removal, model switching)
+
+**Key Retry Analytics Tracking:**
+- Each retry type increments specific counters
+- Temperature reductions happen on all JSON/schema failures
+- Fallback strategies are last resort before final failure
+- All events contribute to `total_retries` counter
+
+## Retry Analytics
+
+Elelem tracks detailed metrics on retry events and failure patterns:
+
+```python
+stats = elelem.get_stats_by_tag("your_tag")
+retry_analytics = stats["retry_analytics"]
+
+# Available metrics:
+retry_analytics["json_parse_retries"]           # Malformed JSON syntax
+retry_analytics["json_schema_retries"]          # Valid JSON, wrong structure  
+retry_analytics["api_json_validation_retries"]  # Provider rejected request
+retry_analytics["rate_limit_retries"]           # Rate limit backoff events
+retry_analytics["temperature_reductions"]       # Temperature adjustment events
+retry_analytics["response_format_removals"]     # Fallback strategy usage
+retry_analytics["fallback_model_usage"]         # Alternative model attempts
+retry_analytics["final_failures"]              # Requests that never succeeded
+retry_analytics["total_retries"]               # Sum of all retry events
+```
+
+**Use Cases**: Production monitoring, cost optimization, model selection, temperature tuning
 
 ## Supported Models
 

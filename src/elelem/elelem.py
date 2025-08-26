@@ -10,6 +10,8 @@ import re
 import time
 import uuid
 from typing import Dict, List, Optional, Union, Any
+import jsonschema
+from jsonschema import validate, ValidationError
 from .models import MODELS
 from .config import Config
 from .providers import create_provider_client
@@ -112,6 +114,34 @@ class Elelem:
                 
         # If no markdown wrapper found, return original content
         return content
+        
+    def _validate_json_schema(self, json_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+        """Validate a JSON object against a JSON Schema.
+        
+        Args:
+            json_obj: The parsed JSON object to validate
+            schema: The JSON Schema to validate against
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            validate(instance=json_obj, schema=schema)
+            return True, None
+        except ValidationError as e:
+            # Build detailed error message
+            error_parts = [f"Schema validation failed: {e.message}"]
+            
+            if e.path:
+                path_str = ".".join(str(p) for p in e.path)
+                error_parts.append(f"at path: {path_str}")
+                
+            if e.schema_path:
+                schema_path_str = ".".join(str(p) for p in e.schema_path)
+                error_parts.append(f"schema path: {schema_path_str}")
+                
+            error_msg = " | ".join(error_parts)
+            return False, error_msg
         
     def _is_json_validation_api_error(self, error: Exception) -> bool:
         """Check if the error is a json_validate_failed API error."""
@@ -283,6 +313,15 @@ class Elelem:
         # Store original values for retry logic
         response_format = api_kwargs.get("response_format")
         original_temperature = api_kwargs.get("temperature", 0.7)
+        json_schema = api_kwargs.get("json_schema")
+        
+        # Warn if json_schema provided without JSON response format
+        if json_schema and (not response_format or response_format.get("type") != "json_object"):
+            self.logger.warning(f"[{request_id}] json_schema provided but response_format is not set to json_object. Schema validation will be skipped.")
+        
+        # Remove json_schema from api_kwargs - it's not part of the OpenAI API
+        if "json_schema" in api_kwargs:
+            api_kwargs.pop("json_schema")
         
         # Handle JSON mode - add instructions whenever response_format is JSON
         modified_messages = messages
@@ -381,7 +420,15 @@ class Elelem:
                             # Force JSON validation to fail so it triggers retry logic
                             raise json.JSONDecodeError(f"API JSON validation failed: {str(api_error)}", "", 0)
                         else:
-                            json.loads(content)
+                            # First parse the JSON
+                            parsed_json = json.loads(content)
+                            
+                            # Then validate against schema if provided
+                            if json_schema:
+                                is_valid, schema_error = self._validate_json_schema(parsed_json, json_schema)
+                                if not is_valid:
+                                    # Treat schema validation failure like JSON parse failure
+                                    raise json.JSONDecodeError(f"JSON schema validation failed: {schema_error}", "", 0)
                     except json.JSONDecodeError as e:
                         if attempt < max_retries:
                             # Calculate new temperature for retry
@@ -391,10 +438,18 @@ class Elelem:
                                 new_temp = min_temp
                                 
                             api_kwargs["temperature"] = new_temp
-                            self.logger.warning(
-                                f"[{request_id}] JSON validation failed (attempt {attempt + 1}/{max_retries + 1}). "
-                                f"Retrying with temperature {new_temp}: {str(e)[:50]}..."
-                            )
+                            
+                            # Log appropriate message based on error type
+                            if "JSON schema validation failed" in str(e):
+                                self.logger.warning(
+                                    f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
+                                    f"Retrying with temperature {new_temp}: {str(e)[:100]}..."
+                                )
+                            else:
+                                self.logger.warning(
+                                    f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
+                                    f"Retrying with temperature {new_temp}: {str(e)[:50]}..."
+                                )
                             # This continue will go back to the start of the retry loop with the same request_id
                             continue
                         elif attempt == max_retries:

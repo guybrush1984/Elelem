@@ -569,6 +569,216 @@ async def test_6_multi_model_parallel_testing(elelem):
         print(f"   Avg time per request: {duration/20:.2f}s")
 
 
+async def test_5_json_schema_validation(elelem):
+    """Test 5: JSON Schema Validation with retry logic"""
+    print("\n" + "="*50)
+    print("TEST 5: JSON Schema Validation")
+    print("="*50)
+    
+    # Test only with groq and deepinfra models
+    test_models = [
+        "groq:openai/gpt-oss-20b"
+    ]
+    
+    available_models = []
+    for model in test_models:
+        provider = model.split(":")[0]
+        if os.getenv(f"{provider.upper()}_API_KEY"):
+            available_models.append(model)
+    
+    if not available_models:
+        print("❌ SKIP - Need GROQ_API_KEY or DEEPINFRA_API_KEY")
+        return
+    
+    print(f"Testing with models: {available_models}")
+    
+    # Define the interactive story schema from the user's example
+    interactive_story_schema = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "required": ["title", "story", "is_ending"],
+        "properties": {
+            "title": {"type": "string"},
+            "story": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["character", "text", "voice_instructions"],
+                    "properties": {
+                        "character": {"type": "string"},
+                        "text": {"type": "string"},
+                        "voice_instructions": {
+                            "type": "object",
+                            "required": ["tone", "emotion", "delivery"],
+                            "properties": {
+                                "tone": {"type": "string"},
+                                "emotion": {"type": "string"},
+                                "delivery": {"type": "string"}
+                            }
+                        },
+                        "ambiance_sound": {"type": "string"}
+                    }
+                }
+            },
+            "continuation": {
+                "type": "object",
+                "required": ["choice_text", "choices"],
+                "properties": {
+                    "choice_text": {"type": "string"},
+                    "choices": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["id", "text", "consequence"],
+                            "properties": {
+                                "id": {"type": "string", "pattern": "^[A-D]$"},
+                                "text": {"type": "string"},
+                                "consequence": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            },
+            "is_ending": {"type": "boolean"}
+        }
+    }
+    
+    for model in available_models:
+        print(f"\n{'='*60}")
+        print(f"TESTING MODEL: {model}")
+        print(f"{'='*60}")
+        
+        print("\n--- Warning Test: json_schema without JSON response format ---")
+        try:
+            response = await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": "Say hello"}],
+                model=model,
+                json_schema=interactive_story_schema,  # Schema without JSON format
+                tags=["schema_warning_test"]
+            )
+            print("✅ PASS - Warning should appear in logs above")
+            
+        except Exception as e:
+            print(f"❌ FAIL - Should not have failed: {e}")
+        
+        print(f"\n--- Schema Validation Loop Test (10 attempts with {model}) ---")
+        successes = 0
+        
+        # Very high temperatures to increase chance of schema validation failures
+        temperatures = [1.7, 1.8, 1.6, 1.9, 1.7, 1.8, 1.6, 1.9, 1.7, 1.8]
+        
+        for i in range(10):
+            try:
+                stats_before = elelem.get_stats_by_tag(f"schema_loop_{model}_{i}")
+                
+                # Complex chaotic prompt that still instructs to follow the schema structure
+                response = await elelem.create_chat_completion(
+                    messages=[
+                        {"role": "user", "content": f"""Create an incredibly complex interactive story JSON (attempt #{i+1}) following this EXACT structure:
+
+{{
+  "title": "...",
+  "story": [
+    {{
+      "character": "...",
+      "text": "...",
+      "voice_instructions": {{
+        "tone": "...",
+        "emotion": "...",
+        "delivery": "..."
+      }},
+      "ambiance_sound": "..." (optional)
+    }}
+  ],
+  "continuation": {{
+    "choice_text": "...",
+    "choices": [
+      {{
+        "id": "A",
+        "text": "...",
+        "consequence": "..."
+      }}
+    ]
+  }},
+  "is_ending": false
+}}
+
+Make this story absolutely CHAOTIC and mind-bendingly complex: featuring time-traveling wizards speaking in riddles, shape-shifting dragons with memory problems, sentient musical instruments creating reality through melodies, omniscient narrators who forget what they're narrating, characters existing in multiple dimensions simultaneously, plots flowing backward through time, magical systems based on emotional resonance of forgotten words, geography that changes based on collective mood, psychological profiles including childhood fears and philosophical opinions, dialogue with multiple layers of meaning and hidden subtext, conversations happening telepathically while pretending to discuss mundane topics, arguments resolved through interpretive dance, negotiations through meaningful silences, declarations of love as mathematical theorems, voice instructions specifying exact pitch fluctuations and micro-pauses, choice systems that unravel causality, options existing only when nobody looks at them, consequences manifesting in parallel timelines, moral frameworks questioning the nature of choice itself. Include at least 5 story segments with incredibly intricate character interactions, multiple complex choice options, and make every voice instruction absurdly detailed with breathing patterns, harmonic frequencies, linguistic quirks, and vocal textures. The more impossibly complex and chaotic while still following the JSON structure, the better!"""}
+                    ],
+                    model=model,
+                    response_format={"type": "json_object"},
+                    json_schema=interactive_story_schema,
+                    temperature=temperatures[i],
+                    tags=[f"schema_loop_{model}_{i}", f"schema_loop_{model}"]
+                )
+                
+                content = response.choices[0].message.content
+                data = json.loads(content)
+                
+                # Verify schema compliance
+                required_fields = ["title", "story", "is_ending", "continuation"]
+                has_required = all(field in data for field in required_fields)
+                
+                if has_required:
+                    successes += 1
+                    status = "✅"
+                else:
+                    status = "⚠️"
+                
+                print(f"[{i+1:2}/10] {status} T={temperatures[i]:.1f} | {model}")
+                    
+            except json.JSONDecodeError as e:
+                print(f"[{i+1:2}/10] ❌ JSON_FAIL T={temperatures[i]:.1f} | {model}")
+            except Exception as e:
+                print(f"[{i+1:2}/10] ❌ ERROR T={temperatures[i]:.1f} | {model}: {str(e)[:30]}...")
+        
+        # Summary for this model
+        stats = elelem.get_stats_by_tag(f"schema_loop_{model}")
+        print(f"\n📊 {model} Results:")
+        print(f"   Successes: {successes}/10")
+        print(f"   Total API calls: {stats['total_calls']} (avg {stats['total_calls']/10:.1f} per request)")
+        print(f"   Total cost: ${stats['total_cost_usd']:.6f}")
+        
+        if stats['total_calls'] > 10:
+            print(f"   🎯 Schema validation retries detected! ({stats['total_calls']} total API calls > 10 requests)")
+        else:
+            print(f"   ⚠️  All requests succeeded on first try ({stats['total_calls']} calls = 10 requests)")
+        
+        print(f"\n\n\n--- Intentional Schema Mismatch Test (1 attempt with {model}) ---")
+        try:
+            stats_before = elelem.get_stats_by_tag(f"schema_mismatch_{model}")
+            
+            # Ask for something that doesn't match our story schema at all
+            response = await elelem.create_chat_completion(
+                messages=[
+                    {"role": "user", "content": "Create a user profile JSON with fields: username, email, age, preferences array, and settings object with theme and notifications."}
+                ],
+                model=model,
+                response_format={"type": "json_object"},
+                json_schema=interactive_story_schema,  # Story schema but asking for different content
+                temperature=1.4,
+                tags=[f"schema_mismatch_{model}"]
+            )
+            
+            stats_after = elelem.get_stats_by_tag(f"schema_mismatch_{model}")
+            attempts = stats_after['total_calls'] - stats_before['total_calls']
+            
+            content = response.choices[0].message.content
+            data = json.loads(content)
+            
+            # Check if it matches our story schema (it shouldn't initially)
+            required_fields = ["title", "story", "is_ending", "continuation"]
+            has_story_structure = all(field in data for field in required_fields)
+            
+            if attempts > 1:
+                print(f"🎯 RETRIES={attempts-1} → {'Story schema (forced)' if has_story_structure else 'Still wrong structure'} | {model}")
+            else:
+                print(f"{'😮 FirstTry → Story schema (unexpected!)' if has_story_structure else '❌ FirstTry → Wrong structure (no retries)'} | {model}")
+                
+        except Exception as e:
+            print(f"❌ ERROR: {str(e)[:60]}... | {model}")
+
+
 async def test_6_stats(elelem):
     """Test 6: Verify statistics tracking including tag-based stats"""
     print("\n" + "="*50)
@@ -688,6 +898,7 @@ async def main():
     
     # Run tests sequentially
     elelem = await test_1_initialization()
+    await test_5_json_schema_validation(elelem)
     #await test_2_simple_request(elelem)
     #await test_3_simple_json_all_models(elelem)
     # Skip sequential test - takes too long
@@ -695,7 +906,7 @@ async def main():
     #print("\n" + "="*50)
     #print("TEST 4: Skipping sequential test (too slow)")
     #print("="*50)
-    await test_6_multi_model_parallel_testing(elelem)
+    #await test_6_multi_model_parallel_testing(elelem)
     await test_6_stats(elelem)
     
     print("\n" + "="*60)

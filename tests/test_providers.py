@@ -4,7 +4,7 @@ Test cases for provider implementations.
 
 import pytest
 from unittest.mock import Mock, patch
-from elelem.providers import create_provider_client
+from elelem.elelem import Elelem
 
 
 class TestProviders:
@@ -12,11 +12,12 @@ class TestProviders:
     
     def test_create_provider_client(self):
         """Test provider client creation."""
-        with patch('elelem.providers.openai.AsyncOpenAI') as mock_openai:
+        with patch('elelem.elelem.openai.AsyncOpenAI') as mock_openai:
             mock_client = Mock()
             mock_openai.return_value = mock_client
             
-            client = create_provider_client(
+            elelem = Elelem()
+            client = elelem._create_provider_client(
                 api_key="test-key",
                 base_url="https://api.example.com/v1",
                 timeout=120

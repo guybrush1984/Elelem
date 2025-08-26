@@ -12,9 +12,9 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 import yaml
+import openai
 from jsonschema import validate, ValidationError
 from .config import Config
-from .providers import create_provider_client
 
 
 class Elelem:
@@ -41,6 +41,14 @@ class Elelem:
             return data.get("models", {})
         except (FileNotFoundError, yaml.YAMLError) as e:
             raise RuntimeError(f"Failed to load Elelem models: {e}")
+    
+    def _create_provider_client(self, api_key: str, base_url: str, timeout: int = 120):
+        """Create an OpenAI-compatible client for any provider."""
+        return openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout
+        )
         
     def _initialize_providers(self) -> Dict[str, Any]:
         """Initialize provider clients."""
@@ -52,7 +60,7 @@ class Elelem:
             api_key = os.getenv(env_var)
             
             if api_key:
-                providers[provider_name] = create_provider_client(
+                providers[provider_name] = self._create_provider_client(
                     api_key=api_key,
                     base_url=provider_config["endpoint"],
                     timeout=self.config.timeout_seconds

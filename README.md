@@ -339,9 +339,8 @@ mypy src/
 
 Elelem follows a modular architecture:
 
-- **elelem.py**: Main Elelem class with unified API
-- **providers.py**: Provider client creation (OpenAI-compatible)
-- **models.py**: Model definitions with capabilities and pricing
+- **elelem.py**: Main Elelem class with unified API and provider client creation
+- **models.yaml**: Model definitions with capabilities, pricing, and provider configurations
 - **config.py**: Configuration management
 - **config.json**: Default configuration settings
 

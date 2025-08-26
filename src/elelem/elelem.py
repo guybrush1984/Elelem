@@ -9,10 +9,10 @@ import os
 import re
 import time
 import uuid
+from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
-import jsonschema
+import yaml
 from jsonschema import validate, ValidationError
-from .models import MODELS
 from .config import Config
 from .providers import create_provider_client
 
@@ -25,10 +25,22 @@ class Elelem:
         self.config = Config()
         self._statistics = {}
         self._tag_statistics = {}
+        self._models = self._load_models()
         self._providers = self._initialize_providers()
         
         # Initialize statistics tracking
         self._reset_stats()
+    
+    def _load_models(self) -> Dict[str, Any]:
+        """Load model definitions from YAML file."""
+        models_path = Path(__file__).parent / "models.yaml"
+        
+        try:
+            with open(models_path, 'r') as f:
+                data = yaml.safe_load(f)
+            return data.get("models", {})
+        except (FileNotFoundError, yaml.YAMLError) as e:
+            raise RuntimeError(f"Failed to load Elelem models: {e}")
         
     def _initialize_providers(self) -> Dict[str, Any]:
         """Initialize provider clients."""
@@ -86,7 +98,7 @@ class Elelem:
             
         provider, model_name = model.split(":", 1)
         
-        if model not in MODELS:
+        if model not in self._models:
             raise ValueError(f"Unknown model: {model}")
             
         if provider not in self._providers:
@@ -97,7 +109,7 @@ class Elelem:
         
     def _should_remove_response_format(self, model: str) -> bool:
         """Check if response_format should be removed for this model."""
-        model_config = MODELS.get(model, {})
+        model_config = self._models.get(model, {})
         return not model_config.get("capabilities", {}).get("supports_json_mode", True)
         
     def _remove_think_tags(self, content: str) -> str:
@@ -161,7 +173,7 @@ class Elelem:
         
     def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], model: str) -> List[Dict[str, str]]:
         """Add JSON formatting instructions to messages when response_format is JSON."""
-        model_config = MODELS.get(model, {})
+        model_config = self._models.get(model, {})
         supports_system = model_config.get("capabilities", {}).get("supports_system", True)
         
         modified_messages = messages.copy()
@@ -201,7 +213,7 @@ class Elelem:
         
     def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0) -> Dict[str, float]:
         """Calculate costs based on model pricing."""
-        model_config = MODELS.get(model, {})
+        model_config = self._models.get(model, {})
         cost_config = model_config.get("cost", {})
         
         input_cost_per_1m = cost_config.get("input_cost_per_1m", 0.0)
@@ -318,7 +330,7 @@ class Elelem:
         provider_client = self._providers[provider_name]
         
         # Get model and provider configurations
-        model_config = MODELS[model]
+        model_config = self._models[model]
         provider_config = self.config.get_provider_config(provider_name)
         
         # Make a copy of kwargs to avoid modifying the original
@@ -702,7 +714,7 @@ class Elelem:
         """
         models_list = []
         
-        for model_key, model_config in MODELS.items():
+        for model_key, model_config in self._models.items():
             provider = model_config.get("provider", "unknown")
             # Check if API key is available for this provider
             env_var = f"{provider.upper()}_API_KEY"

@@ -6,30 +6,6 @@
         "rate_limit_backoff": [1, 2, 4, 8],
         "max_rate_limit_retries": 4
     },
-    "providers": {
-        "openai": {
-            "endpoint": "https://api.openai.com/v1",
-            "fallback_model": "openai:gpt-4.1",
-            "default_params": {}
-        },
-        "groq": {
-            "endpoint": "https://api.groq.com/openai/v1",
-            "fallback_model": "groq:gpt-oss-120b",
-            "default_params": {
-                "service_tier": "auto"
-            }
-        },
-        "deepinfra": {
-            "endpoint": "https://api.deepinfra.com/v1/openai",
-            "fallback_model": "deepinfra:gpt-oss-120b",
-            "default_params": {}
-        },
-        "scaleway": {
-            "endpoint": "https://api.scaleway.ai/v1",
-            "fallback_model": "scaleway:gpt-oss-120b",
-            "default_params": {}
-        }
-    },
     "timeout_seconds": 120,
     "logging_level": "INFO"
 }

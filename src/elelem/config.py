@@ -3,9 +3,9 @@ Configuration loading system for Elelem
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, Any
+import yaml
 
 
 class Config:
@@ -13,6 +13,7 @@ class Config:
     
     def __init__(self):
         self._config = self._load_config()
+        self._models_config = self._load_models_config()
         
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from config.json file."""
@@ -25,6 +26,17 @@ class Config:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             raise RuntimeError(f"Failed to load Elelem configuration: {e}")
     
+    def _load_models_config(self) -> Dict[str, Any]:
+        """Load models and providers configuration from YAML file."""
+        models_path = Path(__file__).parent / "models.yaml"
+        
+        try:
+            with open(models_path, 'r') as f:
+                config = yaml.safe_load(f)
+            return config
+        except (FileNotFoundError, yaml.YAMLError) as e:
+            raise RuntimeError(f"Failed to load Elelem models configuration: {e}")
+    
     @property
     def retry_settings(self) -> Dict[str, Any]:
         """Get retry settings."""
@@ -33,7 +45,7 @@ class Config:
     @property
     def providers(self) -> Dict[str, Any]:
         """Get provider configurations."""
-        return self._config.get("providers", {})
+        return self._models_config.get("providers", {})
         
     @property
     def timeout_seconds(self) -> int:

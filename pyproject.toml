@@ -30,6 +30,7 @@ dependencies = [
     "groq>=0.4.0",
     "aiofiles>=23.0.0",
     "jsonschema>=4.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -53,7 +54,7 @@ Issues = "https://github.com/yourorg/elelem/issues"
 where = ["src"]
 
 [tool.setuptools.package-data]
-elelem = ["config.json"]
+elelem = ["config.json", "models.yaml"]
 
 [tool.setuptools_scm]
 write_to = "src/elelem/_version.py"

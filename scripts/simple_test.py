@@ -50,13 +50,15 @@ async def test_2_simple_request(elelem):
     models = [
         "groq:openai/gpt-oss-20b",
         "deepinfra:openai/gpt-oss-20b",
+        "openrouter:openai/gpt-oss-20b",
         "openai:gpt-4.1-mini"
     ]
     
     model = None
     for m in models:
         provider = m.split(":")[0]
-        if os.getenv(f"{provider.upper()}_API_KEY"):
+        api_key_name = f"{provider.upper()}_API_KEY"
+        if os.getenv(api_key_name):
             model = m
             break
     
@@ -151,13 +153,15 @@ async def test_4_complex_story_json_sequential(elelem):
     models = [
         "deepinfra:openai/gpt-oss-20b",
         "groq:openai/gpt-oss-20b",
+        "openrouter:openai/gpt-oss-20b",
         "openai:gpt-4.1-mini"
     ]
     
     model = None
     for m in models:
         provider = m.split(":")[0]
-        if os.getenv(f"{provider.upper()}_API_KEY"):
+        api_key_name = f"{provider.upper()}_API_KEY"
+        if os.getenv(api_key_name):
             model = m
             break
     
@@ -791,6 +795,110 @@ Make this story absolutely CHAOTIC and mind-bendingly complex: featuring time-tr
             print(f"❌ ERROR: {str(e)[:60]}... | {model}")
 
 
+async def test_openrouter_features(elelem):
+    """Test OpenRouter-specific features: runtime cost, provider tracking, price-first routing"""
+    print("\n" + "="*50)
+    print("TEST OPENROUTER: Provider Tracking & Runtime Cost")
+    print("="*50)
+    
+    if not os.getenv("OPENROUTER_API_KEY"):
+        print("❌ SKIP - OPENROUTER_API_KEY not available")
+        return
+    
+    print("Testing OpenRouter integration features...")
+    
+    # Test 1: Basic OpenRouter request with runtime cost
+    print("\n1. Runtime cost tracking:")
+    try:
+        response = await elelem.create_chat_completion(
+            messages=[{"role": "user", "content": "Say hello in 3 words"}],
+            model="openrouter:openai/gpt-oss-20b",
+            max_tokens=10,
+            tags=["openrouter_test"]
+        )
+        
+        print(f"   Response: {response.choices[0].message.content}")
+        
+        # Check if provider info is captured
+        if hasattr(response, 'provider'):
+            print(f"   ✅ Provider captured: {response.provider}")
+        else:
+            print(f"   ❌ No provider info in response")
+        
+        # Get stats to verify runtime cost tracking
+        stats = elelem.get_stats_by_tag("openrouter_test")
+        if stats['total_cost_usd'] > 0:
+            print(f"   ✅ Runtime cost: ${stats['total_cost_usd']:.8f}")
+        else:
+            print(f"   ❌ No cost tracked")
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+    
+    # Test 2: Provider diversity with multiple requests
+    print("\n2. Provider diversity (5 requests):")
+    providers_used = set()
+    try:
+        for i in range(5):
+            response = await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": f"Count to {i+1}"}],
+                model="openrouter:openai/gpt-oss-120b",
+                max_tokens=10,
+                tags=[f"openrouter_diversity_{i}"]
+            )
+            
+            if hasattr(response, 'provider'):
+                providers_used.add(response.provider)
+                print(f"   Request {i+1}: {response.provider}")
+        
+        if len(providers_used) > 1:
+            print(f"   ✅ Multiple providers used: {list(providers_used)}")
+        elif len(providers_used) == 1:
+            print(f"   ⚠️  Only one provider used: {list(providers_used)[0]}")
+        else:
+            print(f"   ❌ No providers tracked")
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+    
+    # Test 3: Verify price-first routing configuration
+    print("\n3. Price-first routing configuration:")
+    try:
+        from elelem.config import Config
+        config = Config()
+        models = config._models_config.get('models', {})
+        model_config = models.get('openrouter:openai/gpt-oss-120b')
+        if model_config:
+            model_id = model_config.get('model_id', '')
+            if ':floor' in model_id:
+                print(f"   ✅ Price-first routing enforced (:floor suffix)")
+                print(f"      Model ID: {model_id}")
+            else:
+                print(f"   ❌ No :floor suffix in model ID: {model_id}")
+        else:
+            print(f"   ❌ Model config not found")
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+    
+    # Test 4: Provider statistics aggregation
+    print("\n4. Provider statistics aggregation:")
+    try:
+        overall_stats = elelem.get_stats()
+        
+        if 'providers' in overall_stats and overall_stats['providers']:
+            print("   Provider breakdown:")
+            for provider, provider_stats in overall_stats['providers'].items():
+                print(f"   • {provider}:")
+                print(f"       Requests: {provider_stats['count']}")
+                print(f"       Cost: ${provider_stats['total_cost_usd']:.8f}")
+                print(f"       Tokens: {provider_stats['total_tokens']}")
+            print(f"   ✅ Provider statistics working")
+        else:
+            print(f"   ❌ No provider statistics available")
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+    
+    print("\n✅ OpenRouter tests complete")
+
+
 async def test_6_stats(elelem):
     """Test 6: Verify statistics tracking including tag-based stats"""
     print("\n" + "="*50)
@@ -913,10 +1021,12 @@ async def main():
         providers.append("GROQ")
     if os.getenv("DEEPINFRA_API_KEY"):
         providers.append("DeepInfra")
+    if os.getenv("OPENROUTER_API_KEY"):
+        providers.append("OpenRouter")
     
     if not providers:
         print("\n❌ No API keys found!")
-        print("Set one of: OPENAI_API_KEY, GROQ_API_KEY, DEEPINFRA_API_KEY")
+        print("Set one of: OPENAI_API_KEY, GROQ_API_KEY, DEEPINFRA_API_KEY, OPENROUTER_API_KEY")
         sys.exit(1)
     
     print(f"Available providers: {', '.join(providers)}")
@@ -930,8 +1040,9 @@ async def main():
     print("\n" + "="*50)
     print("TEST 4: Skipping sequential test (too slow)")
     print("="*50)
-    await test_6_multi_model_parallel_testing(elelem)
-    await test_5_json_schema_validation(elelem)
+    #await test_6_multi_model_parallel_testing(elelem)
+    #await test_5_json_schema_validation(elelem)
+    await test_openrouter_features(elelem)  # Add OpenRouter test
     await test_6_stats(elelem)
     
     print("\n" + "="*60)

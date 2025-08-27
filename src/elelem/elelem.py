@@ -734,9 +734,8 @@ class Elelem:
                     # API error case - no content to process
                     content = ""
                 
-                # Validate JSON if response_format was requested
-                response_format = api_kwargs.get("response_format")
-                if response_format and response_format.get("type") == "json_object":
+                # Validate JSON if JSON mode was originally requested (even if response_format was removed)
+                if json_mode_requested:
                     try:
                         self._validate_json_response(content, json_schema, api_error)
                     except json.JSONDecodeError as e:

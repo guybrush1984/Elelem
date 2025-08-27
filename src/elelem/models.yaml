@@ -322,7 +322,7 @@ models:
   # OpenRouter Models (Automatic provider routing with runtime pricing)
   "openrouter:openai/gpt-oss-20b":
     provider: openrouter
-    model_id: openai/gpt-oss-20b:floor  # Use :floor suffix to enforce price-first routing
+    model_id: openai/gpt-oss-20b  # Use :floor suffix to enforce price-first routing
     capabilities:
       supports_json_mode: false
       supports_temperature: true
@@ -332,7 +332,7 @@ models:
   # OpenRouter Models (Automatic provider routing with runtime pricing)
   "openrouter:openai/gpt-oss-120b":
     provider: openrouter
-    model_id: openai/gpt-oss-120b:floor  # Use :floor suffix to enforce price-first routing
+    model_id: openai/gpt-oss-120b  # Use :floor suffix to enforce price-first routing
     capabilities:
       supports_json_mode: false
       supports_temperature: true
@@ -342,7 +342,7 @@ models:
   # OpenRouter Models (Automatic provider routing with runtime pricing)
   "openrouter:anthropic/claude-sonnet-4":
     provider: openrouter
-    model_id: anthropic/claude-sonnet-4:floor  # Use :floor suffix to enforce price-first routing
+    model_id: anthropic/claude-sonnet-4  # Use :floor suffix to enforce price-first routing
     capabilities:
       supports_json_mode: false
       supports_temperature: true

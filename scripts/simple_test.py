@@ -51,6 +51,7 @@ async def test_2_simple_request(elelem):
         "groq:openai/gpt-oss-20b",
         "deepinfra:openai/gpt-oss-20b",
         "openrouter:openai/gpt-oss-20b",
+        "openrouter:mistralai/mixtral-8x22b-instruct",
         "openai:gpt-4.1-mini"
     ]
     
@@ -154,6 +155,7 @@ async def test_4_complex_story_json_sequential(elelem):
         "deepinfra:openai/gpt-oss-20b",
         "groq:openai/gpt-oss-20b",
         "openrouter:openai/gpt-oss-20b",
+        "openrouter:mistralai/mistral-large-2411",
         "openai:gpt-4.1-mini"
     ]
     
@@ -895,6 +897,55 @@ async def test_openrouter_features(elelem):
             print(f"   ❌ No provider statistics available")
     except Exception as e:
         print(f"   ❌ Error: {e}")
+    
+    # Test 5: JSON capability test for new Mistral models
+    print("\n5. JSON capability test for new Mistral models:")
+    mistral_models = [
+        "openrouter:mistralai/mixtral-8x22b-instruct",
+        "openrouter:mistralai/mistral-large-2411"
+    ]
+    
+    for model in mistral_models:
+        print(f"\n   Testing {model}:")
+        try:
+            response = await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": "Create a JSON object with fields: name (string), age (number), skills (array of strings). Make it about a software engineer."}],
+                model=model,
+                response_format={"type": "json_object"},
+                max_tokens=100,
+                tags=[f"mistral_json_test"]
+            )
+            
+            content = response.choices[0].message.content
+            
+            # Try to parse JSON
+            try:
+                import json
+                data = json.loads(content)
+                
+                # Check required fields
+                required_fields = ["name", "age", "skills"]
+                has_required = all(field in data for field in required_fields)
+                
+                if has_required and isinstance(data["skills"], list):
+                    print(f"      ✅ Valid JSON with correct structure")
+                    print(f"      📄 Name: {data.get('name', 'N/A')}")
+                    print(f"      🔢 Age: {data.get('age', 'N/A')}")
+                    print(f"      🛠️  Skills: {len(data.get('skills', []))} items")
+                else:
+                    print(f"      ⚠️  JSON valid but missing required fields")
+                    print(f"      📋 Available fields: {list(data.keys())}")
+                    
+            except json.JSONDecodeError as e:
+                print(f"      ❌ Invalid JSON: {str(e)[:50]}...")
+                print(f"      📄 Raw content: {content[:100]}...")
+                
+            # Check provider info
+            if hasattr(response, 'provider'):
+                print(f"      🏢 Provider used: {response.provider}")
+                
+        except Exception as e:
+            print(f"      ❌ Request failed: {e}")
     
     print("\n✅ OpenRouter tests complete")
 

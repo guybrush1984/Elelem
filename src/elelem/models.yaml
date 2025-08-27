@@ -348,3 +348,23 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime  # Costs determined at runtime from OpenRouter response headers
+
+  # OpenRouter Models (Automatic provider routing with runtime pricing)
+  "openrouter:mistralai/mixtral-8x22b-instruct":
+    provider: openrouter
+    model_id: mistralai/mixtral-8x22b-instruct  # Use :floor suffix to enforce price-first routing
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers
+
+  # OpenRouter Models (Automatic provider routing with runtime pricing)
+  "openrouter:mistralai/mistral-large-2411":
+    provider: openrouter
+    model_id: mistralai/mistral-large-2411  # Use :floor suffix to enforce price-first routing
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers 

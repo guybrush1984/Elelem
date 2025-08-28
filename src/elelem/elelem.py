@@ -62,7 +62,15 @@ class Elelem:
         
         # Initialize all configured providers
         for provider_name, provider_config in self.config.providers.items():
-            env_var = f"{provider_name.upper()}_API_KEY"
+            # Handle infrastructure providers (e.g., cerebras@openrouter)
+            base_provider = provider_config.get("base_provider")
+            if base_provider:
+                # Use base provider for API key: cerebras@openrouter -> OPENROUTER_API_KEY
+                env_var = f"{base_provider.upper()}_API_KEY"
+            else:
+                # Direct provider: openrouter -> OPENROUTER_API_KEY
+                env_var = f"{provider_name.upper()}_API_KEY"
+            
             api_key = os.getenv(env_var)
             
             if api_key:
@@ -283,8 +291,8 @@ class Elelem:
         runtime_costs = None
         
         try:
-            # Check if this is an OpenRouter model
-            if not model.startswith("openrouter:"):
+            # Check if this is an OpenRouter model (direct or infrastructure provider)
+            if not (model.startswith("openrouter:") or "@openrouter:" in model):
                 return runtime_costs
             
             # OpenRouter includes detailed usage information when requested
@@ -762,8 +770,18 @@ class Elelem:
                 # Calculate final duration
                 duration = time.time() - start_time
                 
-                # Log successful response
-                self.logger.info(f"[{request_id}] ✅ REQUEST SUCCESS - {current_model} in {duration:.2f}s")
+                # Log successful response with infrastructure provider info if available
+                provider_info = ""
+                if hasattr(response, 'provider') and response.provider:
+                    # Check if this is an infrastructure provider (provider contains @)
+                    provider_name = model_config.get("provider", "")
+                    if "@" in provider_name:
+                        infrastructure_provider, routing_provider = provider_name.split("@")
+                        provider_info = f" via {response.provider} (routed through {routing_provider})"
+                    else:
+                        provider_info = f" via {response.provider}"
+                
+                self.logger.info(f"[{request_id}] ✅ REQUEST SUCCESS - {current_model}{provider_info} in {duration:.2f}s")
                 self.logger.debug(f"[{request_id}] 📊 Token usage - Input: {total_input_tokens}, Output: {total_output_tokens} tokens")
                 if total_reasoning_tokens > 0:
                     self.logger.debug(f"[{request_id}] 🧠 Reasoning tokens used: {total_reasoning_tokens}")
@@ -855,8 +873,15 @@ class Elelem:
         
         for model_key, model_config in self._models.items():
             provider = model_config.get("provider", "unknown")
-            # Check if API key is available for this provider
-            env_var = f"{provider.upper()}_API_KEY"
+            
+            # Handle infrastructure providers for availability check
+            provider_config = self.config.providers.get(provider, {})
+            base_provider = provider_config.get("base_provider")
+            if base_provider:
+                env_var = f"{base_provider.upper()}_API_KEY"
+            else:
+                env_var = f"{provider.upper()}_API_KEY"
+            
             is_available = provider in self._providers
             
             models_list.append({

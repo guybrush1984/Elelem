@@ -51,6 +51,7 @@ async def test_2_simple_request(elelem):
         "groq:openai/gpt-oss-20b",
         "deepinfra:openai/gpt-oss-20b",
         "openrouter:openai/gpt-oss-20b",
+        "cerebras@openrouter:openai/gpt-oss-120b",
         "openrouter:mistralai/mixtral-8x22b-instruct",
         "openai:gpt-4.1-mini"
     ]
@@ -947,6 +948,78 @@ async def test_openrouter_features(elelem):
         except Exception as e:
             print(f"      ❌ Request failed: {e}")
     
+    # Test 6: Infrastructure Provider Selection
+    print("\n6. Infrastructure provider selection:")
+    if not os.getenv("OPENROUTER_API_KEY"):
+        print("   ❌ SKIP - No OPENROUTER_API_KEY")
+    else:
+        try:
+            # Test forced Cerebras vs regular OpenRouter
+            print("\n   Testing forced Cerebras infrastructure:")
+            
+            response1 = await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": "Say 'test' once"}],
+                model="cerebras@openrouter:openai/gpt-oss-120b",
+                max_tokens=5,
+                tags=["cerebras_forced_test"]
+            )
+            
+            print(f"      Cerebras response: '{response1.choices[0].message.content}'")
+            if hasattr(response1, 'provider'):
+                print(f"      ✅ Forced Cerebras provider: {response1.provider}")
+            
+            # Test regular OpenRouter for comparison
+            print("\n   Testing regular OpenRouter routing:")
+            response2 = await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": "Say 'test' once"}],
+                model="openrouter:openai/gpt-oss-120b",
+                max_tokens=5,
+                tags=["regular_routing_test"]
+            )
+            
+            print(f"      Regular response: '{response2.choices[0].message.content}'")
+            if hasattr(response2, 'provider'):
+                print(f"      ✅ Regular routing provider: {response2.provider}")
+            
+            # Compare the providers
+            if hasattr(response1, 'provider') and hasattr(response2, 'provider'):
+                cerebras_provider = response1.provider.lower()
+                regular_provider = response2.provider.lower()
+                
+                if cerebras_provider == "cerebras":
+                    print(f"      ✅ Infrastructure selection working - forced Cerebras")
+                else:
+                    print(f"      ⚠️  Expected Cerebras, got {response1.provider}")
+                
+                if regular_provider != cerebras_provider:
+                    print(f"      ✅ Provider diversity confirmed - different providers used")
+                else:
+                    print(f"      ⚠️  Both used same provider (might be coincidence)")
+            
+            # Test multiple forced requests to ensure consistency
+            print("\n   Testing consistency (3 forced Cerebras requests):")
+            cerebras_providers = []
+            for i in range(3):
+                response = await elelem.create_chat_completion(
+                    messages=[{"role": "user", "content": f"Count: {i+1}"}],
+                    model="cerebras@openrouter:openai/gpt-oss-120b",
+                    max_tokens=5,
+                    tags=[f"cerebras_consistency_{i}"]
+                )
+                if hasattr(response, 'provider'):
+                    cerebras_providers.append(response.provider)
+                    print(f"      Request {i+1}: {response.provider}")
+            
+            if cerebras_providers:
+                unique_providers = set(p.lower() for p in cerebras_providers)
+                if len(unique_providers) == 1 and "cerebras" in unique_providers:
+                    print(f"      ✅ Consistency confirmed - all 3 requests used Cerebras")
+                else:
+                    print(f"      ⚠️  Inconsistent providers: {unique_providers}")
+                    
+        except Exception as e:
+            print(f"      ❌ Infrastructure provider test failed: {e}")
+
     print("\n✅ OpenRouter tests complete")
 
 

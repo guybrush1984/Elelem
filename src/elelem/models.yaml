@@ -34,6 +34,40 @@ providers:
     extra_body:
       usage:
         include: true
+  
+  # Infrastructure providers - force specific providers via OpenRouter
+  throughput@openrouter:
+    base_provider: openrouter
+    endpoint: https://openrouter.ai/api/v1
+    fallback_model: openrouter:openai/gpt-4o-mini  # TODO: fix fallback models
+    headers:
+      HTTP-Referer: https://github.com/guybrush1984/Elelem
+      X-Title: Elelem
+    default_params: {}
+    extra_body:
+      usage:
+        include: true
+      provider:
+        only: ["cerebras", "groq", "together", "deepinfra", "novita", "fireworks"]
+        sort: "throughput"
+        allow_fallbacks: false
+
+  # Infrastructure providers - force specific providers via OpenRouter
+  cost@openrouter:
+    base_provider: openrouter
+    endpoint: https://openrouter.ai/api/v1
+    fallback_model: openrouter:openai/gpt-4o-mini  # TODO: fix fallback models
+    headers:
+      HTTP-Referer: https://github.com/guybrush1984/Elelem
+      X-Title: Elelem
+    default_params: {}
+    extra_body:
+      usage:
+        include: true
+      provider:
+        only: ["cerebras", "groq", "together", "deepinfra", "novita", "fireworks"]
+        sort: "price"
+        allow_fallbacks: false        
 
 models:
   # OpenAI Models (Standard tier pricing)
@@ -340,6 +374,16 @@ models:
     cost: runtime  # Costs determined at runtime from OpenRouter response headers
 
   # OpenRouter Models (Automatic provider routing with runtime pricing)
+  "openrouter:openai/gpt-oss-120b-nitro":
+    provider: openrouter
+    model_id: openai/gpt-oss-120b:nitro  # Use :floor suffix to enforce price-first routing
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers
+
+  # OpenRouter Models (Automatic provider routing with runtime pricing)
   "openrouter:anthropic/claude-sonnet-4":
     provider: openrouter
     model_id: anthropic/claude-sonnet-4  # Use :floor suffix to enforce price-first routing
@@ -367,4 +411,67 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime  # Costs determined at runtime from OpenRouter response headers 
+    cost: runtime  # Costs determined at runtime from OpenRouter response headers
+
+  # Infrastructure provider-specific model
+  "throughput@openrouter:openai/gpt-oss-120b":
+    provider: throughput@openrouter
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime 
+
+ # Infrastructure provider-specific model
+  "cost@openrouter:openai/gpt-oss-120b":
+    provider: cost@openrouter
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  # Infrastructure provider-specific model
+  "throughput@openrouter:openai/gpt-oss-20b":
+    provider: throughput@openrouter
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime 
+
+ # Infrastructure provider-specific model
+  "cost@openrouter:openai/gpt-oss-20b":
+    provider: cost@openrouter
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime    
+
+  # Infrastructure provider-specific model
+  "throughput@openrouter:deepseek/deepseek-3.1":
+    provider: throughput@openrouter
+    model_id: deepseek/deepseek-chat-v3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime 
+
+ # Infrastructure provider-specific model
+  "cost@openrouter:deepseek/deepseek-3.1":
+    provider: cost@openrouter
+    model_id: deepseek/deepseek-chat-v3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+
+    

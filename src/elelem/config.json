@@ -7,5 +7,6 @@
         "max_rate_limit_retries": 4
     },
     "timeout_seconds": 120,
+    "timeout_fallback_model": "scaleway:gpt-oss-120b",
     "logging_level": "INFO"
 }

@@ -75,3 +75,24 @@ class Config:
         """Get default parameters for a specific provider."""
         provider_config = self.get_provider_config(provider)
         return provider_config.get("default_params", {})
+        
+    @property 
+    def timeout_fallback_model(self) -> str:
+        """Get system-wide timeout fallback model."""
+        return self._config.get("timeout_fallback_model", "")
+    
+    def get_timeout_fallback_model(self, model: str) -> str:
+        """Get timeout fallback model for a specific model.
+        
+        Args:
+            model: Model string in "provider:model" format
+            
+        Returns:
+            Model-specific timeout fallback if defined, otherwise system-wide fallback
+        """
+        # Check if the model has a specific timeout_fallback configured
+        models = self._models_config.get("models", {})
+        model_config = models.get(model, {})
+        
+        # Return model-specific fallback if defined, otherwise system-wide fallback
+        return model_config.get("timeout_fallback", self.timeout_fallback_model)

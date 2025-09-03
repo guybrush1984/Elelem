@@ -47,7 +47,7 @@ class Elelem:
         client_kwargs = {
             "api_key": api_key,
             "base_url": base_url,
-            "timeout": timeout
+            "timeout": 600  # High timeout - we'll manage timeouts at application level
         }
         
         # Add custom headers for specific providers
@@ -114,7 +114,8 @@ class Elelem:
                 "temperature_reductions": 0,
                 "final_failures": 0,
                 "fallback_model_usage": 0,
-                "response_format_removals": 0
+                "response_format_removals": 0,
+                "timeout_fallbacks": 0
             }
         }
         self._tag_statistics = {}
@@ -417,7 +418,8 @@ class Elelem:
                         "temperature_reductions": 0,
                         "final_failures": 0,
                         "fallback_model_usage": 0,
-                        "response_format_removals": 0
+                        "response_format_removals": 0,
+                        "timeout_fallbacks": 0
                     }
                 }
                 
@@ -453,10 +455,37 @@ class Elelem:
         
         # Update tag-specific statistics
         for tag in tags:
-            if tag in self._tag_statistics:
-                if retry_type in self._tag_statistics[tag]["retry_analytics"]:
-                    self._tag_statistics[tag]["retry_analytics"][retry_type] += count
-                    self._tag_statistics[tag]["retry_analytics"]["total_retries"] += count
+            # Initialize tag statistics if they don't exist
+            if tag not in self._tag_statistics:
+                self._tag_statistics[tag] = {
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0,
+                    "total_tokens": 0,
+                    "total_input_cost_usd": 0.0,
+                    "total_output_cost_usd": 0.0,
+                    "total_cost_usd": 0.0,
+                    "total_calls": 0,
+                    "total_duration_seconds": 0.0,
+                    "avg_duration_seconds": 0.0,
+                    "reasoning_tokens": 0,
+                    "reasoning_cost_usd": 0.0,
+                    "retry_analytics": {
+                        "json_parse_retries": 0,
+                        "json_schema_retries": 0,
+                        "api_json_validation_retries": 0,
+                        "rate_limit_retries": 0,
+                        "total_retries": 0,
+                        "temperature_reductions": 0,
+                        "final_failures": 0,
+                        "fallback_model_usage": 0,
+                        "response_format_removals": 0,
+                        "timeout_fallbacks": 0
+                    }
+                }
+            
+            if retry_type in self._tag_statistics[tag]["retry_analytics"]:
+                self._tag_statistics[tag]["retry_analytics"][retry_type] += count
+                self._tag_statistics[tag]["retry_analytics"]["total_retries"] += count
     
     def _setup_request(self, model: str, request_id: str, **kwargs) -> tuple[str, str, Any, Dict, Dict, str, bool, Any]:
         """Setup and validate request parameters.
@@ -692,6 +721,7 @@ class Elelem:
         current_model = model
         current_model_name = model_name
         current_provider_client = provider_client
+        using_fallback_model = False
         
         # Log initial request details
         self.logger.debug(f"[{request_id}] 🚀 Making request to {model} with temperature={api_kwargs.get('temperature', 'default')}")
@@ -705,14 +735,45 @@ class Elelem:
                 max_attempts = max_retries + 2
                 self.logger.info(f"[{request_id}] 🔄 REQUEST START - {current_model} (attempt {attempt + 1}/{max_attempts}) - temp={current_temp}")
                 
-                # Make the API call
+                # Make the API call with timeout handling
+                # Use 2x timeout for fallback model
+                current_timeout = self.config.timeout_seconds * 2 if using_fallback_model else self.config.timeout_seconds
                 try:
-                    response = await current_provider_client.chat.completions.create(
-                        messages=modified_messages,
-                        model=current_model_name,
-                        **api_kwargs
+                    response = await asyncio.wait_for(
+                        current_provider_client.chat.completions.create(
+                            messages=modified_messages,
+                            model=current_model_name,
+                            **api_kwargs
+                        ),
+                        timeout=current_timeout
                     )
                     api_error = None
+                except asyncio.TimeoutError:
+                    # Handle timeout with fallback model
+                    # Check for model-specific fallback first, then system-wide fallback
+                    timeout_fallback = self.config.get_timeout_fallback_model(current_model)
+                    if timeout_fallback and current_model != timeout_fallback:
+                        self.logger.warning(f"[{request_id}] 🕐 REQUEST TIMEOUT after {current_timeout}s - falling back to {timeout_fallback}")
+                        
+                        # Switch to fallback model
+                        fallback_provider, fallback_model_name = self._parse_model_string(timeout_fallback)
+                        current_model = timeout_fallback
+                        current_model_name = fallback_model_name
+                        current_provider_client = self._providers[fallback_provider]
+                        using_fallback_model = True
+                        
+                        # Reset temperature for fallback
+                        api_kwargs["temperature"] = original_temperature
+                        
+                        # Track timeout fallback usage
+                        self._update_retry_analytics("timeout_fallbacks", tags)
+                        
+                        fallback_timeout = self.config.timeout_seconds * 2
+                        self.logger.info(f"[{request_id}] 🔄 TIMEOUT FALLBACK - {current_model} (timeout={fallback_timeout}s) - temp={original_temperature}")
+                        continue  # Retry with fallback model
+                    else:
+                        # No fallback available or already using fallback
+                        raise asyncio.TimeoutError(f"Request timed out after {current_timeout}s (no fallback available)")
                 except Exception as api_e:
                     # Check if this is a JSON validation API error
                     if self._is_json_validation_api_error(api_e) and json_mode_requested:
@@ -857,7 +918,8 @@ class Elelem:
                     "temperature_reductions": 0,
                     "final_failures": 0,
                     "fallback_model_usage": 0,
-                    "response_format_removals": 0
+                    "response_format_removals": 0,
+                    "timeout_fallbacks": 0
                 }
             }
         

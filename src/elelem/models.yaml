@@ -432,6 +432,7 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
+    timeout_fallback: throughput@openrouter:openai/gpt-oss-120b
 
   # Infrastructure provider-specific model
   "throughput@openrouter:openai/gpt-oss-20b":
@@ -451,7 +452,8 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime    
+    cost: runtime
+    timeout_fallback: throughput@openrouter:openai/gpt-oss-20b    
 
   # Infrastructure provider-specific model
   "throughput@openrouter:deepseek/deepseek-3.1":
@@ -472,6 +474,7 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
+    timeout_fallback: throughput@openrouter:deepseek/deepseek-3.1
 
 
     

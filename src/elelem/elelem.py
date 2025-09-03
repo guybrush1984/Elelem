@@ -580,7 +580,7 @@ class Elelem:
                 self._update_retry_analytics("json_schema_retries", tags)
                 self.logger.warning(
                     f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
-                    f"Retrying with temperature {new_temp}: {str(e)[:100]}..."
+                    f"Retrying with temperature {new_temp}: {str(e)[:500]}..."
                 )
             else:
                 # Could be API JSON validation or client-side parse failure
@@ -590,7 +590,7 @@ class Elelem:
                     self._update_retry_analytics("json_parse_retries", tags)
                 self.logger.warning(
                     f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
-                    f"Retrying with temperature {new_temp}: {str(e)[:50]}..."
+                    f"Retrying with temperature {new_temp}: {str(e)[:300]}..."
                 )
             return True, new_temp
         return False, 0.0

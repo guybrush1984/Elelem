@@ -1,0 +1,75 @@
+# GROQ provider configuration and models
+provider:
+  endpoint: https://api.groq.com/openai/v1
+  default_params:
+    service_tier: auto
+
+models:
+  "groq:openai/gpt-oss-120b":
+    provider: groq
+    model_id: openai/gpt-oss-120b  # GROQ's model ID format
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.75
+      currency: USD
+    default_params:
+      reasoning_effort: low
+    metadata_ref: "openai_gpt_oss_120b"
+
+  "groq:openai/gpt-oss-20b":
+    provider: groq
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.50
+      currency: USD
+    default_params:
+      reasoning_effort: low
+    metadata_ref: "openai_gpt_oss_20b"      
+
+  "groq:moonshotai/kimi-k2-instruct":
+    provider: groq
+    model_id: moonshotai/kimi-k2-instruct
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.00
+      output_cost_per_1m: 3.00
+      currency: USD
+    metadata_ref: "moonshot_kimi_k2"
+
+  "groq:meta-llama/llama-4-maverick-17b-128e-instruct":
+    provider: groq
+    model_id: meta-llama/llama-4-maverick-17b-128e-instruct
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.60
+      currency: USD
+    metadata_ref: "meta_llama4_maverick"
+
+  "groq:meta-llama/llama-4-scout-17b-16e-instruct":
+    provider: groq
+    model_id: meta-llama/llama-4-scout-17b-16e-instruct
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.11
+      output_cost_per_1m: 0.34
+      currency: USD
+    metadata_ref: "meta_llama4_scout"

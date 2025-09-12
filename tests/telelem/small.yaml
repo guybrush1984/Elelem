@@ -1,0 +1,5 @@
+system: |
+  You are an assistant generating cake recipes. Generate recipes in 6 steps, 50 words each.
+
+user: |
+  I want a chocolate cake for 8. 

@@ -1,0 +1,49 @@
+# Parasail provider configuration and models
+provider:
+  endpoint: https://api.parasail.io/v1
+  default_params: {}
+
+models:
+  "parasail:deepseek-3.1":
+    provider: parasail
+    model_id: parasail-deepseek-31
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.64
+      output_cost_per_1m: 1.65
+      currency: USD
+    metadata_ref: "deepseek_v31"
+
+  "parasail:deepseek-3.1-think":
+    provider: parasail
+    model_id: parasail-deepseek-31
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.64
+      output_cost_per_1m: 1.65
+      currency: USD
+    metadata_ref: "deepseek_v31"
+    extra_body:
+      chat_template_kwargs:
+        thinking: true
+
+  "parasail:gpt-oss-120b":
+    provider: parasail
+    model_id: parasail-gpt-oss-120b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
+      currency: USD
+    metadata_ref: "openai_gpt_oss_120b"
+    default_params:
+      reasoning_effort: low

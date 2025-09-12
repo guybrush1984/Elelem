@@ -1,0 +1,52 @@
+# Fireworks provider configuration and models
+provider:
+  endpoint: https://api.fireworks.ai/inference/v1
+  default_params:
+    stream: true
+  max_tokens_default: 16384
+
+models:
+  "fireworks:deepseek-3.1":
+    metadata_ref: "deepseek_v31-nothink"
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v3p1
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+
+
+  "fireworks:gpt-oss-120b":
+    metadata_ref: "openai_gpt_oss_120b"
+    provider: fireworks
+    model_id: accounts/fireworks/models/gpt-oss-120b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
+      currency: USD
+    default_params:
+      reasoning_effort: low
+
+
+  "fireworks:gpt-oss-20b":
+    metadata_ref: "openai_gpt_oss_20b"
+    provider: fireworks
+    model_id: accounts/fireworks/models/gpt-oss-20b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.07
+      output_cost_per_1m: 0.30
+      currency: USD
+    default_params:
+      reasoning_effort: low      

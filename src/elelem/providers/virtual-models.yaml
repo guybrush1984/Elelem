@@ -1,0 +1,63 @@
+# Virtual models that reference multiple providers for resilience
+# These models automatically failover between providers based on candidate configuration
+
+models:
+  # Virtual model combining multiple gpt-oss-120b providers for resilience
+  "virtual:gpt-oss-120b":
+    metadata_ref: "openai_gpt_oss_120b"
+    timeout: 120s
+    candidates:
+      - model: "parasail:gpt-oss-120b"
+        timeout: 120s   # Try Parasail first
+      - model: "fireworks:gpt-oss-120b"
+        timeout: 120s   # Fireworks fallback with more time
+      - model: "groq:openai/gpt-oss-120b"
+        timeout: 120s  # Groq as final fallback
+
+  # Virtual model combining multiple gpt-oss-20b providers
+  "virtual:gpt-oss-20b":
+    metadata_ref: "openai_gpt_oss_20b"
+    timeout: 120s
+    candidates:
+      - model: "fireworks:gpt-oss-20b"
+        timeout: 120s
+      - model: "groq:openai/gpt-oss-20b"
+        timeout: 120s
+      - model: "deepinfra:openai/gpt-oss-20b"
+        timeout: 120s
+
+  # Virtual model for DeepSeek variants across providers
+  "virtual:deepseek-v3.1":
+    metadata_ref: "deepseek_v31"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:deepseek-ai/DeepSeek-V3.1"
+        timeout: 120s
+      - model: "parasail:deepseek-3.1"
+        timeout: 120s
+      - model: "fireworks:deepseek-3.1"
+        timeout: 120s
+
+  # Cost-optimized routing (cheapest first)
+  "virtual:gpt-oss-120b-cheap":
+    metadata_ref: "openai_gpt_oss_120b"
+    timeout: 120s
+    candidates:
+      - model: "parasail:gpt-oss-120b"     # $0.15/$0.60
+        timeout: 120s
+      - model: "fireworks:gpt-oss-120b"    # $0.15/$0.60
+        timeout: 120s
+      - model: "deepinfra:openai/gpt-oss-120b"  # $0.09/$0.45 - cheapest but last due to no JSON support
+        timeout: 120s
+
+  # Speed-optimized routing (fastest first) - shorter timeouts for speed
+  "virtual:gpt-oss-120b-fast":
+    metadata_ref: "openai_gpt_oss_120b"
+    timeout: 120s
+    candidates:
+      - model: "groq:openai/gpt-oss-120b"  # Usually fastest
+        timeout: 120s   # Very short timeout to force quick failover
+      - model: "fireworks:gpt-oss-120b"    # Good speed
+        timeout: 120s
+      - model: "parasail:gpt-oss-120b"     # Fallback
+        timeout: 120s

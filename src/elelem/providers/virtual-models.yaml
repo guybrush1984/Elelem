@@ -58,7 +58,7 @@ models:
         timeout: 120s
       - model: "fireworks:gpt-oss-20b"
         timeout: 120s
-      - model: "groq:gpt-oss-20b"    
+      - model: "groq:openai/gpt-oss-20b"    
         timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
@@ -70,5 +70,5 @@ models:
         timeout: 120s   
       - model: "fireworks:gpt-oss-20b"    
         timeout: 120s
-      - model: "parasail:gpt-oss-20b"     
+      - model: "deepinfra:openai/gpt-oss-20b"     
         timeout: 120s

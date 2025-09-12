@@ -874,6 +874,10 @@ class Elelem:
         json_schema = kwargs.get("json_schema")
         original_temperature = kwargs.get("temperature", 1.0)
         
+        # Remove json_schema from kwargs - it's not part of the OpenAI API
+        if "json_schema" in kwargs:
+            kwargs.pop("json_schema")
+        
         # Warn if json_schema provided without JSON response format
         if json_schema and not json_mode_requested:
             self.logger.warning(f"[{request_id}] json_schema provided but response_format is not set to json_object. Schema validation will be skipped.")
@@ -968,10 +972,6 @@ class Elelem:
         
         if merged_extra_body:
             api_kwargs["extra_body"] = merged_extra_body
-        
-        # Remove json_schema from api_kwargs - it's not part of the OpenAI API
-        if "json_schema" in api_kwargs:
-            api_kwargs.pop("json_schema")
         
         # Clean up unsupported parameters for this provider
         self._cleanup_api_kwargs(api_kwargs, candidate_model_name, {'capabilities': capabilities})

@@ -29,13 +29,25 @@ class Config:
     def _load_models_config(self) -> Dict[str, Any]:
         """Load models and providers configuration from YAML files.
         
-        Loads main models.yaml and auto-discovers provider files in providers/ directory.
+        Loads main models.yaml, metadata, and auto-discovers provider files in providers/ directory.
         """
         models_path = Path(__file__).parent / "models.yaml"
         providers_dir = Path(__file__).parent / "providers"
+        metadata_path = providers_dir / "_metadata.yaml"
         
         # Initialize merged configuration
         merged_config = {"providers": {}, "models": {}}
+        
+        # Load metadata definitions
+        metadata_definitions = {}
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, 'r') as f:
+                    metadata_config = yaml.safe_load(f) or {}
+                metadata_definitions = metadata_config.get("model_metadata", {})
+            except (FileNotFoundError, yaml.YAMLError) as e:
+                # Metadata is optional, continue without it
+                pass
         
         try:
             # Load main models.yaml if it exists
@@ -50,6 +62,10 @@ class Config:
             # Auto-discover and merge provider files
             if providers_dir.exists():
                 for yaml_file in providers_dir.glob("*.yaml"):
+                    # Skip metadata file
+                    if yaml_file.name.startswith("_"):
+                        continue
+                        
                     with open(yaml_file, 'r') as f:
                         provider_config = yaml.safe_load(f) or {}
                     
@@ -59,9 +75,18 @@ class Config:
                     if 'provider' in provider_config:
                         merged_config['providers'][provider_name] = provider_config['provider']
                     
-                    # Merge models
+                    # Merge models and resolve metadata references
                     if 'models' in provider_config:
-                        merged_config['models'].update(provider_config['models'])
+                        for model_key, model_config in provider_config['models'].items():
+                            # Check for metadata_ref and resolve it
+                            if 'metadata_ref' in model_config and model_config['metadata_ref'] in metadata_definitions:
+                                metadata = metadata_definitions[model_config['metadata_ref']].copy()
+                                # Merge metadata into display_metadata
+                                model_config.setdefault('display_metadata', {}).update(metadata)
+                                # Remove the reference
+                                del model_config['metadata_ref']
+                            
+                            merged_config['models'][model_key] = model_config
             
             return merged_config
         except (FileNotFoundError, yaml.YAMLError) as e:
@@ -152,6 +177,7 @@ class Config:
                         'capabilities': ref_config.get('capabilities', {}),
                         'cost': ref_config.get('cost'),
                         'default_params': ref_config.get('default_params', {}),
+                        'display_metadata': ref_config.get('display_metadata', {}),
                         'timeout': candidate.get('timeout')  # Candidate timeout override
                     }
                 else:
@@ -173,6 +199,7 @@ class Config:
                     'capabilities': config.get('capabilities', {}),
                     'cost': config.get('cost'),
                     'default_params': config.get('default_params', {}),
+                    'display_metadata': config.get('display_metadata', {}),
                     'timeout': config.get('timeout')
                 }],
                 'timeout': config.get('timeout')

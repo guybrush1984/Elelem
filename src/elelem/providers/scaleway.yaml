@@ -6,6 +6,7 @@ provider:
 
 models:
   "scaleway:gpt-oss-120b":
+    metadata_ref: "openai_gpt_oss_120b"
     provider: scaleway
     model_id: gpt-oss-120b
     capabilities:
@@ -20,6 +21,7 @@ models:
       reasoning_effort: low      
 
   "scaleway:gemma-3-27b-it":
+    metadata_ref: "google_gemma_3_27b"
     provider: scaleway
     model_id: gemma-3-27b-it
     capabilities:
@@ -32,6 +34,7 @@ models:
       currency: USD
 
   "scaleway:mistral-small-3.2-24b-instruct-2506":
+    metadata_ref: "mistral_small_32"
     provider: scaleway
     model_id: mistral-small-3.2-24b-instruct-2506
     capabilities:
@@ -44,6 +47,7 @@ models:
       currency: USD
 
   "scaleway:qwen3-235b-a22b-instruct-2507":
+    metadata_ref: "alibaba_qwen3_235b"
     provider: scaleway
     model_id: qwen3-235b-a22b-instruct-2507
     capabilities:

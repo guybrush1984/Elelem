@@ -1,0 +1,180 @@
+# Global model metadata definitions
+# This file contains reusable metadata for models that appear across multiple providers
+
+model_metadata:
+  openai_gpt_oss_120b: &openai-gpt-oss-120b
+    model_owner: "OpenAI"
+    model_nickname: "gpt-oss-120b"
+    model_page: "https://huggingface.co/openai/gpt-oss-120b"
+    license: "Apache 2.0"
+    reasoning: "yes"
+
+  openai_gpt_oss_20b: &openai-gpt-oss-20b
+    model_owner: "OpenAI"
+    model_nickname: "gpt-oss-20b"
+    model_page: "https://huggingface.co/openai/gpt-oss-20b"
+    license: "Apache 2.0"
+    reasoning: "yes"
+
+  deepseek_v31: &deepseek-v31
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-v3.1"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3.1"
+    license: "MIT"
+    reasoning: "yes"
+
+  deepseek_r1: &deepseek-r1
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-r1"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-R1"
+    license: "MIT"
+    reasoning: "yes"
+
+  openai_gpt_41: &openai-gpt-41
+    model_owner: "OpenAI"
+    model_nickname: "gpt-4.1"
+    model_page: "https://openai.com/index/gpt-4/"
+    license: "Proprietary"
+    reasoning: "no"
+
+  openai_gpt_41_mini: &openai-gpt-41-mini
+    model_owner: "OpenAI"
+    model_nickname: "gpt-4.1-mini"
+    model_page: "https://openai.com/index/gpt-4/"
+    license: "Proprietary"
+    reasoning: "no"
+
+  openai_gpt_5: &openai-gpt-5
+    model_owner: "OpenAI"
+    model_nickname: "gpt-5"
+    model_page: "https://openai.com"
+    license: "Proprietary"
+    reasoning: "no"
+
+  openai_o3: &openai-o3
+    model_owner: "OpenAI"
+    model_nickname: "o3"
+    model_page: "https://openai.com"
+    license: "Proprietary"
+    reasoning: "yes"
+
+  meta_llama4_maverick: &meta-llama4-maverick
+    model_owner: "Meta"
+    model_nickname: "llama-4-maverick-17b"
+    model_page: "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct"
+    license: "Llama 4 License"
+    reasoning: "no"
+
+  meta_llama4_scout: &meta-llama4-scout
+    model_owner: "Meta"
+    model_nickname: "llama-4-scout-17b"
+    model_page: "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct"
+    license: "Llama 4 License"
+    reasoning: "no"
+
+  moonshot_kimi_k2: &moonshot-kimi-k2
+    model_owner: "Moonshot AI"
+    model_nickname: "kimi-k2-instruct"
+    model_page: "https://huggingface.co/moonshotai/kimi-k2-instruct"
+    license: "Apache 2.0"
+    reasoning: "no"
+
+  google_gemma_3_27b: &google-gemma-3-27b
+    model_owner: "Google"
+    model_nickname: "gemma-3-27b-it"
+    model_page: "https://huggingface.co/google/gemma-3-27b-it"
+    license: "Gemma Terms of Use"
+    reasoning: "no"
+
+  mistral_small_32: &mistral-small-32
+    model_owner: "Mistral AI"
+    model_nickname: "mistral-small-3.2-24b"
+    model_page: "https://huggingface.co/mistralai/mistral-small-3.2-24b-instruct-2506"
+    license: "Apache 2.0"
+    reasoning: "no"
+
+  alibaba_qwen3_235b: &alibaba-qwen3-235b
+    model_owner: "Alibaba"
+    model_nickname: "qwen3-235b-a22b"
+    model_page: "https://huggingface.co/Qwen/Qwen3-235B-A22B-Instruct"
+    license: "Qwen License"
+    reasoning: "no"
+
+  anthropic_claude_sonnet_4: &anthropic-claude-sonnet-4
+    model_owner: "Anthropic"
+    model_nickname: "claude-sonnet-4"
+    model_page: "https://www.anthropic.com/claude"
+    license: "Proprietary"
+    reasoning: "no"
+
+  mistral_mixtral_8x22b: &mistral-mixtral-8x22b
+    model_owner: "Mistral AI"
+    model_nickname: "mixtral-8x22b-instruct"
+    model_page: "https://huggingface.co/mistralai/Mixtral-8x22B-Instruct-v0.1"
+    license: "Apache 2.0"
+    reasoning: "no"
+
+  mistral_large_2411: &mistral-large-2411
+    model_owner: "Mistral AI"
+    model_nickname: "mistral-large-2411"
+    model_page: "https://huggingface.co/mistralai/mistral-large-2411"
+    license: "Mistral Research License"
+    reasoning: "no"
+
+  # Additional models found in provider files
+  deepseek_r1_0528: &deepseek-r1-0528
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-r1-0528"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528"
+    license: "MIT"
+    reasoning: "yes"
+
+  deepseek_r1_distill_llama_70b: &deepseek-r1-distill-llama-70b
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-r1-distill-llama-70b"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+    license: "MIT"
+    reasoning: "yes"
+
+  deepseek_r1_distill_qwen_32b: &deepseek-r1-distill-qwen-32b
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-r1-distill-qwen-32b"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+    license: "MIT"
+    reasoning: "yes"
+
+  openai_gpt_5_mini: &openai-gpt-5-mini
+    model_owner: "OpenAI"
+    model_nickname: "gpt-5-mini"
+    model_page: "https://openai.com"
+    license: "Proprietary"
+    reasoning: "no"
+
+  openai_o3_mini: &openai-o3-mini
+    model_owner: "OpenAI"
+    model_nickname: "o3-mini"
+    model_page: "https://openai.com"
+    license: "Proprietary"
+    reasoning: "yes"
+
+  # Virtual models - these don't need individual metadata as they reference other models
+  virtual_gpt_oss_120b: &virtual-gpt-oss-120b
+    model_owner: "Multiple"
+    model_nickname: "gpt-oss-120b (virtual)"
+    model_page: "https://huggingface.co/openai/gpt-oss-120b"
+    license: "Apache 2.0"
+    reasoning: "yes"
+
+  virtual_gpt_oss_20b: &virtual-gpt-oss-20b
+    model_owner: "Multiple"
+    model_nickname: "gpt-oss-20b (virtual)"
+    model_page: "https://huggingface.co/openai/gpt-oss-20b"
+    license: "Apache 2.0"
+    reasoning: "yes"
+
+  virtual_deepseek_v31: &virtual-deepseek-v31
+    model_owner: "Multiple"
+    model_nickname: "deepseek-v3.1 (virtual)"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3"
+    license: "MIT"
+    reasoning: "yes"

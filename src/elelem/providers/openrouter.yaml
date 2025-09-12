@@ -12,6 +12,7 @@ provider:
 models:
   # Standard OpenRouter models with runtime pricing
   "openrouter:openai/gpt-oss-20b":
+    metadata_ref: "openai_gpt_oss_20b"
     provider: openrouter
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -21,6 +22,7 @@ models:
     cost: runtime  # Costs determined at runtime from OpenRouter response headers
 
   "openrouter:openai/gpt-oss-120b":
+    metadata_ref: "openai_gpt_oss_120b"
     provider: openrouter
     model_id: openai/gpt-oss-120b
     capabilities:
@@ -30,6 +32,7 @@ models:
     cost: runtime
 
   "openrouter:openai/gpt-oss-120b-nitro":
+    metadata_ref: "openai_gpt_oss_120b"
     provider: openrouter
     model_id: openai/gpt-oss-120b:nitro
     capabilities:
@@ -39,6 +42,7 @@ models:
     cost: runtime
 
   "openrouter:anthropic/claude-sonnet-4":
+    metadata_ref: "anthropic_claude_sonnet_4"
     provider: openrouter
     model_id: anthropic/claude-sonnet-4
     capabilities:
@@ -48,6 +52,7 @@ models:
     cost: runtime
 
   "openrouter:mistralai/mixtral-8x22b-instruct":
+    metadata_ref: "mistral_mixtral_8x22b"
     provider: openrouter
     model_id: mistralai/mixtral-8x22b-instruct
     capabilities:
@@ -57,6 +62,7 @@ models:
     cost: runtime
 
   "openrouter:mistralai/mistral-large-2411":
+    metadata_ref: "mistral_large_2411"
     provider: openrouter
     model_id: mistralai/mistral-large-2411
     capabilities:

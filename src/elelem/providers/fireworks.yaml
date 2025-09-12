@@ -7,6 +7,7 @@ provider:
 
 models:
   "fireworks:deepseek-3.1":
+    metadata_ref: "deepseek_v31"
     provider: fireworks
     model_id: accounts/fireworks/models/deepseek-v3p1
     capabilities:
@@ -19,6 +20,7 @@ models:
       currency: USD
 
   "fireworks:gpt-oss-120b":
+    metadata_ref: "openai_gpt_oss_120b"
     provider: fireworks
     model_id: accounts/fireworks/models/gpt-oss-120b
     capabilities:
@@ -34,6 +36,7 @@ models:
 
 
   "fireworks:gpt-oss-20b":
+    metadata_ref: "openai_gpt_oss_20b"
     provider: fireworks
     model_id: accounts/fireworks/models/gpt-oss-20b
     capabilities:

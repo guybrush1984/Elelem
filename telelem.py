@@ -497,6 +497,13 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
                 # Get cost from stats
                 cost_usd = stats.get('total_cost_usd', 0.0)
                 
+                # Get display metadata from elelem's model configuration
+                model_config = elelem.config.get_model_config(model)
+                display_metadata = {}
+                if model_config and 'candidates' in model_config and model_config['candidates']:
+                    first_candidate = model_config['candidates'][0]
+                    display_metadata = first_candidate.get('display_metadata', {})
+                
                 # Get response preview
                 content = response.choices[0].message.content
                 preview = content[:100] if content else "(empty)"
@@ -512,6 +519,20 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
                     "cost_usd": cost_usd,
                     "response_preview": preview
                 }
+                
+                # Add display metadata if available
+                if display_metadata:
+                    # Extract provider from model key (e.g., "deepinfra:openai/gpt-oss-120b" -> "deepinfra")
+                    provider = model.split(':')[0] if ':' in model else 'unknown'
+                    
+                    run_result.update({
+                        "provider": provider,
+                        "model_owner": display_metadata.get("model_owner"),
+                        "model_nickname": display_metadata.get("model_nickname"),
+                        "model_page": display_metadata.get("model_page"),
+                        "license": display_metadata.get("license"),
+                        "reasoning": display_metadata.get("reasoning")
+                    })
                 
                 # Add reasoning token fields if present
                 if reasoning_tokens > 0:
@@ -586,6 +607,29 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
                 )
             else:
                 model_summary["avg_actual_output_speed"] = model_summary["avg_total_generation_speed"]
+        
+        # Add model metadata to summary
+        try:
+            model_config = elelem.config.get_model_config(model)
+            if model_config and 'candidates' in model_config and model_config['candidates']:
+                first_candidate = model_config['candidates'][0]
+                display_metadata = first_candidate.get('display_metadata', {})
+                
+                if display_metadata:
+                    # Extract provider from model key
+                    provider = model.split(':')[0] if ':' in model else 'unknown'
+                    
+                    model_summary.update({
+                        "provider": provider,
+                        "model_owner": display_metadata.get("model_owner"),
+                        "model_nickname": display_metadata.get("model_nickname"),
+                        "model_page": display_metadata.get("model_page"),
+                        "license": display_metadata.get("license"),
+                        "reasoning": display_metadata.get("reasoning")
+                    })
+        except Exception as e:
+            # Metadata is optional, don't fail if it's missing
+            pass
         
         results["summary_by_model"][model] = model_summary
     

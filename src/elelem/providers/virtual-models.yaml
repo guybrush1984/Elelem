@@ -4,6 +4,7 @@
 models:
   # Virtual model combining multiple gpt-oss-120b providers for resilience
   "virtual:gpt-oss-120b":
+    metadata_ref: "openai_gpt_oss_120b"
     timeout: 180s
     candidates:
       - model: "parasail:gpt-oss-120b"
@@ -15,6 +16,7 @@ models:
 
   # Virtual model combining multiple gpt-oss-20b providers
   "virtual:gpt-oss-20b":
+    metadata_ref: "openai_gpt_oss_20b"
     timeout: 180s
     candidates:
       - model: "fireworks:gpt-oss-20b"
@@ -26,6 +28,7 @@ models:
 
   # Virtual model for DeepSeek variants across providers
   "virtual:deepseek-v3.1":
+    metadata_ref: "deepseek_v31"
     timeout: 200s
     candidates:
       - model: "deepinfra:deepseek-ai/DeepSeek-V3.1"
@@ -37,6 +40,7 @@ models:
 
   # Cost-optimized routing (cheapest first)
   "virtual:gpt-oss-120b-cheap":
+    metadata_ref: "openai_gpt_oss_120b"
     timeout: 240s
     candidates:
       - model: "parasail:gpt-oss-120b"     # $0.15/$0.60
@@ -48,6 +52,7 @@ models:
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:gpt-oss-120b-fast":
+    metadata_ref: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
       - model: "groq:openai/gpt-oss-120b"  # Usually fastest

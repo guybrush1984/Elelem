@@ -1,0 +1,43 @@
+# Cost-optimized infrastructure provider via OpenRouter
+provider:
+  base_provider: openrouter
+  endpoint: https://openrouter.ai/api/v1
+  headers:
+    HTTP-Referer: https://github.com/guybrush1984/Elelem
+    X-Title: Elelem
+  default_params: {}
+  extra_body:
+    usage:
+      include: true
+    provider:
+      only: ["cerebras", "groq", "together", "deepinfra", "novita", "fireworks"]
+      sort: "price"
+      allow_fallbacks: false
+
+models:
+  "cost@openrouter:openai/gpt-oss-120b":
+    provider: cost@openrouter
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  "cost@openrouter:openai/gpt-oss-20b":
+    provider: cost@openrouter
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime    
+
+  "cost@openrouter:deepseek/deepseek-3.1":
+    provider: cost@openrouter
+    model_id: deepseek/deepseek-chat-v3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime

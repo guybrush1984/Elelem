@@ -27,13 +27,43 @@ class Config:
             raise RuntimeError(f"Failed to load Elelem configuration: {e}")
     
     def _load_models_config(self) -> Dict[str, Any]:
-        """Load models and providers configuration from YAML file."""
+        """Load models and providers configuration from YAML files.
+        
+        Loads main models.yaml and auto-discovers provider files in providers/ directory.
+        """
         models_path = Path(__file__).parent / "models.yaml"
+        providers_dir = Path(__file__).parent / "providers"
+        
+        # Initialize merged configuration
+        merged_config = {"providers": {}, "models": {}}
         
         try:
-            with open(models_path, 'r') as f:
-                config = yaml.safe_load(f)
-            return config
+            # Load main models.yaml if it exists
+            if models_path.exists():
+                with open(models_path, 'r') as f:
+                    main_config = yaml.safe_load(f) or {}
+                
+                # Merge main config
+                merged_config["providers"].update(main_config.get("providers", {}))
+                merged_config["models"].update(main_config.get("models", {}))
+            
+            # Auto-discover and merge provider files
+            if providers_dir.exists():
+                for yaml_file in providers_dir.glob("*.yaml"):
+                    with open(yaml_file, 'r') as f:
+                        provider_config = yaml.safe_load(f) or {}
+                    
+                    provider_name = yaml_file.stem  # filename without .yaml
+                    
+                    # Merge provider config
+                    if 'provider' in provider_config:
+                        merged_config['providers'][provider_name] = provider_config['provider']
+                    
+                    # Merge models
+                    if 'models' in provider_config:
+                        merged_config['models'].update(provider_config['models'])
+            
+            return merged_config
         except (FileNotFoundError, yaml.YAMLError) as e:
             raise RuntimeError(f"Failed to load Elelem models configuration: {e}")
     
@@ -121,6 +151,7 @@ class Config:
                         'model_id': ref_config['model_id'],
                         'capabilities': ref_config.get('capabilities', {}),
                         'cost': ref_config.get('cost'),
+                        'default_params': ref_config.get('default_params', {}),
                         'timeout': candidate.get('timeout')  # Candidate timeout override
                     }
                 else:
@@ -141,6 +172,7 @@ class Config:
                     'model_id': config['model_id'],
                     'capabilities': config.get('capabilities', {}),
                     'cost': config.get('cost'),
+                    'default_params': config.get('default_params', {}),
                     'timeout': config.get('timeout')
                 }],
                 'timeout': config.get('timeout')

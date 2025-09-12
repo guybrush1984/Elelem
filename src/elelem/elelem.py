@@ -41,15 +41,8 @@ class Elelem:
         self._reset_stats()
     
     def _load_models(self) -> Dict[str, Any]:
-        """Load model definitions from YAML file."""
-        models_path = Path(__file__).parent / "models.yaml"
-        
-        try:
-            with open(models_path, 'r') as f:
-                data = yaml.safe_load(f)
-            return data.get("models", {})
-        except (FileNotFoundError, yaml.YAMLError) as e:
-            raise RuntimeError(f"Failed to load Elelem models: {e}")
+        """Load model definitions using the Config system."""
+        return self.config.models
     
     def _create_provider_client(self, api_key: str, base_url: str, timeout: int = 120, provider_name: str = None, default_headers: Dict = None):
         """Create an OpenAI-compatible client for any provider."""
@@ -387,9 +380,7 @@ class Elelem:
                         output_cost_usd = total_cost_usd / 2
                     
                     # Extract reasoning tokens if available
-                    reasoning_tokens = 0
-                    if hasattr(usage, 'completion_tokens_details'):
-                        reasoning_tokens = getattr(usage.completion_tokens_details, 'reasoning_tokens', 0)
+                    reasoning_tokens = self._extract_reasoning_tokens(response)
                     
                     # Extract provider information (which actual provider was used)
                     actual_provider = None
@@ -573,6 +564,104 @@ class Elelem:
                 self.logger.debug(f"Removing temperature for {model} (not supported)")
                 api_kwargs.pop("temperature")
     
+    def _extract_reasoning_tokens(self, response) -> int:
+        """Extract reasoning tokens from response object.
+        
+        This handles all provider formats:
+        - OpenAI: response.usage.completion_tokens_details.reasoning_tokens
+        - GROQ: response.usage.output_tokens_details.reasoning_tokens  
+        - DeepSeek/others: response.usage.reasoning_tokens
+        - Any provider: proportional estimation from reasoning content fields (fallback)
+        - Any future nested structure containing reasoning_tokens
+        """
+        if not response or not hasattr(response, 'usage'):
+            return 0
+            
+        usage = response.usage
+        def _recursive_search(obj, target_field="reasoning_tokens", visited=None, depth=0):
+            """Recursively search for a field in nested objects/dicts."""
+            if visited is None:
+                visited = set()
+            
+            # Prevent infinite recursion
+            if depth > 10 or obj is None or id(obj) in visited:
+                return 0
+            
+            visited.add(id(obj))
+                
+            # If it's a dict, check keys
+            if isinstance(obj, dict):
+                if target_field in obj:
+                    value = obj[target_field]
+                    return int(value) if isinstance(value, (int, float)) and value > 0 else 0
+                # Recursively search nested dicts
+                for value in obj.values():
+                    result = _recursive_search(value, target_field, visited, depth + 1)
+                    if result > 0:
+                        return result
+                        
+            # If it's an object with attributes, check attributes
+            elif hasattr(obj, '__dict__') or hasattr(obj, '__getattribute__'):
+                # Direct attribute check
+                if hasattr(obj, target_field):
+                    value = getattr(obj, target_field, 0)
+                    return int(value) if isinstance(value, (int, float)) and value > 0 else 0
+                    
+                # Search nested attributes (only common usage-related attributes)
+                common_attrs = ['completion_tokens_details', 'output_tokens_details', 
+                               'usage_details', 'token_details', 'details']
+                for attr_name in common_attrs:
+                    if hasattr(obj, attr_name):
+                        try:
+                            attr_value = getattr(obj, attr_name)
+                            if not callable(attr_value):
+                                result = _recursive_search(attr_value, target_field, visited, depth + 1)
+                                if result > 0:
+                                    return result
+                        except (AttributeError, TypeError):
+                            continue
+                            
+            return 0
+        
+        # First try to find explicit reasoning_tokens field
+        reasoning_tokens = _recursive_search(usage)
+        if reasoning_tokens > 0:
+            return reasoning_tokens
+            
+        # Fallback: estimate from reasoning content fields (any provider)
+        if response and hasattr(response, 'choices') and response.choices:
+            first_choice = response.choices[0]
+            if hasattr(first_choice, 'message'):
+                message = first_choice.message
+                actual_content = getattr(message, 'content', '')
+                
+                # Look for reasoning content in common field names
+                reasoning_fields = ['reasoning_content', 'reasoning', 'chain_of_thought', 'thinking', 'scratchpad']
+                reasoning_content = ''
+                
+                for field in reasoning_fields:
+                    if hasattr(message, field):
+                        reasoning_content = getattr(message, field, '') or ''
+                        if reasoning_content:
+                            break
+                
+                if reasoning_content and actual_content:
+                    # Calculate proportional token distribution based on character count
+                    reasoning_chars = len(reasoning_content)
+                    content_chars = len(actual_content)
+                    total_chars = reasoning_chars + content_chars
+                    
+                    if total_chars > 0:
+                        reasoning_ratio = reasoning_chars / total_chars
+                        total_completion_tokens = getattr(usage, 'completion_tokens', 0)
+                        estimated_reasoning_tokens = int(total_completion_tokens * reasoning_ratio)
+                        
+                        self.logger.debug(f"Estimated reasoning tokens via char ratio: {estimated_reasoning_tokens} "
+                                        f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
+                        return estimated_reasoning_tokens
+        
+        return 0
+
     def _process_response_content(self, response: Any, json_mode_requested: bool) -> str:
         """Process and clean response content."""
         # Debug logging to understand response structure
@@ -787,6 +876,12 @@ class Elelem:
             if key not in api_kwargs:
                 api_kwargs[key] = value
         
+        # Add model-specific default parameters (overrides provider defaults)
+        model_defaults = candidate.get("default_params", {})
+        for key, value in model_defaults.items():
+            if key not in api_kwargs:
+                api_kwargs[key] = value
+        
         # Add max_tokens default if provider specifies it and user didn't provide max_tokens
         if "max_tokens" not in api_kwargs:
             max_tokens_default = self.config.get_provider_max_tokens_default(provider_name)
@@ -872,7 +967,7 @@ class Elelem:
                     usage = response.usage
                     input_tokens = getattr(usage, 'prompt_tokens', 0)
                     output_tokens = getattr(usage, 'completion_tokens', 0)
-                    reasoning_tokens = getattr(usage, 'reasoning_tokens', 0)
+                    reasoning_tokens = self._extract_reasoning_tokens(response)
                     
                     total_input_tokens += input_tokens
                     total_output_tokens += output_tokens

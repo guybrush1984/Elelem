@@ -1,0 +1,76 @@
+# OpenAI provider configuration and models
+provider:
+  endpoint: https://api.openai.com/v1
+  default_params: {}
+
+models:
+  "openai:gpt-4.1":
+    provider: openai
+    model_id: gpt-4.1
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 2.00  # $2.00 per 1M input tokens
+      output_cost_per_1m: 8.00  # $8.00 per 1M output tokens
+      currency: USD
+
+  "openai:gpt-4.1-mini":
+    provider: openai
+    model_id: gpt-4.1-mini
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.40  # $0.40 per 1M input tokens
+      output_cost_per_1m: 1.60  # $1.60 per 1M output tokens
+      currency: USD
+
+  "openai:gpt-5":
+    provider: openai
+    model_id: gpt-5
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: false  # Only supports default temperature (1)
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.25
+      output_cost_per_1m: 10.00
+      currency: USD
+
+  "openai:gpt-5-mini":
+    provider: openai
+    model_id: gpt-5-mini
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: false  # Only supports default temperature (1)
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.25
+      output_cost_per_1m: 2.00
+      currency: USD
+
+  "openai:o3":
+    provider: openai
+    model_id: o3
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: false  # o-series models don't support temperature
+    cost:
+      input_cost_per_1m: 2.00
+      output_cost_per_1m: 8.00
+      currency: USD
+
+  "openai:o3-mini":
+    provider: openai
+    model_id: o3-mini
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: false
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.10
+      output_cost_per_1m: 4.40
+      currency: USD

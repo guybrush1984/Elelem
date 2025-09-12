@@ -177,17 +177,31 @@ async def run_telelem_test(prompt_file: str, response_file: str, model: str, log
         usage = response.usage
         input_tokens = getattr(usage, 'prompt_tokens', 0)
         output_tokens = getattr(usage, 'completion_tokens', 0)
+        
+        # Get reasoning tokens from elelem's statistics (it handles all provider formats)
+        stats = elelem.get_stats_by_tag("telelem_test")
+        reasoning_tokens = stats.get('reasoning_tokens', 0)
+        
+        actual_output_tokens = output_tokens - reasoning_tokens
         total_tokens = input_tokens + output_tokens
         
         print(f"✅ Request completed in {format_duration(duration)}")
         print(f"   Input tokens: {input_tokens:,}")
         print(f"   Output tokens: {output_tokens:,}")
+        if reasoning_tokens > 0:
+            print(f"   Reasoning tokens: {reasoning_tokens:,}")
+            print(f"   Actual output tokens: {actual_output_tokens:,}")
         print(f"   Total tokens: {total_tokens:,}")
         
         # Calculate and display tokens per second
         if duration > 0 and output_tokens > 0:
-            tokens_per_second = output_tokens / duration
-            print(f"   Output speed: {tokens_per_second:.1f} tokens/s")
+            total_generation_speed = output_tokens / duration
+            if reasoning_tokens > 0 and actual_output_tokens > 0:
+                actual_output_speed = actual_output_tokens / duration
+                print(f"   Total generation speed: {total_generation_speed:.1f} tokens/s (incl. reasoning)")
+                print(f"   Actual output speed: {actual_output_speed:.1f} tokens/s (visible output)")
+            else:
+                print(f"   Output speed: {total_generation_speed:.1f} tokens/s")
         
         # Get cost information
         stats = elelem.get_stats_by_tag("telelem_test")
@@ -206,6 +220,11 @@ async def run_telelem_test(prompt_file: str, response_file: str, model: str, log
             if output_tokens > 0:
                 output_cost_per_1k = (output_cost / output_tokens) * 1000
                 print(f"   Output cost: ${output_cost_per_1k:.4f}/1k tokens")
+                
+                # Show cost per actual output token if reasoning tokens present
+                if reasoning_tokens > 0 and actual_output_tokens > 0:
+                    actual_output_cost_per_1k = (total_cost / actual_output_tokens) * 1000
+                    print(f"   Cost per actual output: ${actual_output_cost_per_1k:.4f}/1k tokens")
         else:
             print(f"   ⚠️  Cost calculation may not be available for this model/provider")
         
@@ -382,8 +401,12 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
             "failed_runs": 0,
             "total_input_tokens": 0,
             "total_output_tokens": 0,
+            "total_reasoning_tokens": 0,
+            "total_actual_output_tokens": 0,
             "total_cost_usd": 0,
             "avg_tokens_per_second": 0,
+            "avg_total_generation_speed": 0,
+            "avg_actual_output_speed": 0,
             "total_duration_seconds": 0
         }
         
@@ -399,8 +422,12 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
                     "failed_runs": 0,
                     "total_input_tokens": 0,
                     "total_output_tokens": 0,
+                    "total_reasoning_tokens": 0,
+                    "total_actual_output_tokens": 0,
                     "total_cost_usd": 0,
                     "avg_tokens_per_second": 0,
+                    "avg_total_generation_speed": 0,
+                    "avg_actual_output_speed": 0,
                     "total_duration_seconds": 0
                 }
             
@@ -457,10 +484,17 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
                 usage = response.usage
                 input_tokens = getattr(usage, 'prompt_tokens', 0)
                 output_tokens = getattr(usage, 'completion_tokens', 0)
-                tokens_per_second = output_tokens / duration if duration > 0 else 0
+                
+                # Get reasoning tokens from elelem's statistics (handles all provider formats)
+                stats = elelem.get_stats_by_tag(unique_tag)
+                reasoning_tokens = stats.get('reasoning_tokens', 0)
+                actual_output_tokens = output_tokens - reasoning_tokens
+                
+                # Calculate token rates
+                total_generation_speed = output_tokens / duration if duration > 0 else 0
+                actual_output_speed = actual_output_tokens / duration if duration > 0 and actual_output_tokens > 0 else 0
                 
                 # Get cost from stats
-                stats = elelem.get_stats_by_tag(unique_tag)
                 cost_usd = stats.get('total_cost_usd', 0.0)
                 
                 # Get response preview
@@ -474,23 +508,44 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
                     "duration_seconds": round(duration, 2),
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
-                    "tokens_per_second": round(tokens_per_second, 1),
+                    "tokens_per_second": round(total_generation_speed, 1),
                     "cost_usd": cost_usd,
                     "response_preview": preview
                 }
                 
-                print(f"   ✅ Success: {output_tokens} tokens in {duration:.1f}s ({tokens_per_second:.1f} tok/s), cost: ${cost_usd:.6f}")
+                # Add reasoning token fields if present
+                if reasoning_tokens > 0:
+                    cost_per_actual_output_token = cost_usd / actual_output_tokens * 1000 if actual_output_tokens > 0 else 0
+                    run_result.update({
+                        "reasoning_tokens": reasoning_tokens,
+                        "actual_output_tokens": actual_output_tokens,
+                        "total_generation_speed": round(total_generation_speed, 1),
+                        "actual_output_speed": round(actual_output_speed, 1),
+                        "cost_per_actual_output_1k": round(cost_per_actual_output_token, 4)
+                    })
+                
+                if reasoning_tokens > 0:
+                    cost_per_actual_1k = cost_usd / actual_output_tokens * 1000 if actual_output_tokens > 0 else 0
+                    print(f"   ✅ Success: {output_tokens} tokens ({reasoning_tokens} reasoning, {actual_output_tokens} output) in {duration:.1f}s")
+                    print(f"       Total: {total_generation_speed:.1f} tok/s, Output: {actual_output_speed:.1f} tok/s")
+                    print(f"       Cost: ${cost_usd:.6f} (${cost_per_actual_1k:.4f}/1k actual output)")
+                else:
+                    print(f"   ✅ Success: {output_tokens} tokens in {duration:.1f}s ({total_generation_speed:.1f} tok/s), cost: ${cost_usd:.6f}")
                 
                 # Update summaries
                 model_summary["successful_runs"] += 1
                 model_summary["total_input_tokens"] += input_tokens
                 model_summary["total_output_tokens"] += output_tokens
+                model_summary["total_reasoning_tokens"] += reasoning_tokens
+                model_summary["total_actual_output_tokens"] += actual_output_tokens
                 model_summary["total_cost_usd"] += cost_usd
                 model_summary["total_duration_seconds"] += duration
                 
                 prompt_summary["successful_runs"] += 1
                 prompt_summary["total_input_tokens"] += input_tokens
                 prompt_summary["total_output_tokens"] += output_tokens
+                prompt_summary["total_reasoning_tokens"] += reasoning_tokens
+                prompt_summary["total_actual_output_tokens"] += actual_output_tokens
                 prompt_summary["total_cost_usd"] += cost_usd
                 prompt_summary["total_duration_seconds"] += duration
                 
@@ -518,31 +573,57 @@ async def run_batch_tests(batch_file: str, output_file: str, **kwargs):
             results["runs"].append(run_result)
         
         # Calculate model averages
-        if model_summary["successful_runs"] > 0:
+        if model_summary["successful_runs"] > 0 and model_summary["total_duration_seconds"] > 0:
             model_summary["avg_tokens_per_second"] = round(
-                model_summary["total_output_tokens"] / model_summary["total_duration_seconds"]
-                if model_summary["total_duration_seconds"] > 0 else 0, 1
+                model_summary["total_output_tokens"] / model_summary["total_duration_seconds"], 1
             )
+            model_summary["avg_total_generation_speed"] = round(
+                model_summary["total_output_tokens"] / model_summary["total_duration_seconds"], 1
+            )
+            if model_summary["total_actual_output_tokens"] > 0:
+                model_summary["avg_actual_output_speed"] = round(
+                    model_summary["total_actual_output_tokens"] / model_summary["total_duration_seconds"], 1
+                )
+            else:
+                model_summary["avg_actual_output_speed"] = model_summary["avg_total_generation_speed"]
         
         results["summary_by_model"][model] = model_summary
     
     # Calculate prompt averages
     for prompt_file, summary in results["summary_by_prompt"].items():
-        if summary["successful_runs"] > 0:
+        if summary["successful_runs"] > 0 and summary["total_duration_seconds"] > 0:
             summary["avg_tokens_per_second"] = round(
-                summary["total_output_tokens"] / summary["total_duration_seconds"]
-                if summary["total_duration_seconds"] > 0 else 0, 1
+                summary["total_output_tokens"] / summary["total_duration_seconds"], 1
             )
+            summary["avg_total_generation_speed"] = round(
+                summary["total_output_tokens"] / summary["total_duration_seconds"], 1
+            )
+            if summary["total_actual_output_tokens"] > 0:
+                summary["avg_actual_output_speed"] = round(
+                    summary["total_actual_output_tokens"] / summary["total_duration_seconds"], 1
+                )
+            else:
+                summary["avg_actual_output_speed"] = summary["avg_total_generation_speed"]
     
     # Calculate overall summary
+    successful_runs = [r for r in results["runs"] if r["status"] == "success"]
+    total_reasoning_tokens = sum(r.get("reasoning_tokens", 0) for r in successful_runs)
+    total_actual_output_tokens = sum(r.get("actual_output_tokens", r["output_tokens"]) for r in successful_runs)
+    total_duration = sum(r["duration_seconds"] for r in results["runs"])
+    
     results["overall_summary"] = {
         "total_runs": test_num,
-        "successful_runs": sum(1 for r in results["runs"] if r["status"] == "success"),
+        "successful_runs": len(successful_runs),
         "failed_runs": sum(1 for r in results["runs"] if r["status"] == "failed"),
         "total_cost_usd": sum(r["cost_usd"] for r in results["runs"]),
         "total_input_tokens": sum(r["input_tokens"] for r in results["runs"]),
         "total_output_tokens": sum(r["output_tokens"] for r in results["runs"]),
-        "total_duration_seconds": sum(r["duration_seconds"] for r in results["runs"])
+        "total_reasoning_tokens": total_reasoning_tokens,
+        "total_actual_output_tokens": total_actual_output_tokens,
+        "total_duration_seconds": total_duration,
+        "avg_tokens_per_second": round(sum(r["output_tokens"] for r in successful_runs) / total_duration, 1) if total_duration > 0 else 0,
+        "avg_total_generation_speed": round(sum(r["output_tokens"] for r in successful_runs) / total_duration, 1) if total_duration > 0 else 0,
+        "avg_actual_output_speed": round(total_actual_output_tokens / total_duration, 1) if total_duration > 0 and total_actual_output_tokens > 0 else 0
     }
     
     # Save results

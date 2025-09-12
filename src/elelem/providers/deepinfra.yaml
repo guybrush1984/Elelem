@@ -1,0 +1,121 @@
+# DeepInfra provider configuration and models
+# CRITICAL: ALL supports_json_mode = false
+provider:
+  endpoint: https://api.deepinfra.com/v1/openai
+  default_params: {}
+
+models:
+  "deepinfra:openai/gpt-oss-120b":
+    provider: deepinfra
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false  # DeepInfra doesn't support response_format
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.09
+      output_cost_per_1m: 0.45
+      currency: USD
+    default_params:
+      reasoning_effort: low
+
+  "deepinfra:openai/gpt-oss-20b":
+    provider: deepinfra
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.04
+      output_cost_per_1m: 0.16
+      currency: USD
+    default_params:
+      reasoning_effort: low      
+
+  "deepinfra:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8":
+    provider: deepinfra
+    model_id: meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.08  # Need to verify - using Scout pricing as placeholder
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  "deepinfra:meta-llama/Llama-4-Scout-17B-16E-Instruct":
+    provider: deepinfra
+    model_id: meta-llama/Llama-4-Scout-17B-16E-Instruct
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.08
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  "deepinfra:moonshotai/Kimi-K2-Instruct":
+    provider: deepinfra
+    model_id: moonshotai/Kimi-K2-Instruct
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.50
+      output_cost_per_1m: 2.00
+      currency: USD
+
+  "deepinfra:deepseek-ai/DeepSeek-R1-0528":
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-R1-0528
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.50
+      output_cost_per_1m: 2.15
+      currency: USD
+
+  "deepinfra:deepseek-ai/DeepSeek-V3.1":
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.30
+      output_cost_per_1m: 1.00
+      currency: USD
+
+  "deepinfra:deepseek-ai/DeepSeek-V3.1-think":
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.30
+      output_cost_per_1m: 1.00
+      currency: USD
+
+  "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Llama-70B":
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.40
+      currency: USD
+
+  "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.075
+      output_cost_per_1m: 0.15
+      currency: USD

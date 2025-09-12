@@ -1,0 +1,58 @@
+# Virtual models that reference multiple providers for resilience
+# These models automatically failover between providers based on candidate configuration
+
+models:
+  # Virtual model combining multiple gpt-oss-120b providers for resilience
+  "virtual:gpt-oss-120b":
+    timeout: 180s
+    candidates:
+      - model: "parasail:gpt-oss-120b"
+        timeout: 60s   # Try Parasail first
+      - model: "fireworks:gpt-oss-120b"
+        timeout: 90s   # Fireworks fallback with more time
+      - model: "groq:openai/gpt-oss-120b"
+        timeout: 120s  # Groq as final fallback
+
+  # Virtual model combining multiple gpt-oss-20b providers
+  "virtual:gpt-oss-20b":
+    timeout: 180s
+    candidates:
+      - model: "fireworks:gpt-oss-20b"
+        timeout: 60s
+      - model: "groq:openai/gpt-oss-20b"
+        timeout: 90s
+      - model: "deepinfra:openai/gpt-oss-20b"
+        timeout: 120s
+
+  # Virtual model for DeepSeek variants across providers
+  "virtual:deepseek-v3.1":
+    timeout: 200s
+    candidates:
+      - model: "deepinfra:deepseek-ai/DeepSeek-V3.1"
+        timeout: 120s
+      - model: "parasail:deepseek-3.1"
+        timeout: 60s
+      - model: "fireworks:deepseek-3.1"
+        timeout: 90s
+
+  # Cost-optimized routing (cheapest first)
+  "virtual:gpt-oss-120b-cheap":
+    timeout: 240s
+    candidates:
+      - model: "parasail:gpt-oss-120b"     # $0.15/$0.60
+        timeout: 60s
+      - model: "fireworks:gpt-oss-120b"    # $0.15/$0.60
+        timeout: 90s
+      - model: "deepinfra:openai/gpt-oss-120b"  # $0.09/$0.45 - cheapest but last due to no JSON support
+        timeout: 120s
+
+  # Speed-optimized routing (fastest first) - shorter timeouts for speed
+  "virtual:gpt-oss-120b-fast":
+    timeout: 120s
+    candidates:
+      - model: "groq:openai/gpt-oss-120b"  # Usually fastest
+        timeout: 30s   # Very short timeout to force quick failover
+      - model: "fireworks:gpt-oss-120b"    # Good speed
+        timeout: 60s
+      - model: "parasail:gpt-oss-120b"     # Fallback
+        timeout: 90s

@@ -5,28 +5,23 @@
 providers:
   openai:
     endpoint: https://api.openai.com/v1
-    fallback_model: openai:gpt-4.1
     default_params: {}
     
   groq:
     endpoint: https://api.groq.com/openai/v1
-    fallback_model: groq:gpt-oss-120b
     default_params:
       service_tier: auto
       
   deepinfra:
     endpoint: https://api.deepinfra.com/v1/openai
-    fallback_model: deepinfra:gpt-oss-120b
     default_params: {}
     
   scaleway:
     endpoint: https://api.scaleway.ai/v1
-    fallback_model: scaleway:gpt-oss-120b
     default_params: {}
     
   openrouter:
     endpoint: https://openrouter.ai/api/v1
-    fallback_model: openrouter:openai/gpt-4o-mini
     headers:
       HTTP-Referer: https://github.com/guybrush1984/Elelem
       X-Title: Elelem
@@ -35,11 +30,20 @@ providers:
       usage:
         include: true
   
+  parasail:
+    endpoint: https://api.parasail.io/v1
+    default_params: {}
+  
+  fireworks:
+    endpoint: https://api.fireworks.ai/inference/v1
+    default_params:
+      stream: true
+    max_tokens_default: 16384
+  
   # Infrastructure providers - force specific providers via OpenRouter
   throughput@openrouter:
     base_provider: openrouter
     endpoint: https://openrouter.ai/api/v1
-    fallback_model: openrouter:openai/gpt-4o-mini  # TODO: fix fallback models
     headers:
       HTTP-Referer: https://github.com/guybrush1984/Elelem
       X-Title: Elelem
@@ -56,7 +60,6 @@ providers:
   cost@openrouter:
     base_provider: openrouter
     endpoint: https://openrouter.ai/api/v1
-    fallback_model: openrouter:openai/gpt-4o-mini  # TODO: fix fallback models
     headers:
       HTTP-Referer: https://github.com/guybrush1984/Elelem
       X-Title: Elelem
@@ -282,6 +285,17 @@ models:
       output_cost_per_1m: 1.00
       currency: USD
 
+  "deepinfra:deepseek-ai/DeepSeek-V3.1-think":
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.30
+      output_cost_per_1m: 1.00
+      currency: USD
+
   "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Llama-70B":
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
@@ -432,7 +446,6 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
-    timeout_fallback: throughput@openrouter:openai/gpt-oss-120b
 
   # Infrastructure provider-specific model
   "throughput@openrouter:openai/gpt-oss-20b":
@@ -452,8 +465,7 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime
-    timeout_fallback: throughput@openrouter:openai/gpt-oss-20b    
+    cost: runtime    
 
   # Infrastructure provider-specific model
   "throughput@openrouter:deepseek/deepseek-3.1":
@@ -474,7 +486,126 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
-    timeout_fallback: throughput@openrouter:deepseek/deepseek-3.1
 
+  # Parasail Models
+  "parasail:deepseek-3.1":
+    provider: parasail
+    model_id: parasail-deepseek-31
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.64
+      output_cost_per_1m: 1.65
+      currency: USD
+
+  "parasail:gpt-oss-120b":
+    provider: parasail
+    model_id: parasail-gpt-oss-120b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
+      currency: USD
+
+  # Fireworks Models
+  "fireworks:deepseek-3.1":
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v3p1
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+
+  "fireworks:gpt-oss-120b":
+    provider: fireworks
+    model_id: accounts/fireworks/models/gpt-oss-120b
+    capabilities:
+      supports_json_mode: trueok
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
+      currency: USD
+
+  "fireworks:gpt-oss-20b":
+    provider: fireworks
+    model_id: accounts/fireworks/models/gpt-oss-20b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.07
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  # ================================================================
+  # VIRTUAL MODELS
+  # ================================================================
+
+  # Virtual model combining multiple gpt-oss-120b providers for resilience
+  "virtual:gpt-oss-120b":
+    timeout: 180s
+    candidates:
+      - model: "parasail:gpt-oss-120b"
+        timeout: 60s   # Try Parasail first
+      - model: "fireworks:gpt-oss-120b"
+        timeout: 90s   # Fireworks fallback with more time
+      - model: "groq:openai/gpt-oss-120b"
+        timeout: 120s  # Groq as final fallback
+
+  # Virtual model combining multiple gpt-oss-20b providers
+  "virtual:gpt-oss-20b":
+    timeout: 180s
+    candidates:
+      - model: "fireworks:gpt-oss-20b"
+        timeout: 60s
+      - model: "groq:openai/gpt-oss-20b"
+        timeout: 90s
+      - model: "deepinfra:openai/gpt-oss-20b"
+        timeout: 120s
+
+  # Virtual model for DeepSeek variants across providers
+  "virtual:deepseek-v3.1":
+    timeout: 200s
+    candidates:
+      - model: "deepinfra:deepseek-ai/DeepSeek-V3.1"
+        timeout: 120s
+      - model: "parasail:deepseek-31"
+        timeout: 60s
+      - model: "fireworks:deepseek-v3p1"
+        timeout: 90s
+
+  # Cost-optimized routing (cheapest first)
+  "virtual:gpt-oss-120b-cheap":
+    timeout: 240s
+    candidates:
+      - model: "parasail:gpt-oss-120b"     # $0.15/$0.60
+        timeout: 60s
+      - model: "fireworks:gpt-oss-120b"    # $0.15/$0.60
+        timeout: 90s
+      - model: "deepinfra:openai/gpt-oss-120b"  # $0.09/$0.45 - cheapest but last due to no JSON support
+        timeout: 120s
+
+  # Speed-optimized routing (fastest first) - shorter timeouts for speed
+  "virtual:gpt-oss-120b-fast":
+    timeout: 120s
+    candidates:
+      - model: "groq:openai/gpt-oss-120b"  # Usually fastest
+        timeout: 30s   # Very short timeout to force quick failover
+      - model: "fireworks:gpt-oss-120b"    # Good speed
+        timeout: 60s
+      - model: "parasail:gpt-oss-120b"     # Fallback
+        timeout: 90s
 
     

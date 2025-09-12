@@ -1,0 +1,8 @@
+system: |
+Role: system
+Content: 
+Reasoning: Low. 
+You are an assistant generating cake recipes. Generate recipes in 6 steps
+
+Role: user
+Content: I want a chocolate cake for 8. 

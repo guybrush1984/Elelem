@@ -17,6 +17,15 @@ from jsonschema import validate, ValidationError
 from .config import Config
 
 
+class InfrastructureError(Exception):
+    """Errors that should trigger candidate iteration."""
+    pass
+
+class ModelError(Exception):
+    """Errors that should not trigger candidate iteration."""
+    pass
+
+
 class Elelem:
     """Unified API wrapper with cost tracking, JSON validation, and retry logic."""
     
@@ -113,9 +122,8 @@ class Elelem:
                 "total_retries": 0,
                 "temperature_reductions": 0,
                 "final_failures": 0,
-                "fallback_model_usage": 0,
                 "response_format_removals": 0,
-                "timeout_fallbacks": 0
+                "candidate_iterations": 0
             }
         }
         self._tag_statistics = {}
@@ -148,8 +156,68 @@ class Elelem:
         model_config = self._models.get(model, {})
         return not model_config.get("capabilities", {}).get("supports_json_mode", True)
         
+    async def _collect_streaming_response(self, stream):
+        """Collect streaming chunks and reconstruct a normal response object."""
+        content_parts = []
+        reasoning_content_parts = []
+        final_chunk = None
+        finish_reason = None
+        
+        async for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                choice = chunk.choices[0]
+                
+                # Extract content from delta
+                if hasattr(choice, 'delta') and choice.delta.content is not None:
+                    content_parts.append(choice.delta.content)
+                
+                # Extract reasoning_content if available
+                if hasattr(choice, 'delta') and hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content is not None:
+                    reasoning_content_parts.append(choice.delta.reasoning_content)
+                
+                # Capture finish_reason
+                if hasattr(choice, 'finish_reason') and choice.finish_reason:
+                    finish_reason = choice.finish_reason
+            
+            # Keep the last chunk for metadata (id, usage, etc.)
+            final_chunk = chunk
+        
+        if not final_chunk:
+            raise ValueError("No chunks received from stream")
+        
+        # Reconstruct the complete content
+        full_content = ''.join(content_parts) if content_parts else None
+        full_reasoning_content = ''.join(reasoning_content_parts) if reasoning_content_parts else None
+        
+        # Create a normal ChatCompletion response (not streaming)
+        from openai.types.chat.chat_completion_message import ChatCompletionMessage
+        from openai.types.chat.chat_completion import Choice
+        import copy
+        
+        # Create the message object
+        message = ChatCompletionMessage(
+            role="assistant",
+            content=full_content,
+            reasoning_content=full_reasoning_content if full_reasoning_content else None
+        )
+        
+        # Create the choice object  
+        choice = Choice(
+            index=0,
+            message=message,
+            finish_reason=finish_reason
+        )
+        
+        # Modify the final chunk to have a proper message-based choice
+        final_chunk = copy.deepcopy(final_chunk)
+        final_chunk.choices = [choice]
+        
+        return final_chunk
+        
     def _remove_think_tags(self, content: str) -> str:
         """Remove <think>...</think> tags from content."""
+        if not content:
+            return ""
         # Pattern to match <think>...</think> including multiline content
         pattern = r'<think>.*?</think>'
         return re.sub(pattern, '', content, flags=re.DOTALL).strip()
@@ -417,9 +485,8 @@ class Elelem:
                         "total_retries": 0,
                         "temperature_reductions": 0,
                         "final_failures": 0,
-                        "fallback_model_usage": 0,
                         "response_format_removals": 0,
-                        "timeout_fallbacks": 0
+                        "candidate_iterations": 0
                     }
                 }
                 
@@ -477,63 +544,14 @@ class Elelem:
                         "total_retries": 0,
                         "temperature_reductions": 0,
                         "final_failures": 0,
-                        "fallback_model_usage": 0,
                         "response_format_removals": 0,
-                        "timeout_fallbacks": 0
+                        "candidate_iterations": 0
                     }
                 }
             
             if retry_type in self._tag_statistics[tag]["retry_analytics"]:
                 self._tag_statistics[tag]["retry_analytics"][retry_type] += count
                 self._tag_statistics[tag]["retry_analytics"]["total_retries"] += count
-    
-    def _setup_request(self, model: str, request_id: str, **kwargs) -> tuple[str, str, Any, Dict, Dict, str, bool, Any]:
-        """Setup and validate request parameters.
-        
-        Returns:
-            Tuple of (provider_name, model_name, provider_client, model_config, 
-                     api_kwargs, original_temperature, json_mode_requested, json_schema)
-        """
-        # Parse model string
-        provider_name, model_name = self._parse_model_string(model)
-        provider_client = self._providers[provider_name]
-        
-        # Get model and provider configurations
-        model_config = self._models[model]
-        provider_config = self.config.get_provider_config(provider_name)
-        
-        # Make a copy of kwargs to avoid modifying the original
-        api_kwargs = kwargs.copy()
-        
-        # Add provider-specific default parameters
-        provider_defaults = provider_config.get("default_params", {})
-        for key, value in provider_defaults.items():
-            if key not in api_kwargs:
-                api_kwargs[key] = value
-        
-        # Add provider-specific extra_body parameters (for newer OpenAI library)
-        extra_body = provider_config.get("extra_body", {})
-        if extra_body:
-            api_kwargs["extra_body"] = {**extra_body, **api_kwargs.get("extra_body", {})}
-        
-        # Store original values for retry logic
-        response_format = api_kwargs.get("response_format")
-        original_temperature = api_kwargs.get("temperature", 0.7)
-        json_schema = api_kwargs.get("json_schema")
-        
-        # Warn if json_schema provided without JSON response format
-        if json_schema and (not response_format or response_format.get("type") != "json_object"):
-            self.logger.warning(f"[{request_id}] json_schema provided but response_format is not set to json_object. Schema validation will be skipped.")
-        
-        # Remove json_schema from api_kwargs - it's not part of the OpenAI API
-        if "json_schema" in api_kwargs:
-            api_kwargs.pop("json_schema")
-        
-        # Handle JSON mode - add instructions whenever response_format is JSON
-        json_mode_requested = response_format and response_format.get("type") == "json_object"
-        
-        return (provider_name, model_name, provider_client, model_config, 
-                api_kwargs, original_temperature, json_mode_requested, json_schema)
     
     def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool) -> List[Dict[str, str]]:
         """Preprocess messages for the request."""
@@ -557,7 +575,37 @@ class Elelem:
     
     def _process_response_content(self, response: Any, json_mode_requested: bool) -> str:
         """Process and clean response content."""
+        # Debug logging to understand response structure
+        if hasattr(response, 'model_dump_json'):
+            self.logger.debug(f"Full response JSON: {response.model_dump_json()[:500]}")
+        
+        if hasattr(response, 'choices') and response.choices:
+            first_choice = response.choices[0]
+            self.logger.debug(f"First choice type: {type(first_choice)}")
+            if hasattr(first_choice, 'message'):
+                self.logger.debug(f"Message type: {type(first_choice.message)}")
+                self.logger.debug(f"Message content: {first_choice.message.content}")
+                if hasattr(first_choice.message, 'model_dump_json'):
+                    self.logger.debug(f"Message JSON: {first_choice.message.model_dump_json()[:500]}")
+        
+        # Check finish_reason first - this should always be present
+        finish_reason = getattr(response.choices[0], 'finish_reason', None)
+        if finish_reason != 'stop':
+            if finish_reason == 'length':
+                raise ModelError(f"Response was truncated due to max_tokens limit (finish_reason: {finish_reason})")
+            elif finish_reason == 'content_filter':
+                raise ModelError(f"Response was filtered due to safety policies (finish_reason: {finish_reason})")
+            elif finish_reason in ['function_call', 'tool_calls']:
+                raise ModelError(f"Unexpected function/tool call in non-function context (finish_reason: {finish_reason})")
+            else:
+                raise ModelError(f"Unexpected finish_reason: {finish_reason}")
+        
         content = response.choices[0].message.content
+        
+        # Handle None content (some providers may return None for empty responses)
+        if content is None:
+            self.logger.warning("Response content is None despite finish_reason being 'stop'")
+            content = ""
         
         # Remove think tags if present
         content = self._remove_think_tags(content)
@@ -624,47 +672,6 @@ class Elelem:
             return True, new_temp
         return False, 0.0
     
-    def _handle_fallback_strategies(self, attempt: int, max_retries: int, request_id: str,
-                                   api_kwargs: Dict, original_temperature: float,
-                                   current_model: str, provider_name: str, tags: List[str]) -> tuple[bool, str, str, Any]:
-        """Handle fallback strategies when retries are exhausted.
-        
-        Returns:
-            Tuple of (should_continue, new_model, new_model_name, new_provider_client)
-        """
-        if attempt == max_retries:
-            # Try removing response_format first if still present
-            if "response_format" in api_kwargs:
-                self._update_retry_analytics("response_format_removals", tags)
-                self.logger.warning(
-                    f"[{request_id}] JSON validation failed after {max_retries + 1} attempts with {current_model}. "
-                    f"Removing response_format and retrying with text parsing."
-                )
-                api_kwargs.pop("response_format")
-                api_kwargs["temperature"] = original_temperature  # Reset temperature
-                max_attempts = max_retries + 2
-                self.logger.info(f"[{request_id}] 🔄 RETRY (format removal) - {current_model} (attempt {attempt + 2}/{max_attempts}) - temp={original_temperature}")
-                return True, current_model, current_model.split(":", 1)[1], self._providers[provider_name]
-            else:
-                # Try fallback model as last resort
-                fallback_model = self.config.get_fallback_model(provider_name)
-                if fallback_model and fallback_model != current_model:
-                    self._update_retry_analytics("fallback_model_usage", tags)
-                    self.logger.warning(
-                        f"[{request_id}] JSON validation failed after format removal. "
-                        f"Trying fallback model: {fallback_model}"
-                    )
-                    
-                    # Parse fallback model
-                    fallback_provider, fallback_model_name = self._parse_model_string(fallback_model)
-                    
-                    # Reset temperature for fallback
-                    api_kwargs["temperature"] = original_temperature
-                    max_attempts = max_retries + 2
-                    self.logger.info(f"[{request_id}] 🔄 RETRY (fallback model) - {fallback_model} (attempt {attempt + 2}/{max_attempts}) - temp={original_temperature}")
-                    return True, fallback_model, fallback_model_name, self._providers[fallback_provider]
-        
-        return False, current_model, current_model.split(":", 1)[1], self._providers[provider_name]
     
     async def create_chat_completion(
         self,
@@ -675,10 +682,11 @@ class Elelem:
     ) -> Dict:
         """
         Unified chat completion method matching OpenAI API signature exactly.
+        Uses unified candidate-based iteration for both regular and virtual models.
         
         Args:
             messages: List of message dictionaries
-            model: Model string in "provider:model" format  
+            model: Model string in "provider:model" format (or virtual:model)
             tags: Tags for cost tracking (elelem-specific parameter)
             **kwargs: All OpenAI API parameters (response_format, temperature, etc.)
             
@@ -695,98 +703,171 @@ class Elelem:
         elif not tags:
             tags = []
         
-        # Setup request parameters and configurations
-        (provider_name, model_name, provider_client, model_config, 
-         api_kwargs, original_temperature, json_mode_requested, json_schema) = self._setup_request(
-            model, request_id, **kwargs)
+        # Get model configuration and candidates
+        try:
+            model_config = self.config.get_model_config(model)
+            candidates = model_config['candidates']
+        except ValueError as e:
+            raise ValueError(f"Model configuration error: {e}")
+        
+        # Extract common parameters
+        json_mode_requested = kwargs.get("response_format", {}).get("type") == "json_object"
+        json_schema = kwargs.get("json_schema")
+        original_temperature = kwargs.get("temperature", 1.0)
+        
+        # Warn if json_schema provided without JSON response format
+        if json_schema and not json_mode_requested:
+            self.logger.warning(f"[{request_id}] json_schema provided but response_format is not set to json_object. Schema validation will be skipped.")
+        
+        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s)")
+        if json_mode_requested:
+            self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
+        
+        # Iterate through candidates
+        last_error = None
+        for candidate_idx, candidate in enumerate(candidates):
+            try:
+                return await self._attempt_candidate(
+                    candidate, candidate_idx + 1, len(candidates),
+                    messages, model, model_config, request_id, 
+                    json_mode_requested, json_schema, original_temperature,
+                    tags, start_time, **kwargs
+                )
+            except InfrastructureError as e:
+                self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed: {e}")
+                self._update_retry_analytics("candidate_iterations", tags)
+                last_error = e
+                
+                if candidate_idx < len(candidates) - 1:
+                    continue  # Try next candidate
+                else:
+                    # All candidates exhausted
+                    raise e
+            except ModelError as e:
+                # Model/request errors don't trigger candidate iteration
+                raise e
+        
+        # Should never reach here, but just in case
+        raise last_error or Exception(f"All {len(candidates)} candidates failed")
+    
+    
+    async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
+                                messages, original_model, model_config, request_id, 
+                                json_mode_requested, json_schema, original_temperature,
+                                tags, start_time, **kwargs):
+        """Attempt to complete request with a specific candidate."""
+        
+        # Get timeout for this candidate
+        timeout = self.config.get_candidate_timeout(candidate, model_config)
+        
+        # Setup provider and model for this candidate
+        provider_name = candidate['provider']
+        model_name = candidate['model_id']
+        provider_client = self._providers[provider_name]
+        capabilities = candidate.get('capabilities', {})
+        
+        # Use original model reference for statistics (cost lookup)
+        # For virtual models: use the original model reference (e.g., "parasail:gpt-oss-120b")
+        # For regular models: use the original requested model name (e.g., "fireworks:deepseek-v3p1")
+        stats_model_name = candidate.get('original_model_ref', original_model)
+        candidate_model_name = f"{provider_name}:{model_name}"
+        
+        self.logger.info(f"[{request_id}] 🎯 Candidate {candidate_idx}/{total_candidates}: {candidate_model_name} (timeout={timeout}s)")
+        
+        # Prepare API parameters
+        api_kwargs = kwargs.copy()
+        api_kwargs['temperature'] = original_temperature
+        
+        # Get provider configuration for defaults
+        provider_config = self.config.get_provider_config(provider_name)
+        
+        # Add provider-specific default parameters
+        provider_defaults = provider_config.get("default_params", {})
+        for key, value in provider_defaults.items():
+            if key not in api_kwargs:
+                api_kwargs[key] = value
+        
+        # Add max_tokens default if provider specifies it and user didn't provide max_tokens
+        if "max_tokens" not in api_kwargs:
+            max_tokens_default = self.config.get_provider_max_tokens_default(provider_name)
+            if max_tokens_default is not None:
+                api_kwargs["max_tokens"] = max_tokens_default
+        
+        # Add extra_body parameters with precedence: user > model > provider
+        provider_extra_body = provider_config.get("extra_body", {})
+        model_extra_body = self.config.get_model_extra_body(original_model)
+        user_extra_body = api_kwargs.get("extra_body", {})
+        
+        # Merge with proper precedence (rightmost wins)
+        merged_extra_body = {**provider_extra_body, **model_extra_body, **user_extra_body}
+        
+        if merged_extra_body:
+            api_kwargs["extra_body"] = merged_extra_body
+        
+        # Remove json_schema from api_kwargs - it's not part of the OpenAI API
+        if "json_schema" in api_kwargs:
+            api_kwargs.pop("json_schema")
+        
+        # Clean up unsupported parameters for this provider
+        self._cleanup_api_kwargs(api_kwargs, candidate_model_name, {'capabilities': capabilities})
         
         # Preprocess messages for JSON mode if needed
-        modified_messages = self._preprocess_messages(messages, model, json_mode_requested)
-        if json_mode_requested:
-            self.logger.debug(f"[{request_id}] 🔧 Injected JSON enforcement instructions for {model} (response_format=json_object)")
+        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested)
         
-        # Clean up unsupported API parameters
-        self._cleanup_api_kwargs(api_kwargs, model, model_config)
-                
-        # Implement JSON validation and retry logic with fallback
+        # Retry logic for this candidate (temperature reduction, JSON validation)
         max_retries = self.config.retry_settings["max_json_retries"]
-        temperature_reductions = self.config.retry_settings["temperature_reductions"]  # [0.1, 0.3]
-        min_temp = self.config.retry_settings["min_temp"]  # 0.3
+        temperature_reductions = self.config.retry_settings["temperature_reductions"]
+        min_temp = self.config.retry_settings["min_temp"]
         
-        # Track all attempts for token accumulation
         total_input_tokens = 0
         total_output_tokens = 0
         total_reasoning_tokens = 0
         
-        current_model = model
-        current_model_name = model_name
-        current_provider_client = provider_client
-        using_fallback_model = False
-        
-        # Log initial request details
-        self.logger.debug(f"[{request_id}] 🚀 Making request to {model} with temperature={api_kwargs.get('temperature', 'default')}")
-        if json_mode_requested:
-            self.logger.debug(f"[{request_id}] 📋 JSON mode requested - response_format=json_object")
-        
-        for attempt in range(max_retries + 2):  # +2 for fallback attempt
+        for attempt in range(max_retries + 1):
             try:
-                # Log attempt start with detailed info
-                current_temp = api_kwargs.get('temperature', 'default')
-                max_attempts = max_retries + 2
-                self.logger.info(f"[{request_id}] 🔄 REQUEST START - {current_model} (attempt {attempt + 1}/{max_attempts}) - temp={current_temp}")
+                current_temp = api_kwargs.get('temperature', original_temperature)
+                self.logger.debug(f"[{request_id}] 🔄 Attempt {attempt + 1}/{max_retries + 1} - temp={current_temp}")
                 
-                # Make the API call with timeout handling
-                # Use 2x timeout for fallback model
-                current_timeout = self.config.timeout_seconds * 2 if using_fallback_model else self.config.timeout_seconds
+                # Make API call with timeout
                 try:
-                    response = await asyncio.wait_for(
-                        current_provider_client.chat.completions.create(
-                            messages=modified_messages,
-                            model=current_model_name,
-                            **api_kwargs
-                        ),
-                        timeout=current_timeout
-                    )
-                    api_error = None
-                except asyncio.TimeoutError:
-                    # Handle timeout with fallback model
-                    # Check for model-specific fallback first, then system-wide fallback
-                    timeout_fallback = self.config.get_timeout_fallback_model(current_model)
-                    if timeout_fallback and current_model != timeout_fallback:
-                        self.logger.warning(f"[{request_id}] 🕐 REQUEST TIMEOUT after {current_timeout}s - falling back to {timeout_fallback}")
-                        
-                        # Switch to fallback model
-                        fallback_provider, fallback_model_name = self._parse_model_string(timeout_fallback)
-                        current_model = timeout_fallback
-                        current_model_name = fallback_model_name
-                        current_provider_client = self._providers[fallback_provider]
-                        using_fallback_model = True
-                        
-                        # Reset temperature for fallback
-                        api_kwargs["temperature"] = original_temperature
-                        
-                        # Track timeout fallback usage
-                        self._update_retry_analytics("timeout_fallbacks", tags)
-                        
-                        fallback_timeout = self.config.timeout_seconds * 2
-                        self.logger.info(f"[{request_id}] 🔄 TIMEOUT FALLBACK - {current_model} (timeout={fallback_timeout}s) - temp={original_temperature}")
-                        continue  # Retry with fallback model
+                    if api_kwargs.get("stream", False):
+                        # Handle streaming response
+                        stream = await asyncio.wait_for(
+                            provider_client.chat.completions.create(
+                                messages=modified_messages,
+                                model=model_name,
+                                **api_kwargs
+                            ),
+                            timeout=timeout
+                        )
+                        response = await self._collect_streaming_response(stream)
                     else:
-                        # No fallback available or already using fallback
-                        raise asyncio.TimeoutError(f"Request timed out after {current_timeout}s (no fallback available)")
+                        # Handle non-streaming response
+                        response = await asyncio.wait_for(
+                            provider_client.chat.completions.create(
+                                messages=modified_messages,
+                                model=model_name,
+                                **api_kwargs
+                            ),
+                            timeout=timeout
+                        )
+                    api_error = None
+                except asyncio.TimeoutError as e:
+                    # Timeout is an infrastructure error - try next candidate
+                    raise InfrastructureError(f"Request timed out after {timeout}s")
                 except Exception as api_e:
-                    # Check if this is a JSON validation API error
-                    if self._is_json_validation_api_error(api_e) and json_mode_requested:
-                        self.logger.warning(f"[{request_id}] 🎯 API JSON VALIDATION FAILED - {str(api_e)[:30]}... Will trigger retry logic")
-                        # Set a flag to trigger JSON validation retry logic
+                    # Classify the error
+                    if self._is_infrastructure_error(api_e):
+                        raise InfrastructureError(f"API infrastructure error: {str(api_e)}")
+                    elif self._is_json_validation_api_error(api_e) and json_mode_requested:
+                        # API-level JSON validation errors will be handled in JSON validation section
                         api_error = api_e
-                        # Create a dummy response to continue the flow
                         response = None
                     else:
-                        # Re-raise non-JSON validation errors
-                        raise api_e
+                        # Other API errors are typically model errors (don't iterate)
+                        raise ModelError(f"API error: {str(api_e)}")
                 
-                # Extract usage statistics and accumulate (only if we got a real response)
+                # Extract tokens from response
                 if response:
                     usage = response.usage
                     input_tokens = getattr(usage, 'prompt_tokens', 0)
@@ -797,97 +878,97 @@ class Elelem:
                     total_output_tokens += output_tokens
                     total_reasoning_tokens += reasoning_tokens
                     
-                    # Process response content
                     content = self._process_response_content(response, json_mode_requested)
                 else:
-                    # API error case - no content to process
                     content = ""
                 
-                # Validate JSON if JSON mode was originally requested (even if response_format was removed)
+                # JSON validation if requested
                 if json_mode_requested:
                     try:
                         self._validate_json_response(content, json_schema, api_error)
                     except json.JSONDecodeError as e:
-                        # Handle JSON validation retry
-                        should_continue, new_temp = self._handle_json_retry(
-                            e, attempt, max_retries, request_id, api_kwargs, 
-                            original_temperature, temperature_reductions, min_temp, tags)
-                        
-                        if should_continue:
-                            continue
-                        else:
-                            # Try fallback strategies
-                            should_continue, current_model, current_model_name, current_provider_client = self._handle_fallback_strategies(
-                                attempt, max_retries, request_id, api_kwargs, 
-                                original_temperature, current_model, provider_name, tags)
+                        if attempt < max_retries:
+                            # Try temperature reduction
+                            if temperature_reductions and len(temperature_reductions) > 0:
+                                reduction_idx = min(attempt, len(temperature_reductions) - 1)
+                                reduction = temperature_reductions[reduction_idx]
+                                new_temp = max(current_temp - reduction, min_temp)
+                                
+                                if new_temp < current_temp:
+                                    api_kwargs['temperature'] = new_temp
+                                    self._update_retry_analytics("temperature_reductions", tags)
+                                    self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp}")
+                                    continue
                             
-                            if should_continue:
+                            # Try removing response format
+                            if 'response_format' in api_kwargs:
+                                api_kwargs.pop('response_format', None)
+                                api_kwargs['temperature'] = original_temperature
+                                self._update_retry_analytics("response_format_removals", tags)
+                                self.logger.warning(f"[{request_id}] Removing response_format and retrying")
                                 continue
-                            else:
-                                # Track final failure
-                                self._update_retry_analytics("final_failures", tags)
-                                raise ValueError(f"Failed to generate valid JSON after all retries including fallback: {e}")
+                        
+                        # All JSON retries exhausted - this is a model error, don't iterate candidates
+                        self._update_retry_analytics("final_failures", tags)
+                        raise ModelError(f"JSON validation failed after all retries: {e}")
                 
-                # Calculate final duration
+                # Success! Calculate duration and return
                 duration = time.time() - start_time
                 
-                # Log successful response with infrastructure provider info if available
+                # Log success with provider info
                 provider_info = ""
                 if hasattr(response, 'provider') and response.provider:
-                    # Check if this is an infrastructure provider (provider contains @)
-                    provider_name = model_config.get("provider", "")
-                    if "@" in provider_name:
-                        infrastructure_provider, routing_provider = provider_name.split("@")
-                        provider_info = f" via {response.provider} (routed through {routing_provider})"
-                    else:
-                        provider_info = f" via {response.provider}"
+                    provider_info = f" via {response.provider}"
                 
-                self.logger.info(f"[{request_id}] ✅ REQUEST SUCCESS - {current_model}{provider_info} in {duration:.2f}s")
-                self.logger.debug(f"[{request_id}] 📊 Token usage - Input: {total_input_tokens}, Output: {total_output_tokens} tokens")
-                if total_reasoning_tokens > 0:
-                    self.logger.debug(f"[{request_id}] 🧠 Reasoning tokens used: {total_reasoning_tokens}")
+                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s")
                 
-                # Extract runtime costs from OpenRouter if applicable
-                runtime_costs = self._extract_openrouter_costs(response, current_model)
+                # Extract runtime costs
+                runtime_costs = self._extract_openrouter_costs(response, candidate_model_name)
                 
-                # Update statistics with accumulated tokens
-                self._update_statistics(current_model, total_input_tokens, total_output_tokens, 
+                # Update statistics using original model reference for proper cost lookup
+                self._update_statistics(stats_model_name, total_input_tokens, total_output_tokens,
                                       total_reasoning_tokens, duration, tags, runtime_costs)
                 
-                # Update response with cleaned content
+                # Update response content
                 response.choices[0].message.content = content
                 
-                # Return the original OpenAI-style response object
                 return response
                 
+            except (InfrastructureError, ModelError):
+                # Re-raise classification errors as-is
+                raise
             except Exception as e:
-                # Extract tokens even from failed calls if available
-                if hasattr(e, 'response') and hasattr(e.response, 'usage'):
-                    usage = e.response.usage
-                    total_input_tokens += getattr(usage, 'prompt_tokens', 0)
-                    total_output_tokens += getattr(usage, 'completion_tokens', 0)
-                    total_reasoning_tokens += getattr(usage, 'reasoning_tokens', 0)
-                
-                # Handle rate limits with exponential backoff
+                # Handle rate limits
                 if "429" in str(e) or "rate limit" in str(e).lower():
-                    backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                    max_rate_retries = self.config.retry_settings["max_rate_limit_retries"]
-                    
-                    if attempt < max_rate_retries:
-                        # Track rate limit retry
-                        self._update_retry_analytics("rate_limit_retries", tags)
+                    if attempt < max_retries:
+                        backoff_times = self.config.retry_settings["rate_limit_backoff"]
                         wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
-                        self.logger.warning(
-                            f"[{request_id}] Rate limit hit (attempt {attempt + 1}/{max_rate_retries + 1}). "
-                            f"Waiting {wait_time}s before retry."
-                        )
+                        self._update_retry_analytics("rate_limit_retries", tags)
+                        self.logger.warning(f"[{request_id}] Rate limit, waiting {wait_time}s")
                         await asyncio.sleep(wait_time)
                         continue
+                    else:
+                        # Rate limit exhaustion is infrastructure issue
+                        raise InfrastructureError(f"Rate limit exhausted: {e}")
                 
-                # Re-raise if not a retryable error or max attempts reached
-                raise
-                
-        raise Exception("Unexpected error in retry loop")
+                # Other unexpected errors
+                raise ModelError(f"Unexpected error: {e}")
+        
+        # Should not reach here
+        raise ModelError("Exhausted all attempts for candidate")
+    
+    def _is_infrastructure_error(self, error) -> bool:
+        """Determine if an error is infrastructure-related (should try next candidate)."""
+        error_str = str(error).lower()
+        
+        # Common infrastructure error patterns
+        infrastructure_patterns = [
+            "connection", "network", "timeout", "503", "502", "500", 
+            "service unavailable", "bad gateway", "internal server error",
+            "401", "403", "unauthorized", "forbidden", "quota", "billing"
+        ]
+        
+        return any(pattern in error_str for pattern in infrastructure_patterns)
         
     def get_stats(self) -> Dict[str, Any]:
         """Get overall statistics."""
@@ -917,9 +998,8 @@ class Elelem:
                     "total_retries": 0,
                     "temperature_reductions": 0,
                     "final_failures": 0,
-                    "fallback_model_usage": 0,
                     "response_format_removals": 0,
-                    "timeout_fallbacks": 0
+                    "candidate_iterations": 0
                 }
             }
         

@@ -1,0 +1,208 @@
+Role: system
+Content: # Identity
+You are a specialist in creating irresistible **quatrièmes de couverture** (back cover blurbs) for children's books in **FRENCH**. Your role is to transform detailed story parameters into an enticing, mysterious, and captivating book summary that makes children and parents eager to read the story.
+
+# Purpose
+Based on detailed JSON story parameters, create a compelling French book blurb that includes:
+1. An attractive **title** that captures the essence of the adventure
+2. A **quatrième de couverture** (back cover summary) that hooks readers with mystery and excitement
+
+# Output Format
+**IMPORTANT**: Return ONLY a clean JSON object - no markdown, no code blocks, no extra text.
+
+Your response must be exactly this structure:
+
+{
+  "title": "Un titre accrocheur et mystérieux",
+  "blurb": "Une quatrième de couverture captivante de 3-4 phrases qui donne envie de lire l'histoire sans tout révéler."
+}
+
+# Guidelines for Title
+- Make it intriguing and mysterious (e.g., "Le Secret du Grenier Hanté", "L'Énigme de la Forêt Silencieuse")
+- Include key elements: location, mystery, or main character
+- Avoid spoilers but hint at the adventure
+- Keep it concise (3-8 words typically)
+- Use French literary conventions
+
+# Guidelines for Blurb (Quatrième de Couverture)
+- **Hook immediately**: Start with an intriguing situation or question
+- **Build mystery**: Hint at the central conflict without revealing the solution
+- **Create urgency**: Use phrases that suggest time pressure or danger
+- **End with questions**: Leave readers wondering what will happen
+- **Match tone**: Reflect the story's tone (mysterious, funny, adventurous, slightly spooky)
+- **Age-appropriate**: Exciting but not traumatic for children
+- **3-4 sentences maximum**: Concise and punchy
+
+# French Literary Style
+- Use engaging, flowing French prose
+- Include rhetorical questions to hook readers
+- Use dramatic but age-appropriate language
+- Create atmosphere with descriptive but concise language
+- End with intrigue or a call to adventure
+
+# Examples of Good Blurb Patterns
+- "Quand [event happens], [character] découvre que [mystery setup]. Mais [complication] et [stakes]. Parviendra-t-il/elle à [goal] avant que [time pressure]?"
+- "[Setting description with mystery]. [Character] thought [assumption], but [twist]. Now [urgent situation]. What secrets hide in [location]?"
+
+# Tone Matching
+- **Mysterious**: Use words like "secret", "énigme", "mystère", "étrange"
+- **Adventurous**: Use "aventure", "découverte", "exploration", "danger"
+- **Funny**: Include light humor and playful language
+- **Slightly spooky**: Add atmospheric elements without being scary
+
+## Example Output
+Here is a concrete example of the expected JSON format:
+
+```json
+{
+  "title": "Le Mystère du Grenier Hanté",
+  "blurb": "Quand Tristan entend des bruits étranges dans le grenier de sa maison à Châteaugiron, il découvre que quelque chose d'inexplicable se cache là-haut. Avec l'aide de ses amis Lucas et Lia, il doit percer ce mystère avant que les phénomènes ne s'aggravent. Mais que se passe-t-il vraiment dans ce grenier centenaire ? Une aventure pleine de suspense et d'amitié vous attend !"
+}
+```
+
+# Final Instructions
+- Never reveal the ending or major plot twists
+- Always include regional/local elements if mentioned in parameters
+- Make it feel like a real published children's book
+- The blurb should work both as marketing copy AND as rich context for story generation
+- Always return valid JSON with "title" and "blurb" fields
+- Write in flowing, engaging French that captures the story's spirit
+
+CRITICAL: You must respond with ONLY a clean JSON object - no markdown, no code blocks, no extra text. Do not wrap the JSON in ```json``` blocks or any other formatting. Return raw, valid JSON that can be parsed directly. Start your response with { and end with }. Any non-JSON content will cause a parsing error.
+
+Role: user
+Content: Create an attractive title and compelling quatrième de couverture for this story:
+
+{
+  "tone": "mysterious",
+  "theme": "un hiver mystérieux qui s'abat soudainement sur Dakar en plein été",
+  "scary_level": "mild",
+  "style": "cinematic et suspenseful",
+  "setting": {
+    "time": "une nuit d'été étrangement froide",
+    "place": "maison de vacances à Dakar",
+    "weather": "neige tombant sur la plage tropicale"
+  },
+  "characters": [
+    {
+      "character_id": "tristan-main-001",
+      "name": "Tristan",
+      "role": "protagoniste et détective en herbe",
+      "source": "child_profile",
+      "age": 10,
+      "gender": "male",
+      "personality": [
+        "curieux",
+        "observateur",
+        "courageux"
+      ],
+      "goal": "découvrir pourquoi l'hiver est arrivé à Dakar",
+      "voice_id": "boy_energetic",
+      "is_main_character": true
+    },
+    {
+      "character_id": "lucas-friend-002",
+      "name": "Lucas",
+      "role": "ami fidèle et aventurier",
+      "source": "child_profile",
+      "age": 10,
+      "gender": "male",
+      "personality": [
+        "brave",
+        "loyal",
+        "aventureux"
+      ],
+      "voice_id": "boy_brave",
+      "is_main_character": false
+    },
+    {
+      "character_id": "rookie-cat-003",
+      "name": "Rookie",
+      "role": "chat obèse aux sens aiguisés",
+      "source": "child_profile",
+      "age": 7,
+      "gender": "male",
+      "personality": [
+        "glouton",
+        "observateur",
+        "maladroit"
+      ],
+      "voice_id": "pet_cat",
+      "is_main_character": false
+    },
+    {
+      "character_id": "papi-esprit-004",
+      "name": "Papi",
+      "role": "esprit de l'ingénieur spatial qui guide Tristan",
+      "source": "child_profile",
+      "age": 70,
+      "gender": "male",
+      "personality": [
+        "sage",
+        "ingénieux",
+        "mystérieux"
+      ],
+      "voice_id": "elderly_male_wise",
+      "is_main_character": false
+    },
+    {
+      "character_id": "mamie-005",
+      "name": "Mamie",
+      "role": "grand-mère qui connaît les légendes locales",
+      "source": "child_profile",
+      "age": 68,
+      "gender": "female",
+      "personality": [
+        "savante",
+        "bienveillante",
+        "mystérieuse"
+      ],
+      "voice_id": "elderly_female_mystical",
+      "is_main_character": false
+    },
+    {
+      "character_id": "marc-papa-006",
+      "name": "Papa Marc",
+      "role": "père ingénieur qui cherche une explication scientifique",
+      "source": "child_profile",
+      "age": 42,
+      "gender": "male",
+      "personality": [
+        "rationnel",
+        "protecteur",
+        "ingénieux"
+      ],
+      "voice_id": "adult_male_gentle",
+      "is_main_character": false
+    }
+  ],
+  "conflict_source": {
+    "type": "mystery",
+    "details": "Un hiver magique et inexplicable envahit Dakar, avec de la neige sur les plages et un froid polaire en plein été",
+    "resolution_hint": "découvrir que c'est le fantôme de Papi qui teste une invention spatiale posthume"
+  },
+  "narrator": {
+    "character_id": "narrator",
+    "voice_id": "narrator_mysterious",
+    "personality": [
+      "mystérieux",
+      "engageant",
+      "dramatique"
+    ]
+  },
+  "narrative_voice": "third_person",
+  "pacing": "fast",
+  "values_to_emphasize": [
+    "curiosité",
+    "ingéniosité",
+    "amitié"
+  ],
+  "regional_anchoring": {
+    "reference_places": [
+      "plages de Dakar",
+      "maison de vacances à Sarzeau"
+    ],
+    "local_flavor": "le contraste entre la chaleur sénégalaise et le froid hivernal, les poissons surpris par la neige",
+    "cultural_elements": "les légendes locales sur les esprits météorologiques"
+  }
+}

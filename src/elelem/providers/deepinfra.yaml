@@ -83,19 +83,7 @@ models:
       currency: USD
 
   "deepinfra:deepseek-ai/DeepSeek-V3.1":
-    metadata_ref: "deepseek_v31"
-    provider: deepinfra
-    model_id: deepseek-ai/DeepSeek-V3.1
-    capabilities:
-      supports_json_mode: false
-      supports_temperature: true
-    cost:
-      input_cost_per_1m: 0.30
-      output_cost_per_1m: 1.00
-      currency: USD
-
-  "deepinfra:deepseek-ai/DeepSeek-V3.1-think":
-    metadata_ref: "deepseek_v31"
+    metadata_ref: "deepseek_v31-nothink"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-V3.1
     capabilities:

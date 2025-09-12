@@ -16,12 +16,19 @@ model_metadata:
     license: "Apache 2.0"
     reasoning: "yes"
 
-  deepseek_v31: &deepseek-v31
+  deepseek_v31-think: &deepseek-v31-think
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-v3.1"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3.1#thinking"
+    license: "MIT"
+    reasoning: "yes"
+
+  deepseek_v31-nothink: &deepseek-v31-nothink
     model_owner: "DeepSeek"
     model_nickname: "deepseek-v3.1"
     model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3.1"
     license: "MIT"
-    reasoning: "yes"
+    reasoning: "no"
 
   deepseek_r1: &deepseek-r1
     model_owner: "DeepSeek"
@@ -49,7 +56,7 @@ model_metadata:
     model_nickname: "gpt-5"
     model_page: "https://openai.com"
     license: "Proprietary"
-    reasoning: "no"
+    reasoning: "yes"
 
   openai_o3: &openai-o3
     model_owner: "OpenAI"
@@ -148,7 +155,7 @@ model_metadata:
     model_nickname: "gpt-5-mini"
     model_page: "https://openai.com"
     license: "Proprietary"
-    reasoning: "no"
+    reasoning: "yes"
 
   openai_o3_mini: &openai-o3-mini
     model_owner: "OpenAI"

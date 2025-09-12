@@ -211,9 +211,20 @@ class Elelem:
         """Remove <think>...</think> tags from content."""
         if not content:
             return ""
+        
         # Pattern to match <think>...</think> including multiline content
         pattern = r'<think>.*?</think>'
-        return re.sub(pattern, '', content, flags=re.DOTALL).strip()
+        cleaned = re.sub(pattern, '', content, flags=re.DOTALL).strip()
+        
+        # Fallback: if content starts with thinking content and contains </think>,
+        # extract everything after </think>
+        if cleaned == content and '</think>' in content:
+            parts = content.split('</think>', 1)
+            if len(parts) > 1:
+                cleaned = parts[1].strip()
+                self.logger.debug(f"Removed thinking content using </think> split: kept {len(cleaned)} chars")
+        
+        return cleaned
         
     def _extract_json_from_markdown(self, content: str) -> str:
         """Extract JSON from markdown code blocks."""
@@ -627,6 +638,65 @@ class Elelem:
         reasoning_tokens = _recursive_search(usage)
         if reasoning_tokens > 0:
             return reasoning_tokens
+            
+        # Check for <think> tags in response content (Parasail DeepSeek, etc.)
+        if response and hasattr(response, 'choices') and response.choices:
+            first_choice = response.choices[0]
+            if hasattr(first_choice, 'message') and first_choice.message.content:
+                content = first_choice.message.content
+                self.logger.debug(f"Checking content for <think> tags, length: {len(content)}")
+                
+                # Extract reasoning content from <think> tags
+                import re
+                think_pattern = r'<think>(.*?)</think>'
+                think_matches = re.findall(think_pattern, content, re.DOTALL)
+                
+                self.logger.debug(f"Found {len(think_matches)} <think> matches")
+                
+                if think_matches:
+                    reasoning_content = think_matches[0].strip()
+                    if reasoning_content:
+                        # Estimate reasoning tokens using character count ratio
+                        reasoning_chars = len(reasoning_content)
+                        
+                        # Get actual response content (everything after </think>)
+                        actual_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                        actual_chars = len(actual_content)
+                        total_chars = reasoning_chars + actual_chars
+                        
+                        self.logger.debug(f"Reasoning chars: {reasoning_chars}, Actual chars: {actual_chars}")
+                        
+                        if total_chars > 0:
+                            reasoning_ratio = reasoning_chars / total_chars
+                            total_completion_tokens = getattr(usage, 'completion_tokens', 0)
+                            estimated_reasoning_tokens = int(total_completion_tokens * reasoning_ratio)
+                            
+                            self.logger.debug(f"Extracted reasoning from <think> tags: {estimated_reasoning_tokens} tokens "
+                                            f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
+                            return estimated_reasoning_tokens
+                
+                # Fallback for content that starts with thinking but no opening <think> tag
+                elif '</think>' in content:
+                    self.logger.debug("Found </think> but no opening <think> tag, using fallback")
+                    parts = content.split('</think>', 1)
+                    if len(parts) > 1:
+                        reasoning_content = parts[0].strip()
+                        actual_content = parts[1].strip()
+                        
+                        reasoning_chars = len(reasoning_content)
+                        actual_chars = len(actual_content)
+                        total_chars = reasoning_chars + actual_chars
+                        
+                        self.logger.debug(f"Fallback - Reasoning chars: {reasoning_chars}, Actual chars: {actual_chars}")
+                        
+                        if total_chars > 0 and reasoning_chars > 0:
+                            reasoning_ratio = reasoning_chars / total_chars
+                            total_completion_tokens = getattr(usage, 'completion_tokens', 0)
+                            estimated_reasoning_tokens = int(total_completion_tokens * reasoning_ratio)
+                            
+                            self.logger.debug(f"Extracted reasoning via fallback: {estimated_reasoning_tokens} tokens "
+                                            f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
+                            return estimated_reasoning_tokens
             
         # Fallback: estimate from reasoning content fields (any provider)
         if response and hasattr(response, 'choices') and response.choices:

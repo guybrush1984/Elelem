@@ -144,14 +144,18 @@ class Config:
         return self._models_config.get("models", {})
     
     def get_model_config(self, model_name: str) -> Dict[str, Any]:
-        """Get unified candidate structure for any model (regular or virtual).
-        
+        """Get unified candidate structure for any model (regular, virtual, or dynamic).
+
         Args:
-            model_name: Model name (e.g., "openai:gpt-4.1" or "virtual:gpt-oss-120b")
-            
+            model_name: Model name (e.g., "openai:gpt-4.1", "virtual:gpt-oss-120b", or "dynamic:{...}")
+
         Returns:
             Dict with 'candidates' list and optional 'timeout'
         """
+        # Handle dynamic models
+        if model_name.startswith("dynamic:{"):
+            return self._parse_dynamic_model(model_name)
+
         models = self.models
         
         if model_name not in models:
@@ -242,3 +246,84 @@ class Config:
             
         # Fall back to global timeout
         return self.timeout_seconds
+
+    def _parse_dynamic_model(self, model_string: str) -> Dict[str, Any]:
+        """Parse dynamic model specification from YAML syntax.
+
+        Args:
+            model_string: Dynamic model string starting with "dynamic:{...}"
+
+        Returns:
+            Dict with 'candidates' list and optional 'timeout' (same format as virtual models)
+        """
+        import yaml
+
+        # Properly split on first colon to extract YAML content
+        if not model_string.startswith("dynamic:"):
+            raise ValueError("Dynamic model string must start with 'dynamic:'")
+
+        _, yaml_content = model_string.split(":", 1)
+
+        try:
+            config = yaml.safe_load(yaml_content)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in dynamic model specification: {e}")
+
+        if not isinstance(config, dict):
+            raise ValueError("Dynamic model specification must be a YAML dictionary")
+
+        if 'candidates' not in config:
+            raise ValueError("Dynamic model specification must include 'candidates' list")
+
+        # Transform string candidates to dict format (consistent with virtual models)
+        candidates = []
+        for candidate in config['candidates']:
+            if isinstance(candidate, str):
+                # Simple string -> convert to dict format
+                candidates.append({'model': candidate})
+            elif isinstance(candidate, dict):
+                # Already in dict format
+                candidates.append(candidate)
+            else:
+                raise ValueError(f"Invalid candidate format: {candidate}")
+
+        # Create config in same format as static virtual models
+        parsed_config = {
+            'candidates': candidates,
+            'timeout': config.get('timeout'),
+            'metadata_ref': config.get('metadata_ref')
+        }
+
+        # Apply the same resolution logic as virtual models
+        models = self.models
+        resolved_candidates = []
+
+        for candidate in candidates:
+            if 'model' in candidate:
+                # Reference to another model
+                ref_model_name = candidate['model']
+                if ref_model_name not in models:
+                    raise ValueError(f"Referenced model '{ref_model_name}' not found")
+
+                ref_config = models[ref_model_name]
+                resolved = {
+                    'original_model_ref': ref_model_name,  # Keep track of original reference
+                    'provider': ref_config['provider'],
+                    'model_id': ref_config['model_id'],
+                    'capabilities': ref_config.get('capabilities', {}),
+                    'cost': ref_config.get('cost'),
+                    'default_params': ref_config.get('default_params', {}),
+                    'display_metadata': ref_config.get('display_metadata', {}),
+                    'timeout': candidate.get('timeout')  # Candidate timeout override
+                }
+            else:
+                # Inline definition (shouldn't happen, but handle it)
+                resolved = candidate.copy()
+
+            resolved_candidates.append(resolved)
+
+        return {
+            'candidates': resolved_candidates,
+            'timeout': parsed_config.get('timeout'),
+            'metadata_ref': parsed_config.get('metadata_ref')
+        }

@@ -31,7 +31,7 @@ models:
       supports_system: true
     cost: runtime
 
-  "openrouter:openai/gpt-oss-120b-nitro":
+  "openrouter:openai/gpt-oss-120b?nitro":
     metadata_ref: "openai_gpt_oss_120b"
     provider: openrouter
     model_id: openai/gpt-oss-120b:nitro

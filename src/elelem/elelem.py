@@ -121,27 +121,24 @@ class Elelem:
         }
         self._tag_statistics = {}
         
-    def _parse_model_string(self, model: str) -> tuple[str, str]:
-        """Parse provider:model string and get actual model_id from config."""
-        if ":" not in model:
-            raise ValueError(f"Model must be in 'provider:model' format, got: {model}")
-            
-        provider, _ = model.split(":", 1)
-        
+    def _get_model_config(self, model: str) -> tuple[str, str]:
+        """Get provider and model_id from model configuration (opaque key lookup)."""
         if model not in self._models:
             raise ValueError(f"Unknown model: {model}")
-            
+
+        model_config = self._models.get(model, {})
+        provider = model_config.get("provider")
+        model_id = model_config.get("model_id")
+
+        if not provider:
+            raise ValueError(f"Model '{model}' missing provider configuration")
+        if not model_id:
+            raise ValueError(f"Model '{model}' missing model_id configuration")
+
         if provider not in self._providers:
             available_providers = list(self._providers.keys())
             raise ValueError(f"Provider '{provider}' not available. Available: {available_providers}")
-        
-        # Get the actual model_id from configuration
-        model_config = self._models.get(model, {})
-        model_id = model_config.get("model_id")
-        if not model_id:
-            # Fallback to the part after colon if no model_id is specified
-            _, model_id = model.split(":", 1)
-            
+
         return provider, model_id
         
     def _should_remove_response_format(self, model: str) -> bool:

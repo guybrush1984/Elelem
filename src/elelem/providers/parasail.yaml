@@ -4,7 +4,7 @@ provider:
   default_params: {}
 
 models:
-  "parasail:deepseek-3.1":
+  "parasail:deepseek/deepseek-3.1?nothink":
     provider: parasail
     model_id: parasail-deepseek-31
     capabilities:
@@ -17,7 +17,7 @@ models:
       currency: USD
     metadata_ref: "deepseek_v31"
 
-  "parasail:deepseek-3.1-think":
+  "parasail:deepseek/deepseek-3.1?think":
     provider: parasail
     model_id: parasail-deepseek-31
     capabilities:
@@ -33,7 +33,7 @@ models:
       chat_template_kwargs:
         thinking: true
 
-  "parasail:gpt-oss-120b":
+  "parasail:openai/gpt-oss-120b":
     provider: parasail
     model_id: parasail-gpt-oss-120b
     capabilities:

@@ -48,7 +48,7 @@ models:
       currency: USD
     metadata_ref: "moonshot_kimi_k2"
 
-  "groq:meta-llama/llama-4-maverick-17b-128e-instruct":
+  "groq:meta-llama/llama-4-maverick-17b":
     provider: groq
     model_id: meta-llama/llama-4-maverick-17b-128e-instruct
     capabilities:
@@ -61,7 +61,7 @@ models:
       currency: USD
     metadata_ref: "meta_llama4_maverick"
 
-  "groq:meta-llama/llama-4-scout-17b-16e-instruct":
+  "groq:meta-llama/llama-4-scout-17b":
     provider: groq
     model_id: meta-llama/llama-4-scout-17b-16e-instruct
     capabilities:

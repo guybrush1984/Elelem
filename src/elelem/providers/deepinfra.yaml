@@ -34,7 +34,7 @@ models:
     default_params:
       reasoning_effort: low      
 
-  "deepinfra:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8":
+  "deepinfra:meta-llama/llama-4-maverick-17b":
     metadata_ref: "meta_llama4_maverick"
     provider: deepinfra
     model_id: meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8
@@ -46,7 +46,7 @@ models:
       output_cost_per_1m: 0.30
       currency: USD
 
-  "deepinfra:meta-llama/Llama-4-Scout-17B-16E-Instruct":
+  "deepinfra:meta-llama/llama-4-scout-17b":
     metadata_ref: "meta_llama4_scout"
     provider: deepinfra
     model_id: meta-llama/Llama-4-Scout-17B-16E-Instruct
@@ -58,7 +58,7 @@ models:
       output_cost_per_1m: 0.30
       currency: USD
 
-  "deepinfra:moonshotai/Kimi-K2-Instruct":
+  "deepinfra:moonshotai/kimi-k2-instruct":
     metadata_ref: "moonshot_kimi_k2"
     provider: deepinfra
     model_id: moonshotai/Kimi-K2-Instruct
@@ -70,7 +70,7 @@ models:
       output_cost_per_1m: 2.00
       currency: USD
 
-  "deepinfra:deepseek-ai/DeepSeek-R1-0528":
+  "deepinfra:deepseek/deepseek-r1-0528":
     metadata_ref: "deepseek_r1_0528"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-0528
@@ -82,7 +82,7 @@ models:
       output_cost_per_1m: 2.15
       currency: USD
 
-  "deepinfra:deepseek-ai/DeepSeek-V3.1":
+  "deepinfra:deepseek/deepseek-3.1?nothink":
     metadata_ref: "deepseek_v31-nothink"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-V3.1
@@ -94,7 +94,7 @@ models:
       output_cost_per_1m: 1.00
       currency: USD
 
-  "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Llama-70B":
+  "deepinfra:deepseek/deepseek-r1-distill-llama-70b":
     metadata_ref: "deepseek_r1_distill_llama_70b"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
@@ -106,7 +106,7 @@ models:
       output_cost_per_1m: 0.40
       currency: USD
 
-  "deepinfra:deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
+  "deepinfra:deepseek/deepseek-r1-distill-qwen-32b":
     metadata_ref: "deepseek_r1_distill_qwen_32b"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B

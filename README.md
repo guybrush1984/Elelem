@@ -146,6 +146,7 @@ response = await elelem.create_chat_completion(
     model="cost@openrouter:openai/gpt-oss-120b",  # Cost-optimized routing
     messages=[{"role": "user", "content": "Cheap and cheerful!"}]
 )
+```
 
 ### 🥊 The OpenAI SDK Override Championship
 
@@ -173,19 +174,22 @@ Every provider returns data differently. Elelem makes them all look like OpenAI:
 
 ## Installation
 
-### Local Development
-```bash
-pip install -e /path/to/Elelem/
-```
+> **Note:** Elelem is not available on PyPI. Install directly from GitHub.
 
 ### From Git Repository
 ```bash
-pip install git+https://github.com/yourorg/elelem.git
-```
+# Using pip
+pip install git+https://github.com/guybrush1984/Elelem.git
 
-### From Private PyPI
-```bash
-pip install elelem --index-url https://your-private-pypi.com
+# Or clone and install locally
+git clone https://github.com/guybrush1984/Elelem.git
+cd Elelem
+pip install -e .
+
+# Using uv (recommended)
+git clone https://github.com/guybrush1984/Elelem.git
+cd Elelem
+uv pip install -e .
 ```
 
 ## Quick Start - The 60-Second Tour
@@ -593,5 +597,5 @@ MIT License - see LICENSE file for details.
 
 For issues and questions:
 - Check the [documentation](SPECIFICATION.md)
-- Review existing [issues](https://github.com/yourorg/elelem/issues)
-- Submit a [new issue](https://github.com/yourorg/elelem/issues/new)
+- Review existing [issues](https://github.com/guybrush1984/Elelem/issues)
+- Submit a [new issue](https://github.com/guybrush1984/Elelem/issues/new)

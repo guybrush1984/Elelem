@@ -36,7 +36,7 @@ models:
     cost: runtime 
 
   "throughput@openrouter:deepseek/deepseek-3.1?nothink":
-    metadata_ref: "deepseek_v31"
+    metadata_ref: "deepseek_v31-nothink"
     provider: throughput@openrouter
     model_id: deepseek/deepseek-chat-v3.1
     capabilities:

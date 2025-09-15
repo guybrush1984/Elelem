@@ -32,6 +32,14 @@ dependencies = [
     "jsonschema>=4.0.0",
     "pyyaml>=6.0.0",
     "python-dotenv>=1.0.1",
+    "fastapi>=0.116.1",
+    "uvicorn[standard]>=0.33.0",
+    "pydantic>=2.10.6",
+    "pandas>=2.0.3",
+    "requests>=2.32.4",
+    "pytest>=8.3.5",
+    "flask>=3.0.3",
+    "pytest-asyncio>=0.24.0",
 ]
 
 [project.optional-dependencies]

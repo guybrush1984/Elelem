@@ -1,0 +1,39 @@
+scenario: "provider_errors"
+description: "Test various provider errors - timeout, auth, overloaded"
+type: "conditional"
+
+models:
+  "faker:error-prone":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  - check: "message_contains"
+    value: "timeout"
+    response:
+      type: "timeout"
+
+  - check: "message_contains"
+    value: "auth"
+    response:
+      type: "auth_error"
+
+  - check: "message_contains"
+    value: "overloaded"
+    response:
+      type: "overloaded"
+
+  - check: "temperature_above"
+    value: 0.8
+    response:
+      type: "overloaded"
+
+default_response:
+  type: "success"
+  content: "Default response when no error conditions match"
+  tokens:
+    input: 40
+    output: 10

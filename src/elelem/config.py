@@ -11,9 +11,15 @@ import yaml
 class Config:
     """Configuration loader for Elelem settings."""
     
-    def __init__(self):
+    def __init__(self, extra_provider_dirs: Optional[List[str]] = None):
         self._config = self._load_config()
-        self._models_config = self._load_models_config()
+        # Check for extra provider dirs from environment variable
+        if extra_provider_dirs is None:
+            import os
+            env_dirs = os.environ.get('ELELEM_EXTRA_PROVIDER_DIRS')
+            if env_dirs:
+                extra_provider_dirs = [d.strip() for d in env_dirs.split(',')]
+        self._models_config = self._load_models_config(extra_provider_dirs)
         
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from config.json file."""
@@ -26,7 +32,7 @@ class Config:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             raise RuntimeError(f"Failed to load Elelem configuration: {e}")
     
-    def _load_models_config(self) -> Dict[str, Any]:
+    def _load_models_config(self, extra_provider_dirs: Optional[List[str]] = None) -> Dict[str, Any]:
         """Load models and providers configuration from YAML files.
         
         Loads main models.yaml, metadata, and auto-discovers provider files in providers/ directory.
@@ -59,9 +65,21 @@ class Config:
                 merged_config["providers"].update(main_config.get("providers", {}))
                 merged_config["models"].update(main_config.get("models", {}))
             
-            # Auto-discover and merge provider files
+            # Auto-discover and merge provider files from main and extra directories
+            provider_dirs_to_scan = []
             if providers_dir.exists():
-                for yaml_file in providers_dir.glob("*.yaml"):
+                provider_dirs_to_scan.append(providers_dir)
+
+            # Add extra provider directories if specified
+            if extra_provider_dirs:
+                for extra_dir in extra_provider_dirs:
+                    extra_path = Path(extra_dir)
+                    if extra_path.exists():
+                        provider_dirs_to_scan.append(extra_path)
+
+            # Scan all provider directories
+            for current_dir in provider_dirs_to_scan:
+                for yaml_file in current_dir.glob("*.yaml"):
                     # Skip metadata file
                     if yaml_file.name.startswith("_"):
                         continue

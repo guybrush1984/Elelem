@@ -9,12 +9,20 @@ import os
 import re
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 import yaml
 import openai
+from openai import (
+    BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError,
+    ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError,
+    LengthFinishReasonError, ContentFilterFinishReasonError
+)
+import pandas as pd
 from jsonschema import validate, ValidationError
 from .config import Config
+from .metrics import MetricsStore
 
 
 class InfrastructureError(Exception):
@@ -29,16 +37,14 @@ class ModelError(Exception):
 class Elelem:
     """Unified API wrapper with cost tracking, JSON validation, and retry logic."""
     
-    def __init__(self):
+    def __init__(self, metrics_persist_file: Optional[str] = None, extra_provider_dirs: Optional[List[str]] = None):
         self.logger = logging.getLogger("elelem")
-        self.config = Config()
-        self._statistics = {}
-        self._tag_statistics = {}
+        self.config = Config(extra_provider_dirs)
         self._models = self._load_models()
         self._providers = self._initialize_providers()
-        
-        # Initialize statistics tracking
-        self._reset_stats()
+
+        # Initialize metrics system
+        self._metrics_store = MetricsStore(persist_file=metrics_persist_file)
     
     def _load_models(self) -> Dict[str, Any]:
         """Load model definitions using the Config system."""
@@ -49,7 +55,8 @@ class Elelem:
         client_kwargs = {
             "api_key": api_key,
             "base_url": base_url,
-            "timeout": 600  # High timeout - we'll manage timeouts at application level
+            "timeout": 600,  # High timeout - we'll manage timeouts at application level
+            "max_retries": 0  # Disable OpenAI SDK retries - Elelem handles all retry logic
         }
         
         # Add custom headers for specific providers
@@ -94,32 +101,7 @@ class Elelem:
         
     def _reset_stats(self):
         """Reset all statistics."""
-        self._statistics = {
-            "total_input_tokens": 0,
-            "total_output_tokens": 0,
-            "total_tokens": 0,
-            "total_input_cost_usd": 0.0,
-            "total_output_cost_usd": 0.0,
-            "total_cost_usd": 0.0,
-            "total_calls": 0,
-            "total_duration_seconds": 0.0,
-            "avg_duration_seconds": 0.0,
-            "reasoning_tokens": 0,
-            "reasoning_cost_usd": 0.0,
-            "providers": {},  # Track which actual providers were used (e.g., "Novita": {"count": 5, "cost": 0.001})
-            "retry_analytics": {
-                "json_parse_retries": 0,
-                "json_schema_retries": 0,
-                "api_json_validation_retries": 0,
-                "rate_limit_retries": 0,
-                "total_retries": 0,
-                "temperature_reductions": 0,
-                "final_failures": 0,
-                "response_format_removals": 0,
-                "candidate_iterations": 0
-            }
-        }
-        self._tag_statistics = {}
+        self._metrics_store.reset()
         
     def _get_model_config(self, model: str) -> tuple[str, str]:
         """Get provider and model_id from model configuration (opaque key lookup)."""
@@ -141,10 +123,6 @@ class Elelem:
 
         return provider, model_id
         
-    def _should_remove_response_format(self, model: str) -> bool:
-        """Check if response_format should be removed for this model."""
-        model_config = self._models.get(model, {})
-        return not model_config.get("capabilities", {}).get("supports_json_mode", True)
         
     async def _collect_streaming_response(self, stream):
         """Collect streaming chunks and reconstruct a normal response object."""
@@ -152,7 +130,7 @@ class Elelem:
         reasoning_content_parts = []
         final_chunk = None
         finish_reason = None
-        
+
         async for chunk in stream:
             if chunk.choices and len(chunk.choices) > 0:
                 choice = chunk.choices[0]
@@ -181,28 +159,36 @@ class Elelem:
         
         # Create a normal ChatCompletion response (not streaming)
         from openai.types.chat.chat_completion_message import ChatCompletionMessage
-        from openai.types.chat.chat_completion import Choice
-        import copy
-        
+        from openai.types.chat.chat_completion import ChatCompletion, Choice
+
         # Create the message object
         message = ChatCompletionMessage(
             role="assistant",
             content=full_content,
             reasoning_content=full_reasoning_content if full_reasoning_content else None
         )
-        
-        # Create the choice object  
+
+        # Create the choice object
         choice = Choice(
             index=0,
             message=message,
             finish_reason=finish_reason
         )
-        
-        # Modify the final chunk to have a proper message-based choice
-        final_chunk = copy.deepcopy(final_chunk)
-        final_chunk.choices = [choice]
-        
-        return final_chunk
+
+        # Create a proper ChatCompletion object (not ChatCompletionChunk)
+        # Use the metadata from the final chunk but create a new ChatCompletion
+        completion = ChatCompletion(
+            id=final_chunk.id,
+            object="chat.completion",  # Not "chat.completion.chunk"
+            created=final_chunk.created,
+            model=final_chunk.model,
+            choices=[choice],
+            usage=final_chunk.usage if hasattr(final_chunk, 'usage') and final_chunk.usage else None,
+            system_fingerprint=final_chunk.system_fingerprint if hasattr(final_chunk, 'system_fingerprint') else None,
+            service_tier=final_chunk.service_tier if hasattr(final_chunk, 'service_tier') else None
+        )
+
+        return completion
         
     def _remove_think_tags(self, content: str) -> str:
         """Remove <think>...</think> tags from content."""
@@ -276,10 +262,9 @@ class Elelem:
         error_str = str(error).lower()
         return "json_validate_failed" in error_str and "400" in error_str
         
-    def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], model: str) -> List[Dict[str, str]]:
+    def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict) -> List[Dict[str, str]]:
         """Add JSON formatting instructions to messages when response_format is JSON."""
-        model_config = self._models.get(model, {})
-        supports_system = model_config.get("capabilities", {}).get("supports_system", True)
+        supports_system = capabilities.get("supports_system", True)
         
         modified_messages = messages.copy()
         
@@ -316,10 +301,9 @@ class Elelem:
             
         return modified_messages
         
-    def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None) -> Dict[str, float]:
+    def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None, candidate_cost_config: Dict = None) -> Dict[str, float]:
         """Calculate costs based on model pricing or runtime data from provider."""
-        model_config = self._models.get(model, {})
-        cost_config = model_config.get("cost", {})
+        cost_config = candidate_cost_config
         
         # Handle runtime cost calculation (e.g., from OpenRouter headers)
         if runtime_costs:
@@ -418,159 +402,92 @@ class Elelem:
         
         return runtime_costs
         
-    def _update_statistics(self, model: str, input_tokens: int, output_tokens: int, 
-                          reasoning_tokens: int, duration: float, tags: List[str], runtime_costs: Dict = None):
+    def _update_statistics(self, model: str, input_tokens: int, output_tokens: int,
+                          reasoning_tokens: int, duration: float, tags: List[str], runtime_costs: Dict = None, candidate_cost_config: Dict = None, candidate_provider: str = None, requested_model: str = None):
         """Update statistics tracking."""
-        costs = self._calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs)
-        
+        costs = self._calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs, candidate_cost_config)
+
         # Track actual provider used (for OpenRouter)
         actual_provider = runtime_costs.get("actual_provider") if runtime_costs else None
-        
-        # Update overall statistics
-        self._statistics["total_input_tokens"] += input_tokens
-        self._statistics["total_output_tokens"] += output_tokens
-        self._statistics["total_tokens"] += input_tokens + output_tokens
-        self._statistics["total_input_cost_usd"] += costs["input_cost_usd"]
-        self._statistics["total_output_cost_usd"] += costs["output_cost_usd"]
-        self._statistics["total_cost_usd"] += costs["total_cost_usd"]
-        self._statistics["total_calls"] += 1
-        self._statistics["total_duration_seconds"] += duration
-        self._statistics["avg_duration_seconds"] = (
-            self._statistics["total_duration_seconds"] / self._statistics["total_calls"]
+
+        # Use candidate provider directly
+        provider = candidate_provider
+
+        # Add model and provider as automatic tags
+        enhanced_tags = list(tags) if tags else []
+        enhanced_tags.append(f"model:{model}")
+        enhanced_tags.append(f"provider:{provider}")
+
+        self._metrics_store.record_call(
+            model=model,
+            provider=provider,
+            tags=enhanced_tags,
+            duration_seconds=duration,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            reasoning_tokens=reasoning_tokens,
+            costs=costs,
+            actual_provider=actual_provider,
+            requested_model=requested_model
         )
-        
-        if reasoning_tokens > 0:
-            self._statistics["reasoning_tokens"] += reasoning_tokens
-            self._statistics["reasoning_cost_usd"] += costs["reasoning_cost_usd"]
-        
-        # Track provider usage (for OpenRouter actual providers)
-        if actual_provider:
-            if actual_provider not in self._statistics["providers"]:
-                self._statistics["providers"][actual_provider] = {
-                    "count": 0,
-                    "total_cost_usd": 0.0,
-                    "total_tokens": 0,
-                    "total_input_tokens": 0,
-                    "total_output_tokens": 0
-                }
-            
-            provider_stats = self._statistics["providers"][actual_provider]
-            provider_stats["count"] += 1
-            provider_stats["total_cost_usd"] += costs["total_cost_usd"]
-            provider_stats["total_tokens"] += input_tokens + output_tokens
-            provider_stats["total_input_tokens"] += input_tokens
-            provider_stats["total_output_tokens"] += output_tokens
-            
-        # Update tag-specific statistics
-        for tag in tags:
-            if tag not in self._tag_statistics:
-                self._tag_statistics[tag] = {
-                    "total_input_tokens": 0,
-                    "total_output_tokens": 0,
-                    "total_tokens": 0,
-                    "total_input_cost_usd": 0.0,
-                    "total_output_cost_usd": 0.0,
-                    "total_cost_usd": 0.0,
-                    "total_calls": 0,
-                    "total_duration_seconds": 0.0,
-                    "avg_duration_seconds": 0.0,
-                    "reasoning_tokens": 0,
-                    "reasoning_cost_usd": 0.0,
-                    "retry_analytics": {
-                        "json_parse_retries": 0,
-                        "json_schema_retries": 0,
-                        "api_json_validation_retries": 0,
-                        "rate_limit_retries": 0,
-                        "total_retries": 0,
-                        "temperature_reductions": 0,
-                        "final_failures": 0,
-                        "response_format_removals": 0,
-                        "candidate_iterations": 0
-                    }
-                }
-                
-            tag_stats = self._tag_statistics[tag]
-            tag_stats["total_input_tokens"] += input_tokens
-            tag_stats["total_output_tokens"] += output_tokens
-            tag_stats["total_tokens"] += input_tokens + output_tokens
-            tag_stats["total_input_cost_usd"] += costs["input_cost_usd"]
-            tag_stats["total_output_cost_usd"] += costs["output_cost_usd"]
-            tag_stats["total_cost_usd"] += costs["total_cost_usd"]
-            tag_stats["total_calls"] += 1
-            tag_stats["total_duration_seconds"] += duration
-            tag_stats["avg_duration_seconds"] = (
-                tag_stats["total_duration_seconds"] / tag_stats["total_calls"]
-            )
-            
-            if reasoning_tokens > 0:
-                tag_stats["reasoning_tokens"] += reasoning_tokens
-                tag_stats["reasoning_cost_usd"] += costs["reasoning_cost_usd"]
     
     def _update_retry_analytics(self, retry_type: str, tags: List[str], count: int = 1):
-        """Update retry analytics for both overall and tag-specific statistics.
-        
+        """Update retry analytics.
+
         Args:
             retry_type: Type of retry ('json_parse_retries', 'json_schema_retries', etc.)
             tags: List of tags to update
             count: Number to increment by (default 1)
         """
-        # Update overall statistics
-        if retry_type in self._statistics["retry_analytics"]:
-            self._statistics["retry_analytics"][retry_type] += count
-            self._statistics["retry_analytics"]["total_retries"] += count
-        
-        # Update tag-specific statistics
-        for tag in tags:
-            # Initialize tag statistics if they don't exist
-            if tag not in self._tag_statistics:
-                self._tag_statistics[tag] = {
-                    "total_input_tokens": 0,
-                    "total_output_tokens": 0,
-                    "total_tokens": 0,
-                    "total_input_cost_usd": 0.0,
-                    "total_output_cost_usd": 0.0,
-                    "total_cost_usd": 0.0,
-                    "total_calls": 0,
-                    "total_duration_seconds": 0.0,
-                    "avg_duration_seconds": 0.0,
-                    "reasoning_tokens": 0,
-                    "reasoning_cost_usd": 0.0,
-                    "retry_analytics": {
-                        "json_parse_retries": 0,
-                        "json_schema_retries": 0,
-                        "api_json_validation_retries": 0,
-                        "rate_limit_retries": 0,
-                        "total_retries": 0,
-                        "temperature_reductions": 0,
-                        "final_failures": 0,
-                        "response_format_removals": 0,
-                        "candidate_iterations": 0
-                    }
-                }
-            
-            if retry_type in self._tag_statistics[tag]["retry_analytics"]:
-                self._tag_statistics[tag]["retry_analytics"][retry_type] += count
-                self._tag_statistics[tag]["retry_analytics"]["total_retries"] += count
+        # Record in MetricsStore
+        self._metrics_store.record_retry(
+            retry_type=retry_type,
+            tags=tags,
+            count=count
+        )
     
-    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool) -> List[Dict[str, str]]:
+    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, capabilities: Dict) -> List[Dict[str, str]]:
         """Preprocess messages for the request."""
         if json_mode_requested:
             # Always add JSON instructions when JSON is requested
-            return self._add_json_instructions_to_messages(messages, model)
+            return self._add_json_instructions_to_messages(messages, capabilities)
         return messages
     
     def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
         """Remove unsupported parameters from api_kwargs."""
-        # Remove response_format if not supported by the model
-        if self._should_remove_response_format(model) and "response_format" in api_kwargs:
-            self.logger.debug(f"Removing response_format for {model} (not supported)")
+        self.logger.debug(f"[DEBUG] _cleanup_api_kwargs called for model '{model}'")
+        self.logger.debug(f"[DEBUG]   api_kwargs keys: {list(api_kwargs.keys())}")
+        self.logger.debug(f"[DEBUG]   response_format in api_kwargs: {'response_format' in api_kwargs}")
+        if 'response_format' in api_kwargs:
+            self.logger.debug(f"[DEBUG]   response_format value: {api_kwargs['response_format']}")
+
+        # Get capabilities from the passed model_config (which comes from candidate)
+        capabilities = model_config.get("capabilities", {})
+        supports_json_mode = capabilities.get("supports_json_mode", True)
+        should_remove_rf = not supports_json_mode
+        has_response_format = "response_format" in api_kwargs
+
+        self.logger.debug(f"[DEBUG]   capabilities from model_config: {capabilities}")
+        self.logger.debug(f"[DEBUG]   supports_json_mode: {supports_json_mode}")
+        self.logger.debug(f"[DEBUG]   should_remove_rf: {should_remove_rf}")
+        self.logger.debug(f"[DEBUG]   has response_format: {has_response_format}")
+
+        if should_remove_rf and has_response_format:
+            self.logger.debug(f"[DEBUG] REMOVING response_format for {model} (not supported)")
             api_kwargs.pop("response_format")
-            
-        # Remove temperature if not supported  
-        if not model_config["capabilities"].get("supports_temperature", True):
+        else:
+            if not should_remove_rf:
+                self.logger.debug(f"[DEBUG] NOT removing response_format - model supports JSON mode")
+            if not has_response_format:
+                self.logger.debug(f"[DEBUG] NOT removing response_format - not present in kwargs")
+
+        # Remove temperature if not supported
+        if not capabilities.get("supports_temperature", True):
             if "temperature" in api_kwargs:
                 self.logger.debug(f"Removing temperature for {model} (not supported)")
                 api_kwargs.pop("temperature")
+
+        self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
     
     def _extract_reasoning_tokens(self, response) -> int:
         """Extract reasoning tokens from response object.
@@ -864,6 +781,11 @@ class Elelem:
             model_config = self.config.get_model_config(model)
             candidates = model_config['candidates']
         except ValueError as e:
+            # Record failure for invalid model
+            enhanced_tags = list(tags) if tags else []
+            enhanced_tags.append(f"model:{model}")
+            enhanced_tags.append("error:ModelNotFound")
+            self._update_retry_analytics("final_failures", enhanced_tags)
             raise ValueError(f"Model configuration error: {e}")
         
         # Extract common parameters
@@ -901,13 +823,32 @@ class Elelem:
                 if candidate_idx < len(candidates) - 1:
                     continue  # Try next candidate
                 else:
-                    # All candidates exhausted
+                    # All candidates exhausted - record failure
+                    enhanced_tags = list(tags) if tags else []
+                    enhanced_tags.append(f"model:{model}")
+                    provider = self._get_model_config(model)[0]
+                    enhanced_tags.append(f"provider:{provider}")
+                    enhanced_tags.append("error:AllCandidatesFailed")
+                    self._update_retry_analytics("final_failures", enhanced_tags)
                     raise e
             except ModelError as e:
                 # Model/request errors don't trigger candidate iteration
+                # Record failure
+                enhanced_tags = list(tags) if tags else []
+                enhanced_tags.append(f"model:{model}")
+                provider = self._get_model_config(model)[0]
+                enhanced_tags.append(f"provider:{provider}")
+                enhanced_tags.append("error:ModelError")
+                self._update_retry_analytics("final_failures", enhanced_tags)
                 raise e
-        
+
         # Should never reach here, but just in case
+        enhanced_tags = list(tags) if tags else []
+        enhanced_tags.append(f"model:{model}")
+        provider = self._get_model_config(model)[0]
+        enhanced_tags.append(f"provider:{provider}")
+        enhanced_tags.append("error:UnknownError")
+        self._update_retry_analytics("final_failures", enhanced_tags)
         raise last_error or Exception(f"All {len(candidates)} candidates failed")
     
     
@@ -944,7 +885,10 @@ class Elelem:
         # Add provider-specific default parameters
         provider_defaults = provider_config.get("default_params", {})
         for key, value in provider_defaults.items():
-            if key not in api_kwargs:
+            if key == "stream":
+                # Always apply provider stream default, ignore client input
+                api_kwargs[key] = value
+            elif key not in api_kwargs:
                 api_kwargs[key] = value
         
         # Add model-specific default parameters (overrides provider defaults)
@@ -958,7 +902,7 @@ class Elelem:
             max_tokens_default = self.config.get_provider_max_tokens_default(provider_name)
             if max_tokens_default is not None:
                 api_kwargs["max_tokens"] = max_tokens_default
-        
+
         # Add extra_body parameters with precedence: user > model > provider
         provider_extra_body = provider_config.get("extra_body", {})
         model_extra_body = self.config.get_model_extra_body(original_model)
@@ -970,14 +914,21 @@ class Elelem:
         if merged_extra_body:
             api_kwargs["extra_body"] = merged_extra_body
         
-        # Clean up unsupported parameters for this provider
-        self._cleanup_api_kwargs(api_kwargs, candidate_model_name, {'capabilities': capabilities})
+        # Clean up unsupported parameters for this candidate model
+        self.logger.debug(f"[{request_id}] Full candidate dict: {candidate}")
+        candidate_key = candidate.get('model', f"{provider_name}:{model_name}")  # Fallback to constructed name
+        self.logger.debug(f"[{request_id}] Candidate key: {candidate_key}")
+        self.logger.debug(f"[{request_id}] Capabilities passed to cleanup: {capabilities}")
+        self.logger.debug(f"[{request_id}] Before cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
+        self._cleanup_api_kwargs(api_kwargs, candidate_key, {'capabilities': capabilities})
+        self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
         
         # Preprocess messages for JSON mode if needed
-        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested)
-        
+        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, capabilities)
+
         # Retry logic for this candidate (temperature reduction, JSON validation)
         max_retries = self.config.retry_settings["max_json_retries"]
+        max_rate_limit_retries = self.config.retry_settings["max_rate_limit_retries"]
         temperature_reductions = self.config.retry_settings["temperature_reductions"]
         min_temp = self.config.retry_settings["min_temp"]
         
@@ -1017,6 +968,9 @@ class Elelem:
                 except asyncio.TimeoutError as e:
                     # Timeout is an infrastructure error - try next candidate
                     raise InfrastructureError(f"Request timed out after {timeout}s")
+                except RateLimitError:
+                    # Let rate limit errors pass through to outer handler for proper retry logic
+                    raise
                 except Exception as api_e:
                     # Classify the error
                     if self._is_infrastructure_error(api_e):
@@ -1087,32 +1041,76 @@ class Elelem:
                 # Extract runtime costs
                 runtime_costs = self._extract_openrouter_costs(response, candidate_model_name)
                 
-                # Update statistics using original model reference for proper cost lookup
+                # Calculate costs for this specific request
+                candidate_cost_config = candidate.get('cost', {})
+                costs = self._calculate_costs(stats_model_name, total_input_tokens, total_output_tokens,
+                                            total_reasoning_tokens, runtime_costs, candidate_cost_config)
+
+                # Update statistics
                 self._update_statistics(stats_model_name, total_input_tokens, total_output_tokens,
-                                      total_reasoning_tokens, duration, tags, runtime_costs)
-                
+                                      total_reasoning_tokens, duration, tags, runtime_costs, candidate_cost_config, provider_name, original_model)
+
                 # Update response content
                 response.choices[0].message.content = content
-                
-                return response
+
+                # Convert response to dict for modification
+                response_dict = response.model_dump() if hasattr(response, 'model_dump') else response.__dict__
+
+                # Add Elelem-specific metrics
+                response_dict["elelem_metrics"] = {
+                    "request_duration_seconds": duration,
+                    "provider_used": provider_name,
+                    "model_used": stats_model_name,
+                    "tokens": {
+                        "input": total_input_tokens,
+                        "output": total_output_tokens,
+                        "reasoning": total_reasoning_tokens,
+                        "total": total_input_tokens + total_output_tokens
+                    },
+                    "costs_usd": costs,
+                    "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
+                }
+
+                return response_dict
                 
             except (InfrastructureError, ModelError):
                 # Re-raise classification errors as-is
                 raise
+            except RateLimitError as e:
+                # Handle OpenAI rate limit errors with dedicated retry logic
+                if attempt < max_rate_limit_retries:
+                    backoff_times = self.config.retry_settings["rate_limit_backoff"]
+                    wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
+                    self._update_retry_analytics("rate_limit_retries", tags)
+                    self.logger.warning(f"[{request_id}] Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_rate_limit_retries + 1})")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    # Rate limit exhaustion is infrastructure issue - try next candidate
+                    raise InfrastructureError(f"Rate limit exhausted after {max_rate_limit_retries + 1} attempts: {e}")
+            except (AuthenticationError, PermissionDeniedError) as e:
+                # Authentication/permission errors are infrastructure issues - try next candidate
+                raise InfrastructureError(f"Authentication/permission error: {e}")
+            except (InternalServerError, BadRequestError) as e:
+                # Server errors and bad requests are infrastructure issues - try next candidate
+                raise InfrastructureError(f"Server/request error: {e}")
+            except (NotFoundError, ConflictError, UnprocessableEntityError) as e:
+                # These are typically model/request issues - don't retry candidate
+                raise ModelError(f"Model/request error: {e}")
             except Exception as e:
-                # Handle rate limits
+                # Fallback for any other unexpected errors
+                # Check if it might be a rate limit that wasn't caught as RateLimitError
                 if "429" in str(e) or "rate limit" in str(e).lower():
-                    if attempt < max_retries:
+                    if attempt < max_rate_limit_retries:
                         backoff_times = self.config.retry_settings["rate_limit_backoff"]
                         wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
                         self._update_retry_analytics("rate_limit_retries", tags)
-                        self.logger.warning(f"[{request_id}] Rate limit, waiting {wait_time}s")
+                        self.logger.warning(f"[{request_id}] Rate limit (fallback), waiting {wait_time}s")
                         await asyncio.sleep(wait_time)
                         continue
                     else:
-                        # Rate limit exhaustion is infrastructure issue
                         raise InfrastructureError(f"Rate limit exhausted: {e}")
-                
+
                 # Other unexpected errors
                 raise ModelError(f"Unexpected error: {e}")
         
@@ -1125,48 +1123,62 @@ class Elelem:
         
         # Common infrastructure error patterns
         infrastructure_patterns = [
-            "connection", "network", "timeout", "503", "502", "500", 
+            "connection", "network", "timeout", "503", "502", "500",
             "service unavailable", "bad gateway", "internal server error",
-            "401", "403", "unauthorized", "forbidden", "quota", "billing"
+            "401", "403", "unauthorized", "forbidden", "quota", "billing",
+            "429", "rate limit", "too many requests"
         ]
         
         return any(pattern in error_str for pattern in infrastructure_patterns)
         
     def get_stats(self) -> Dict[str, Any]:
         """Get overall statistics."""
-        return dict(self._statistics)
-        
+        return self._metrics_store.get_overall_stats()
+
     def get_stats_by_tag(self, tag: str) -> Dict[str, Any]:
         """Get statistics for a specific tag."""
-        if tag not in self._tag_statistics:
-            # Return empty stats structure if tag not found
-            return {
-                "total_input_tokens": 0,
-                "total_output_tokens": 0,
-                "total_tokens": 0,
-                "total_input_cost_usd": 0.0,
-                "total_output_cost_usd": 0.0,
-                "total_cost_usd": 0.0,
-                "total_calls": 0,
-                "total_duration_seconds": 0.0,
-                "avg_duration_seconds": 0.0,
-                "reasoning_tokens": 0,
-                "reasoning_cost_usd": 0.0,
-                "retry_analytics": {
-                    "json_parse_retries": 0,
-                    "json_schema_retries": 0,
-                    "api_json_validation_retries": 0,
-                    "rate_limit_retries": 0,
-                    "total_retries": 0,
-                    "temperature_reductions": 0,
-                    "final_failures": 0,
-                    "response_format_removals": 0,
-                    "candidate_iterations": 0
-                }
-            }
-        
-        return dict(self._tag_statistics[tag])
-        
+        return self._metrics_store.get_stats_by_tag(tag)
+
+    def get_summary(self,
+                    start_time: Optional[datetime] = None,
+                    end_time: Optional[datetime] = None,
+                    tags: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Get comprehensive summary statistics for a time range.
+
+        Args:
+            start_time: Filter calls after this time (inclusive). None = no lower bound
+            end_time: Filter calls before this time (inclusive). None = no upper bound
+            tags: Filter by specific tags. None = all tags
+
+        Returns:
+            Dict with aggregated metrics for tokens, costs, duration, and retry analytics
+        """
+        return self._metrics_store.get_summary(start_time, end_time, tags)
+
+    def get_metrics_dataframe(self,
+                              start_time: Optional[datetime] = None,
+                              end_time: Optional[datetime] = None,
+                              tags: Optional[List[str]] = None) -> pd.DataFrame:
+        """Get filtered DataFrame for custom metrics analysis.
+
+        Args:
+            start_time: Filter calls after this time (inclusive). None = no lower bound
+            end_time: Filter calls before this time (inclusive). None = no upper bound
+            tags: Filter by specific tags. None = all tags
+
+        Returns:
+            Filtered pandas DataFrame with all metrics data
+        """
+        return self._metrics_store.get_dataframe(start_time, end_time, tags)
+
+    def get_metrics_tags(self) -> List[str]:
+        """Get all unique tags from metrics data.
+
+        Returns:
+            Sorted list of unique tags including automatic tags like model:* and provider:*
+        """
+        return self._metrics_store.get_unique_tags()
+
     def list_models(self) -> Dict[str, Any]:
         """List all available models in OpenAI-compatible format.
         
@@ -1177,7 +1189,10 @@ class Elelem:
         
         for model_key, model_config in self._models.items():
             provider = model_config.get("provider", "unknown")
-            
+
+            # Get model metadata from display_metadata
+            metadata = model_config.get("display_metadata", {})
+
             # Handle infrastructure providers for availability check
             provider_config = self.config.providers.get(provider, {})
             base_provider = provider_config.get("base_provider")
@@ -1185,16 +1200,59 @@ class Elelem:
                 env_var = f"{base_provider.upper()}_API_KEY"
             else:
                 env_var = f"{provider.upper()}_API_KEY"
-            
+
             is_available = provider in self._providers
-            
-            models_list.append({
+
+            # Determine if this is a virtual model
+            is_virtual = 'candidates' in model_config
+
+            model_entry = {
                 "id": model_key,
-                "object": "model", 
+                "object": "model",
                 "created": 1677610602,  # Fixed timestamp like OpenAI
-                "owned_by": provider,
-                "available": is_available  # Elelem-specific field
-            })
+                "owned_by": "elelem" if is_virtual else metadata.get("model_owner", provider),
+                "provider": provider,  # Elelem-specific: service provider
+                "available": is_available,  # Elelem-specific field
+                "model_type": "virtual" if is_virtual else "regular"
+            }
+
+            # Add additional metadata if available
+            if metadata:
+                if "model_nickname" in metadata:
+                    model_entry["nickname"] = metadata["model_nickname"]
+                if "license" in metadata:
+                    model_entry["license"] = metadata["license"]
+                if "reasoning" in metadata:
+                    model_entry["reasoning"] = metadata["reasoning"] == "yes"
+                if "model_page" in metadata:
+                    model_entry["model_page"] = metadata["model_page"]
+
+            # Add cost information
+            cost_config = model_config.get("cost", {})
+            if isinstance(cost_config, dict) and cost_config:
+                model_entry["cost"] = {
+                    "input_cost_per_1m": cost_config.get("input_cost_per_1m", 0),
+                    "output_cost_per_1m": cost_config.get("output_cost_per_1m", 0),
+                    "currency": cost_config.get("currency", "USD")
+                }
+
+            # Add candidate information for virtual models
+            if is_virtual:
+                candidates_info = []
+                for candidate in model_config['candidates']:
+                    if 'model' in candidate:
+                        # Reference to another model
+                        ref_model_name = candidate['model']
+                        ref_config = self._models.get(ref_model_name, {})
+                        candidates_info.append({
+                            "model": ref_model_name,
+                            "provider": ref_config.get("provider", "unknown"),
+                            "timeout": candidate.get("timeout")
+                        })
+
+                model_entry["candidates"] = candidates_info
+
+            models_list.append(model_entry)
         
         return {
             "object": "list",

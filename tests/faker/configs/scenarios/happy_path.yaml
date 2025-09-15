@@ -1,0 +1,24 @@
+scenario: "happy_path"
+description: "Basic working scenario - all requests succeed"
+type: "fixed"
+
+models:
+  "faker:basic":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+response:
+  type: "success"
+  content: "This is a successful fake response from the happy path scenario."
+  tokens:
+    input: 50
+    output: 15
+  json_data:
+    status: "success"
+    message: "JSON mode is working correctly"
+    data:
+      fake: true
+      test_scenario: "happy_path"

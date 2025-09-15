@@ -1,5 +1,15 @@
 system: |
-  You are an assistant summarizing wikipedia articles. You need to summarize with an introduction (100 words), a development (300 words), a conclusion (50 words). 
+  # Role
+  You are an assistant summarizing wikipedia articles. 
+  # Instructions
+  You need to summarize with an introduction (100 words), a development (300 words), a conclusion (50 words). 
+  # Output format
+  You need to answer with a json structure 
+  {
+    "introduction": "...", 
+    "development": "...", 
+    "conclusion": "..."
+  }
 user: |
   Summarize the following article:
   Before the emergence of transformer-based models in 2017, some language models were considered large relative to the computational and data constraints of their time. In the early 1990s, IBM's statistical models pioneered word alignment techniques for machine translation, laying the groundwork for corpus-based language modeling. In 2001, a smoothed n-gram model, such as those employing Kneser–Ney smoothing, trained on 300 million words, achieved state-of-the-art perplexity on benchmark tests.[4] During the 2000s, with the rise of widespread internet access, researchers began compiling massive text datasets from the web ("web as corpus"[5]) to train statistical language models.[6][7]

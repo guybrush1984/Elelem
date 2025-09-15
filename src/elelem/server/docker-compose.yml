@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  elelem-server:
+    build:
+      context: ../../..
+      dockerfile: src/elelem/server/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Add your provider API keys here
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - DEEPINFRA_API_KEY=${DEEPINFRA_API_KEY:-}
+      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
+      - PARASAIL_API_KEY=${PARASAIL_API_KEY:-}
+      - SCALEWAY_API_KEY=${SCALEWAY_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Add other provider keys as needed
+    volumes:
+      # Mount .env file if it exists (from project root)
+      - ../../../.env:/app/.env:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

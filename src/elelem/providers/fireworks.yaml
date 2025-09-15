@@ -11,7 +11,7 @@ models:
     provider: fireworks
     model_id: accounts/fireworks/models/deepseek-v3p1
     capabilities:
-      supports_json_mode: true
+      supports_json_mode: false
       supports_temperature: true
       supports_system: true
     cost:
@@ -25,7 +25,7 @@ models:
     provider: fireworks
     model_id: accounts/fireworks/models/gpt-oss-120b
     capabilities:
-      supports_json_mode: true
+      supports_json_mode: false
       supports_temperature: true
       supports_system: true
     cost:
@@ -41,7 +41,7 @@ models:
     provider: fireworks
     model_id: accounts/fireworks/models/gpt-oss-20b
     capabilities:
-      supports_json_mode: true
+      supports_json_mode: false
       supports_temperature: true
       supports_system: true
     cost:

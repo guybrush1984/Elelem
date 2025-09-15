@@ -1,0 +1,21 @@
+# Faker streaming provider configuration for testing Elelem's streaming collection
+# This provider uses streaming by default (like Fireworks)
+provider:
+  endpoint: http://localhost:6666/v1
+  default_params:
+    stream: true  # Enable streaming by default like Fireworks
+  max_tokens_default: 4096
+
+models:
+  # Model for testing streaming response collection
+  "faker-streaming:streaming-test":
+    provider: faker-streaming
+    model_id: streaming-test
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.12
+      output_cost_per_1m: 0.35
+      currency: USD

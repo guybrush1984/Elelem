@@ -1,0 +1,24 @@
+# Virtual models using faker candidates for testing failover behavior
+
+models:
+  # Virtual model with 3 faker candidates for failover testing
+  "virtual:faker-test-failover":
+    timeout: 30s
+    candidates:
+      - model: "faker:rate-limited"  # First candidate - will fail with rate limits
+        timeout: 30s
+      - model: "faker:no-json"       # Second candidate - different capabilities
+        timeout: 30s
+      - model: "faker:basic"         # Third candidate - should succeed
+        timeout: 30s
+
+  # Virtual model testing complete failure scenario
+  "virtual:faker-test-all-fail":
+    timeout: 30s
+    candidates:
+      - model: "faker:rate-limited"  # Will fail
+        timeout: 30s
+      - model: "faker:rate-limited"  # Will also fail
+        timeout: 30s
+      - model: "faker:rate-limited"  # Will also fail
+        timeout: 30s

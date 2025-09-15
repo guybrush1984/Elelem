@@ -15,7 +15,7 @@ models:
       input_cost_per_1m: 0.64
       output_cost_per_1m: 1.65
       currency: USD
-    metadata_ref: "deepseek_v31"
+    metadata_ref: "deepseek_v31-nothink"
 
   "parasail:deepseek/deepseek-3.1?think":
     provider: parasail
@@ -28,7 +28,7 @@ models:
       input_cost_per_1m: 0.64
       output_cost_per_1m: 1.65
       currency: USD
-    metadata_ref: "deepseek_v31"
+    metadata_ref: "deepseek_v31-think"
     extra_body:
       chat_template_kwargs:
         thinking: true

@@ -38,7 +38,7 @@ except ImportError:
     pass
 
 # Add the src directory to the path so we can import elelem
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # Import Elelem for direct mode
 from elelem import Elelem
@@ -503,12 +503,16 @@ def generate_csv_summary(summary, csv_file, elelem_server):
     # Get model configuration data for static info (costs, metadata)
     if elelem_server:
         # API mode - get model list
-        response = requests.get(f"http://{elelem_server}/v1/models")
+        if elelem_server.startswith(('http://', 'https://')):
+            base_url = elelem_server
+        else:
+            base_url = f"http://{elelem_server}"
+        response = requests.get(f"{base_url}/v1/models")
         models_data = response.json() if response.status_code == 200 else {"data": []}
         models_config = {m["id"]: m for m in models_data.get("data", [])}
     else:
         # Direct mode - access config
-        from src.elelem import Elelem
+        from elelem import Elelem
         elelem = Elelem()
         models_config = {}
         for model_key, model_config in elelem._models.items():
@@ -689,9 +693,14 @@ async def run_batch_tests(batch_file: str, output_file: str, elelem_server: Opti
 
     # Get overall summary (no tags = all metrics since test_start_time)
     if elelem_server:
-        # API mode
+        # API mode - construct proper URL
+        if elelem_server.startswith(('http://', 'https://')):
+            base_url = elelem_server
+        else:
+            base_url = f"http://{elelem_server}"
+
         response = requests.get(
-            f"http://{elelem_server}/v1/metrics/summary",
+            f"{base_url}/v1/metrics/summary",
             params={"start": test_start_time.isoformat()}
         )
         if response.status_code == 200:
@@ -702,16 +711,22 @@ async def run_batch_tests(batch_file: str, output_file: str, elelem_server: Opti
             overall_summary = {}
     else:
         # Direct mode - need to initialize elelem to access metrics
-        from src.elelem import Elelem
+        from elelem import Elelem
         elelem = Elelem()
-        overall_summary = elelem._metrics_store.get_summary(start=test_start_time)
+        overall_summary = elelem._metrics_store.get_summary(start_time=test_start_time)
         print(f"[DEBUG] Overall summary (direct): {overall_summary}")
 
     # Get per-model summaries
     for model in sorted(tested_models):
         if elelem_server:
+            # API mode - construct proper URL
+            if elelem_server.startswith(('http://', 'https://')):
+                base_url = elelem_server
+            else:
+                base_url = f"http://{elelem_server}"
+
             response = requests.get(
-                f"http://{elelem_server}/v1/metrics/summary",
+                f"{base_url}/v1/metrics/summary",
                 params={
                     "tags": f"model:{model}",
                     "start": test_start_time.isoformat()
@@ -726,7 +741,7 @@ async def run_batch_tests(batch_file: str, output_file: str, elelem_server: Opti
         else:
             model_summary = elelem._metrics_store.get_summary(
                 tags=[f"model:{model}"],
-                start=test_start_time
+                start_time=test_start_time
             )
             print(f"[DEBUG] Model {model} summary (direct): {model_summary}")
 

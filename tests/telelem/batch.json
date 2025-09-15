@@ -8,7 +8,7 @@
       "parasail:deepseek/deepseek-3.1?nothink"
     ],
     "prompts": [
-      "tests/telelem/small.yaml"
+      "small.yaml"
     ],
     "temperature": 0.1
   }

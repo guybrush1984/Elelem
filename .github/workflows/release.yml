@@ -6,8 +6,8 @@ on:
       - 'v*'  # Trigger on version tags like v1.0.0
 
 permissions:
-  contents: read
-  packages: write
+  contents: write  # Required for creating releases
+  packages: write  # Required for pushing Docker images
 
 jobs:
   test:
@@ -181,8 +181,8 @@ jobs:
 
             ### What's included:
             - 📦 **Python package**: Available in release assets
-            - 🐳 **Docker image**: `ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
-            - 🐳 **Latest tag**: `ghcr.io/${{ github.repository }}:latest`
+            - 🐳 **Docker image**: `ghcr.io/guybrush1984/elelem:${{ github.ref_name }}`
+            - 🐳 **Latest tag**: `ghcr.io/guybrush1984/elelem:latest`
 
             ### Usage:
             ```bash
@@ -190,7 +190,7 @@ jobs:
             pip install elelem
 
             # Docker server
-            docker run -p 8000:8000 ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            docker run -p 8000:8000 ghcr.io/guybrush1984/elelem:${{ github.ref_name }}
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

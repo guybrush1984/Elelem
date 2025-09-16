@@ -1,3 +1,44 @@
+# Project
+- Elelem is an "Inference provider" selector
+- It defines providers and models you can use
+
+# Provider definitions
+- Providers (Groq, Scaleway, ...) are defined in src/elelem/providers/, one line per provider
+- Models are defined in provider files
+- Provider-wide flags can be passed in default_params (will be added as a header to all requests Elelem makes toward this provider)
+- Example 
+    provider:
+    endpoint: {OPEN_AI_API ENDPOINT}
+    default_params:
+        param_1: param1_value
+- Additional models can be passed at runtime through an ENV variable
+
+# Model Syntax
+Models are defined in every provider fles for convenience
+
+models:
+  "{MODEL_KEY}":
+    metadata_ref: "{MODEL_METADATA}" # defined in src/elelem/providers/_metadata.yaml
+    provider: {INFRASTRUCTURE_PROVIDER}
+    model_id: {ID_AT_THE_PROVIDER} # How is the model referenced by the provider itself
+    capabilities:
+      supports_json_mode: {BOOLEAN} # Indicates if the model supports "response_format: json_object syntax. When set to false, Elelem will remove this flag BUT still expect JSON in output
+      supports_temperature: {BOOLEAN} # Indicates if the model supports temperature adjustment
+      supports_system: {BOOLEAN} # Indicates if system role messages are supported
+    cost:
+      input_cost_per_1m: {COST} Price per 1M input token 
+      output_cost_per_1m:  {COST} Price per 1M output token (includes reasoning tokens)
+      currency: USD
+
+# Testing
+- When making edits to the model definitions, launching tests/test_config_validation.py is recommended (uv run pytest tests/test_config_validation.py -v)
+- When making edits to the core code, launching tests/test_elemem_with_faker.py is recommended (uv run pytest tests/test_elemem_with_faker.py -v)
+- Before tagging or merging, or after large edits, launching the full pytest is of course recommended
+
+# Model Faker
+- A "Model Faker" is defined in tests/faker. This model is a fale model that answers to a pure OpenAI API, but its behavior can be full configured. It's meant to test Elelem thoroughly by emulating typical LLM problems.
+- The model faker has "scenarios" in tests/faker/config/scenarios that can be used to emulate such failures or behaviors.
+
 # Python Package Management with uv
 
 Use uv exclusively for Python package management in this project.

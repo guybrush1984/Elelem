@@ -186,10 +186,10 @@ jobs:
 
             ### Usage:
             ```bash
-            # Python package
-            pip install elelem
+            # Install Python package from GitHub
+            pip install git+https://github.com/guybrush1984/Elelem@${{ github.ref_name }}
 
-            # Docker server
+            # Run Docker server
             docker run -p 8000:8000 ghcr.io/guybrush1984/elelem:${{ github.ref_name }}
             ```
         env:

@@ -23,12 +23,12 @@ COPY . .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-server.txt
 
-# Expose port
-EXPOSE 8000
+# Expose ports - API server on 8000, Dashboard on 8501
+EXPOSE 8000 8501
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the server
-CMD ["uvicorn", "elelem.server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run both services using shell script
+CMD ["sh", "-c", "uvicorn elelem.server.main:app --host 0.0.0.0 --port 8000 & streamlit run src/elelem/server/dashboard.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true & wait"]

@@ -40,6 +40,8 @@ dependencies = [
     "pytest>=8.3.5",
     "flask>=3.0.3",
     "pytest-asyncio>=0.24.0",
+    "streamlit>=1.28.0",
+    "plotly>=5.17.0",
 ]
 
 [project.optional-dependencies]
@@ -69,6 +71,7 @@ elelem = ["config.json", "models.yaml"]
 write_to = "src/elelem/_version.py"
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+fallback_version = "0.1.0.dev0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

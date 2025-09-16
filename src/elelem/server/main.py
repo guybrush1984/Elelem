@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from elelem.elelem import Elelem
+from elelem import __version__
 from elelem.server.models import (
     ChatCompletionRequest,
     ErrorResponse,
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Elelem OpenAI API Server",
     description="OpenAI-compatible API server with multi-provider backend",
-    version="0.1.0",
+    version=__version__,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -66,7 +67,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 async def health_check() -> HealthResponse:
     """Health check endpoint."""
-    return HealthResponse(status="healthy", version="0.1.0")
+    return HealthResponse(status="healthy", version=__version__)
 
 
 @app.get("/v1/models")

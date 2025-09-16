@@ -7,22 +7,22 @@ models:
     metadata_ref: "deepseek_v31-nothink"
     timeout: 120s
     candidates:
-      - model: "deepinfra:deepseek-ai/DeepSeek-V3.1"
+      - model: "deepinfra:deepseek/deepseek-3.1?nothink"
         timeout: 120s
-      - model: "fireworks:deepseek-3.1"
+      - model: "fireworks:deepseek/deepseek-3.1?nothink"
         timeout: 120s
-      - model: "parasail:deepseek-3.1"
+      - model: "parasail:deepseek/deepseek-3.1?nothink"
         timeout: 120s
 
   "virtual:deepseek-v3.1-quick":
     metadata_ref: "deepseek_v31-nothink"
     timeout: 120s
     candidates:
-      - model: "fireworks:deepseek-3.1"
+      - model: "fireworks:deepseek/deepseek-3.1?nothink"
         timeout: 120s
-      - model: "parasail:deepseek-3.1"
+      - model: "parasail:deepseek/deepseek-3.1?nothink"
         timeout: 120s
-      - model: "deepinfra:deepseek-ai/DeepSeek-V3.1"
+      - model: "deepinfra:deepseek/deepseek-3.1?nothink"
         timeout: 120s
 
   # Cost-optimized routing (cheapest first)
@@ -32,9 +32,9 @@ models:
     candidates:
       - model: "deepinfra:openai/gpt-oss-120b"
         timeout: 120s
-      - model: "fireworks:gpt-oss-120b"
+      - model: "fireworks:openai/gpt-oss-120b"
         timeout: 120s
-      - model: "parasail:gpt-oss-120b"    
+      - model: "parasail:openai/gpt-oss-120b"    
         timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
@@ -44,9 +44,9 @@ models:
     candidates:
       - model: "groq:openai/gpt-oss-120b"  
         timeout: 120s   
-      - model: "fireworks:gpt-oss-120b"    
+      - model: "fireworks:openai/gpt-oss-120b"    
         timeout: 120s
-      - model: "parasail:gpt-oss-120b"     
+      - model: "parasail:openai/gpt-oss-120b"     
         timeout: 120s
 
   # Cost-optimized routing (cheapest first)
@@ -56,7 +56,7 @@ models:
     candidates:
       - model: "deepinfra:openai/gpt-oss-20b"
         timeout: 120s
-      - model: "fireworks:gpt-oss-20b"
+      - model: "fireworks:openai/gpt-oss-20b"
         timeout: 120s
       - model: "groq:openai/gpt-oss-20b"    
         timeout: 120s
@@ -68,7 +68,7 @@ models:
     candidates:
       - model: "groq:openai/gpt-oss-20b"  
         timeout: 120s   
-      - model: "fireworks:gpt-oss-20b"    
+      - model: "fireworks:openai/gpt-oss-20b"    
         timeout: 120s
       - model: "deepinfra:openai/gpt-oss-20b"     
         timeout: 120s

@@ -1,0 +1,25 @@
+scenario: "rate_limits"
+description: "Test rate limiting with retries - 429, 429, then success"
+type: "sequence"
+
+models:
+  "faker:rate-limited":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+response_sequence:
+  - type: "rate_limit"
+    retry_after: 5
+  - type: "rate_limit"
+    retry_after: 5
+  - type: "success"
+    content: "Success after rate limit retries"
+    tokens:
+      input: 50
+      output: 12
+    json_data:
+      status: "success_after_retries"
+      message: "Request succeeded after rate limiting"

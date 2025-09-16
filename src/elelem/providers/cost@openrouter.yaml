@@ -35,7 +35,7 @@ models:
       supports_system: true
     cost: runtime    
 
-  "cost@openrouter:deepseek/deepseek-3.1-nothink":
+  "cost@openrouter:deepseek/deepseek-3.1?nothink":
     metadata_ref: "deepseek_v31-nothink"
     provider: cost@openrouter
     model_id: deepseek/deepseek-chat-v3.1

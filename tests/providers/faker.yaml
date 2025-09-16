@@ -1,0 +1,135 @@
+# Faker provider configuration for testing Elelem
+provider:
+  endpoint: http://localhost:6666/v1  # Default faker port
+  default_params: {}
+
+models:
+  # Basic working model for happy path testing
+  "faker:basic":
+    provider: faker
+    model_id: basic
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  # Model for testing rate limit behavior
+  "faker:rate-limited":
+    provider: faker
+    model_id: rate-limited
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.15
+      currency: USD
+
+  # Model for testing JSON temperature reduction
+  "faker:json-temp-test":
+    provider: faker
+    model_id: json-temp-test
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.60
+      currency: USD
+
+  # Model that doesn't support JSON mode (for parameter cleanup testing)
+  "faker:no-json":
+    provider: faker
+    model_id: no-json
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.01
+      output_cost_per_1m: 0.03
+      currency: USD
+
+  # Model that doesn't support system messages
+  "faker:no-system":
+    provider: faker
+    model_id: no-system
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: false
+    cost:
+      input_cost_per_1m: 0.08
+      output_cost_per_1m: 0.25
+      currency: USD
+
+  # Model for testing JSON schema validation
+  "faker:json-schema-test":
+    provider: faker
+    model_id: json-schema-test
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.45
+      currency: USD
+
+  # Model for testing reasoning token extraction
+  "faker:reasoning-test":
+    provider: faker
+    model_id: reasoning-test
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.60
+      currency: USD
+
+  # Model that doesn't support temperature parameter
+  "faker:no-temperature":
+    provider: faker
+    model_id: no-temperature
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: false
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.10
+      currency: USD
+
+  # Model that doesn't support system messages
+  "faker:no-system-alt":
+    provider: faker
+    model_id: no-system
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: false
+    cost:
+      input_cost_per_1m: 0.03
+      output_cost_per_1m: 0.08
+      currency: USD
+
+  # Model for testing streaming responses
+  "faker:streaming-test":
+    provider: faker
+    model_id: streaming-test
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.12
+      output_cost_per_1m: 0.35
+      currency: USD

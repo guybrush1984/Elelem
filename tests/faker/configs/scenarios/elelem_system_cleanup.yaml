@@ -1,0 +1,18 @@
+scenario: "elelem_system_cleanup"
+description: "Test Elelem's system message handling for models that don't support system messages"
+type: "fixed"
+
+models:
+  "no-system":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: false  # Key: doesn't support system messages
+
+response:
+  type: "success"
+  content: "System message was handled - this model doesn't support system role but should receive instructions as user message"
+  tokens:
+    input: 80
+    output: 35

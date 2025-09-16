@@ -1,0 +1,31 @@
+scenario: "json_errors"
+description: "Test JSON mode with temperature reduction - malformed JSON, then valid JSON"
+type: "sequence"
+
+models:
+  "faker:json-retry":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+response_sequence:
+  - type: "json_error"  # Returns malformed JSON
+    content: "This should trigger JSON parsing error"
+    tokens:
+      input: 60
+      output: 20
+  - type: "success"
+    content: "Valid JSON response after temperature reduction"
+    tokens:
+      input: 60
+      output: 25
+    json_data:
+      status: "success_after_json_retry"
+      temperature_reduced: true
+      message: "JSON parsing succeeded after retry"
+      data:
+        retry_count: 2
+        original_temperature: 0.9
+        final_temperature: 0.7

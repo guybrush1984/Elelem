@@ -1,0 +1,25 @@
+scenario: "elelem_parameter_cleanup"
+description: "Test that Elelem removes unsupported parameters based on model capabilities"
+type: "fixed"
+
+models:
+  "no-json":
+    provider: faker
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+
+  "no-system":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: false
+
+response:
+  type: "success"
+  content: "Parameter cleanup test - if you see this, Elelem cleaned up the parameters correctly"
+  tokens:
+    input: 60
+    output: 20

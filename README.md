@@ -1,74 +1,236 @@
-# Elelem
+# Elelem 🎪 The "It Just Works™" Multi-Provider LLM Gateway
 
-Elelem is a unified API wrapper for multiple AI providers (OpenAI, GROQ, DeepInfra, Scaleway, Fireworks, OpenRouter, Parasail), designed for production use with comprehensive cost tracking, reasoning token analytics, and advanced fallback strategies. It provides a fully OpenAI-compatible response format, making it a drop-in replacement for the OpenAI Python SDK.
+> *Because managing 47 models across 8 providers shouldn't require a PhD in API archaeology*
 
-## Features
+## Why Elelem Exists (A Love Story)
 
-- 🔧 **Unified Interface**: Single API for 8+ providers with 47+ models
-- 🎯 **OpenAI Compatible**: Drop-in replacement with identical response format
-- 🧠 **Reasoning Token Analytics**: Dual token rates for reasoning models (total vs actual output speed)
-- 🔄 **Virtual Models & Candidate System**: Automatic fallback across providers with timeout handling
-- 💰 **Cost Tracking**: Precise token and cost tracking with tag-based categorization
-- 📊 **Rich Metadata System**: Model display names, owners, reasoning capabilities, licenses
-- 🛡️ **JSON Schema Validation**: Automatic validation with detailed error reporting and retries
-- 📊 **Retry Analytics**: Comprehensive tracking of retry events and failure patterns
-- ⚡ **Rate Limit Handling**: Exponential backoff for rate limit errors
-- 🛡️ **Error Handling**: Graceful handling of API errors and infrastructure failures
-- 🧠 **Thinking Mode Support**: DeepSeek thinking mode with `<think>` tag extraction
-- 🎯 **Provider-Specific Handling**: Auto-removes unsupported parameters per provider
-- 🔄 **YAML Configuration System**: Provider-specific files with centralized metadata
-- 📈 **Telelem Batch Testing**: Comprehensive benchmarking tool with dashboard-ready JSON output
+Once upon a time, I just wanted my LLMs to return JSON. Simple, right? **WRONG.**
+
+- OpenAI wants `response_format: {type: "json_object"}`
+- Groq wants it but sometimes doesn't support it
+- DeepInfra laughs at your JSON dreams
+- Fireworks needs `stream: true` even when you don't want streaming
+- Don't even get me started on reasoning tokens...
+
+So Elelem was born - not to pick the best model (that's your job), but to make sure when sh*t hits the fan with Provider A, you can seamlessly fail over to Provider B, C, or even D. It's about **infrastructure redundancy**, not model selection.
+
+Think of it as:
+- 🎯 A very tiny [LiteLLM](https://github.com/BerriAI/litellm), but obsessed with JSON
+- 🌐 Your own local [OpenRouter](https://openrouter.ai/) (which btw, is also an Elelem provider!)
+- 🤹 A circus juggler that never drops the JSON ball
+
+### The Never-Ending Quest
+
+Started as a pet project to figure out why one could return JSON but the other would rather write poetry about JSON. Now it's a never-ending quest to tame the wild west of LLM APIs. Very, very far from complete - new providers break things weekly, and so do I! 🎢
+
+## Key Features (The Good Stuff)
+
+### 🎭 Virtual Models - Your Failover Safety Net
+
+Define virtual models that iterate through different providers until one works:
+
+```yaml
+# In your virtual-models.yaml
+models:
+  "virtual:gpt-oss-120b-reliable":
+    candidates:
+      - model: "groq:openai/gpt-oss-120b"      # Try Groq first (fast!)
+        timeout: 10s
+      - model: "fireworks:openai/gpt-oss-120b" # Fall back to Fireworks
+        timeout: 15s
+      - model: "deepinfra:openai/gpt-oss-120b" # Last resort
+        timeout: 30s
+```
+
+```python
+# Just use it like any other model
+response = await elelem.create_chat_completion(
+    model="virtual:gpt-oss-120b-reliable",
+    messages=[{"role": "user", "content": "Never fail me!"}]
+)
+# Elelem handles the provider dance for you
+```
+
+### 🚀 Dynamic Models - Create Virtual Models on the Fly
+
+```python
+# When you need a custom failover RIGHT NOW
+response = await elelem.create_chat_completion(
+    model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout: 30s}",
+    messages=[{"role": "user", "content": "I'm dynamically redundant!"}]
+)
+```
+
+### 🎯 JSON Mode That Actually Works
+
+Elelem is paranoid about JSON. It will:
+1. Try the native JSON mode if supported
+2. Strip markdown code blocks if the model gets creative
+3. Fix common JSON errors (trailing commas, single quotes)
+4. Retry with lower temperature if all else fails
+5. Validate against your schema (if provided)
+
+```python
+# This WILL return valid JSON, or die trying (it won't die, it'll failover)
+response = await elelem.create_chat_completion(
+    model="any-model-really",
+    messages=[{"role": "user", "content": "Return a JSON with name and age"}],
+    response_format={"type": "json_object"},  # Elelem handles model quirks
+    json_schema={  # Optional but recommended
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"}
+        }
+    }
+)
+```
+
+### 🔌 Use as Library or OpenAI-Compatible Server
+
+**As a Library:**
+```python
+from elelem import Elelem
+
+elelem = Elelem()
+response = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+**As an OpenAI-Compatible Server:**
+```bash
+# Start the server
+docker-compose -f src/elelem/server/docker-compose.yml up -d
+
+# Use with OpenAI SDK
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="anything")
+response = client.chat.completions.create(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+### 📊 Built-in Pandas Metrics Store
+
+Every call is tracked, tagged, and ready for analysis:
+
+```python
+# Tag your calls for later analysis
+response = await elelem.create_chat_completion(
+    model="openai:gpt-4.1",
+    messages=[{"role": "user", "content": "Analyze this"}],
+    tags=["experiment-42", "production"]
+)
+
+# Later, get your metrics
+df = elelem.get_metrics_dataframe(tags=["experiment-42"])
+# Ready for S3, BigQuery, or your favorite data warehouse
+```
+
+### 🎮 OpenRouter as a Provider (Meta!)
+
+Yes, OpenRouter can be an Elelem provider. It's providers all the way down:
+
+```python
+# Use OpenRouter's infrastructure through Elelem
+response = await elelem.create_chat_completion(
+    model="openrouter:anthropic/claude-sonnet-4",  # OpenRouter's Claude
+    messages=[{"role": "user", "content": "Inception!"}]
+)
+
+# Or their optimized routing
+response = await elelem.create_chat_completion(
+    model="cost@openrouter:openai/gpt-oss-120b",  # Cost-optimized routing
+    messages=[{"role": "user", "content": "Cheap and cheerful!"}]
+)
+```
+
+### 🥊 The OpenAI SDK Override Championship
+
+Elelem completely takes over retry logic from the OpenAI SDK. Why? Because:
+- OpenAI SDK: "Let me retry 3 times with the same provider that's down"
+- Elelem: "Let me try 3 different providers that actually work"
+
+Built on OpenAI SDK, but with trust issues and commitment to redundancy.
+
+### 🎨 Response Harmonization
+
+Every provider returns data differently. Elelem makes them all look like OpenAI:
+- Reasoning tokens? ✓ (even when hidden in weird places)
+- Usage stats? ✓ (standardized across all providers)
+- Cost calculation? ✓ (because money matters)
+- Model metadata? ✓ (who made this model anyway?)
+
+## What Elelem Is NOT
+
+- ❌ Not a model picker (that's your job)
+- ❌ Not trying to be LangChain (too many abstractions)
+- ❌ Not competing with OpenRouter (we're friends!)
+- ❌ Not complete (new providers break things weekly)
+- ❌ Not using Pydantic yet (yes, I know, I'm sorry!)
 
 ## Installation
 
-### Local Development
-```bash
-pip install -e /path/to/Elelem/
-```
+> **Note:** Elelem is not available on PyPI. Install directly from GitHub.
 
 ### From Git Repository
 ```bash
-pip install git+https://github.com/yourorg/elelem.git
+# Using pip
+pip install git+https://github.com/guybrush1984/Elelem.git
+
+# Or clone and install locally
+git clone https://github.com/guybrush1984/Elelem.git
+cd Elelem
+pip install -e .
+
+# Using uv (recommended)
+git clone https://github.com/guybrush1984/Elelem.git
+cd Elelem
+uv pip install -e .
 ```
 
-### From Private PyPI
-```bash
-pip install elelem --index-url https://your-private-pypi.com
-```
-
-## Quick Start
+## Quick Start - The 60-Second Tour
 
 ```python
 import asyncio
 from elelem import Elelem
 
 async def main():
-    # Initialize Elelem
+    # Initialize Elelem (it loads 47 models and hopes for the best)
     elelem = Elelem()
-    
-    # Make a chat completion request
+
+    # Method 1: The "I have a favorite provider" approach
     response = await elelem.create_chat_completion(
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Generate a JSON object with sample data."}
-        ],
-        model="scaleway:gpt-oss-120b",  # or "virtual:gpt-oss-120b" for multi-provider fallback
-        response_format={"type": "json_object"},
-        tags=["example"]
+        model="groq:openai/gpt-oss-120b",  # Fast and furious
+        messages=[{"role": "user", "content": "Say hello in JSON"}],
+        response_format={"type": "json_object"}  # Will work even if model doesn't support it
     )
-    
-    # Access response content (OpenAI-compatible format)
-    content = response.choices[0].message.content
-    print(content)
-    
-    # Get usage statistics
-    stats = elelem.get_stats()
-    print(f"Total cost: ${stats['total_cost_usd']:.4f}")
-    print(f"Reasoning tokens: {stats['reasoning_tokens']}")
-    
-    # Get statistics by tag
-    tag_stats = elelem.get_stats_by_tag("example")
-    print(f"Example tag cost: ${tag_stats['total_cost_usd']:.4f}")
+
+    # Method 2: The "I don't care who answers" approach (recommended!)
+    response = await elelem.create_chat_completion(
+        model="virtual:gpt-oss-120b-quick",  # Tries multiple providers
+        messages=[{"role": "user", "content": "What's 2+2? In JSON please."}],
+        response_format={"type": "json_object"}
+    )
+
+    # Method 3: The "I'm feeling lucky" dynamic approach
+    response = await elelem.create_chat_completion(
+        model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1]}",
+        messages=[{"role": "user", "content": "Make me a sandwich... in JSON"}],
+        tags=["lunch", "experimental"]  # Track your experiments
+    )
+
+    # It's all OpenAI-compatible (because standards are nice)
+    print(response.choices[0].message.content)  # Your JSON
+    print(f"Cost: ${response.usage.cost_usd:.4f}")  # Your bill
+
+    # Check the damage
+    stats = elelem.get_stats_by_tag("lunch")
+    print(f"Lunch experiments cost: ${stats['total_cost_usd']:.4f}")
+    print(f"Retries: {stats['total_retries']}")  # How many providers failed you
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -378,7 +540,6 @@ model="virtual:gpt-oss-120b"
 3. Global timeout (default: 120s)
 
 ### Cost Tracking
-- **Multi-Currency Support**: USD, EUR with automatic conversion
 - **Reasoning Token Costs**: Separate tracking for reasoning vs output tokens
 - **Provider Comparison**: Runtime costs from OpenRouter when available
 - **Tag-Based Analytics**: Project and category-based cost allocation
@@ -402,27 +563,21 @@ Elelem follows a modular, provider-agnostic architecture:
 ## Development
 
 ### Running Tests
+
 ```bash
-# Install development dependencies
-pip install -e ".[dev]"
+# Run all tests (simple - works out of the box!)
+uv run pytest
 
-# Run tests
-pytest
+# Run with more details
+uv run pytest -v
 
-# Run tests with coverage
-pytest --cov=elelem --cov-report=html
-```
+# Run specific test categories
+uv run pytest tests/test_config_validation.py    # Config validation only
+uv run pytest tests/test_real_providers.py       # Real provider tests (needs API keys)
+uv run pytest tests/test_elelem_with_faker.py    # Faker tests (no API keys needed)
 
-### Telelem Testing
-```bash
-# Test single model
-uv run python telelem.py --model parasail:deepseek-3.1-think --user "Hello world" --debug
-
-# Batch testing
-uv run python telelem.py --batch tests/telelem/batch.json --output results.json
-
-# Custom prompt file
-uv run python telelem.py --model virtual:gpt-oss-120b --prompt tests/telelem/medium.yaml --output test.json
+# Run with coverage report
+uv run pytest --cov=elelem --cov-report=html
 ```
 
 ## License
@@ -442,5 +597,5 @@ MIT License - see LICENSE file for details.
 
 For issues and questions:
 - Check the [documentation](SPECIFICATION.md)
-- Review existing [issues](https://github.com/yourorg/elelem/issues)
-- Submit a [new issue](https://github.com/yourorg/elelem/issues/new)
+- Review existing [issues](https://github.com/guybrush1984/Elelem/issues)
+- Submit a [new issue](https://github.com/guybrush1984/Elelem/issues/new)

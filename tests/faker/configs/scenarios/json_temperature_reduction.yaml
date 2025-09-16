@@ -1,0 +1,50 @@
+scenario: "json_temperature_reduction"
+description: "Test JSON temperature reduction - specifically designed to test Elelem's retry logic"
+type: "conditional"
+
+models:
+  "faker:json-temp-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  # High temperature (>0.8) - return malformed JSON to trigger retry
+  - check: "temperature_above"
+    value: 0.8
+    response:
+      type: "json_error"
+      tokens:
+        input: 75
+        output: 30
+
+  # Medium temperature (>0.6) - return malformed JSON to trigger another retry
+  - check: "temperature_above"
+    value: 0.6
+    response:
+      type: "json_error"
+      tokens:
+        input: 75
+        output: 30
+
+  # Low temperature (<=0.6) - return valid JSON
+  - check: "json_mode"
+    response:
+      type: "success"
+      tokens:
+        input: 75
+        output: 35
+      json_data:
+        status: "success_after_temperature_reduction"
+        final_temperature: "low"
+        message: "Valid JSON returned after temperature was reduced"
+        retry_successful: true
+
+default_response:
+  type: "success"
+  content: "Non-JSON mode response"
+  tokens:
+    input: 75
+    output: 20

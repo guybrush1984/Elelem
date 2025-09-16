@@ -1,0 +1,27 @@
+scenario: "elelem_streaming"
+description: "Test Elelem's streaming response collection and processing"
+type: "fixed"
+
+models:
+  "streaming-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+response:
+  type: "streaming"
+  chunks:
+    - delta: {"content": "Hello"}
+    - delta: {"content": " there!"}
+    - delta: {"content": " How"}
+    - delta: {"content": " can"}
+    - delta: {"content": " I"}
+    - delta: {"content": " help"}
+    - delta: {"content": " you?"}
+    - finish_reason: "stop"
+  final_content: "Hello there! How can I help you?"
+  tokens:
+    input: 45
+    output: 30

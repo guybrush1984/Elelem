@@ -1,0 +1,18 @@
+scenario: "elelem_temperature_cleanup"
+description: "Test Elelem's temperature parameter cleanup for models that don't support it"
+type: "fixed"
+
+models:
+  "no-temperature":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: false  # Key: doesn't support temperature
+      supports_system: true
+
+response:
+  type: "success"
+  content: "Temperature parameter was cleaned up - this model doesn't support temperature control"
+  tokens:
+    input: 60
+    output: 30

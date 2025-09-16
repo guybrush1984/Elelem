@@ -1,0 +1,49 @@
+scenario: "elelem_json_schema"
+description: "Test Elelem's JSON schema validation functionality"
+type: "conditional"
+
+models:
+  "json-schema-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  - condition: "valid_schema"
+    match:
+      temperature: 1.0
+    response:
+      type: "success"
+      json_data:
+        name: "John Doe"
+        age: 30
+        email: "john@example.com"
+        active: true
+      tokens:
+        input: 80
+        output: 25
+
+  - condition: "invalid_schema"
+    match:
+      temperature: 0.5
+    response:
+      type: "success"
+      json_data:
+        name: "Jane Smith"
+        age: "thirty"  # Invalid - should be number
+        email: "jane@example.com"
+      tokens:
+        input: 80
+        output: 25
+
+default_response:
+  type: "success"
+  json_data:
+    name: "Default User"
+    age: 25
+    email: "default@example.com"
+  tokens:
+    input: 80
+    output: 25

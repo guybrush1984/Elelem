@@ -1,0 +1,24 @@
+scenario: "elelem_rate_limits"
+description: "Test Elelem's rate limit retry logic before candidate failover"
+type: "sequence"
+
+models:
+  "rate-limited":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+response_sequence:
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "success"
+    content: "Success after Elelem's rate limit retries"
+    tokens:
+      input: 75
+      output: 25

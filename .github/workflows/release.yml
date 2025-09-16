@@ -106,9 +106,49 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         platforms: linux/amd64
 
+    - name: Test Docker image
+      run: |
+        echo "🧪 Testing Docker image functionality..."
+
+        # Pull and run the image locally
+        docker run -d -p 8000:8000 --name test-container ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+        # Wait for server startup
+        echo "⏳ Waiting for server to start..."
+        sleep 15
+
+        # Check if container is running
+        if ! docker ps | grep test-container; then
+          echo "❌ Container failed to start"
+          docker logs test-container
+          exit 1
+        fi
+
+        # Test health endpoint
+        echo "🔍 Testing /health endpoint..."
+        if ! curl -f --max-time 10 http://localhost:8000/health; then
+          echo "❌ Health check failed"
+          docker logs test-container
+          exit 1
+        fi
+
+        # Test models endpoint
+        echo "🔍 Testing /v1/models endpoint..."
+        if ! curl -f --max-time 10 http://localhost:8000/v1/models; then
+          echo "❌ Models endpoint failed"
+          docker logs test-container
+          exit 1
+        fi
+
+        echo "✅ Docker image tests passed!"
+
+        # Cleanup
+        docker stop test-container
+        docker rm test-container
+
     - name: Print image details
       run: |
-        echo "🐳 Docker image built and pushed successfully!"
+        echo "🐳 Docker image built, tested, and pushed successfully!"
         echo "📦 Image: ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
         echo "🏷️  All tags: ${{ steps.meta.outputs.tags }}"
 

@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write  # Required for creating releases
-  packages: write  # Required for pushing Docker images
 
 jobs:
   test:
@@ -80,22 +79,17 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Log in to GitHub Container Registry
+    - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set repository name to lowercase
-      id: repo
-      run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ghcr.io/${{ steps.repo.outputs.name }}
+        images: ${{ secrets.DOCKERHUB_USERNAME }}/elelem
         tags: |
           type=ref,event=tag
           type=raw,value=latest
@@ -115,7 +109,7 @@ jobs:
         echo "🧪 Testing Docker image functionality..."
 
         # Pull and run the image locally
-        docker run -d -p 8000:8000 --name test-container ghcr.io/${{ steps.repo.outputs.name }}:${{ github.ref_name }}
+        docker run -d -p 8000:8000 --name test-container ${{ secrets.DOCKERHUB_USERNAME }}/elelem:${{ github.ref_name }}
 
         # Wait for server startup
         echo "⏳ Waiting for server to start..."
@@ -150,24 +144,12 @@ jobs:
         docker stop test-container
         docker rm test-container
 
-    - name: Make container package public
-      run: |
-        echo "🔓 Making container package public..."
-        curl -X PATCH \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          "https://api.github.com/user/packages/container/elelem" \
-          -d '{"visibility":"public"}' \
-          && echo "✅ Package visibility set to public" \
-          || echo "⚠️  Package visibility API call failed (may already be public)"
-
     - name: Print image details
       run: |
         echo "🐳 Docker image built, tested, and pushed successfully!"
-        echo "📦 Image: ghcr.io/${{ steps.repo.outputs.name }}:${{ github.ref_name }}"
+        echo "📦 Image: ${{ secrets.DOCKERHUB_USERNAME }}/elelem:${{ github.ref_name }}"
         echo "🏷️  All tags: ${{ steps.meta.outputs.tags }}"
-        echo "🌐 Package should be publicly accessible"
+        echo "🌐 Image is publicly available on Docker Hub"
 
   release:
     name: Create GitHub Release
@@ -194,16 +176,16 @@ jobs:
 
             ### What's included:
             - 📦 **Python package**: Available in release assets
-            - 🐳 **Docker image**: `ghcr.io/guybrush1984/elelem:${{ github.ref_name }}`
-            - 🐳 **Latest tag**: `ghcr.io/guybrush1984/elelem:latest`
+            - 🐳 **Docker image**: `guybrush1984/elelem:${{ github.ref_name }}`
+            - 🐳 **Latest tag**: `guybrush1984/elelem:latest`
 
             ### Usage:
             ```bash
             # Install Python package from GitHub
             pip install git+https://github.com/guybrush1984/Elelem@${{ github.ref_name }}
 
-            # Run Docker server
-            docker run -p 8000:8000 ghcr.io/guybrush1984/elelem:${{ github.ref_name }}
+            # Run Docker server (no authentication needed!)
+            docker run -p 8000:8000 --env-file .env guybrush1984/elelem:${{ github.ref_name }}
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

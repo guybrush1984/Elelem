@@ -5,7 +5,7 @@ provider:
 
 models:
   # Gemini 2.5 Pro reasoning variants (Pro cannot disable reasoning)
-  "google:gemini-2.5-pro?think":
+  "google:gemini-2.5-pro?low":
     provider: google
     model_id: gemini-2.5-pro
     capabilities:
@@ -17,10 +17,10 @@ models:
       output_cost_per_1m: 10.00  # $10.00 per 1M output tokens
       currency: USD
     default_params:
-      reasoning_effort: medium
+      reasoning_effort: low
     metadata_ref: "google_gemini_25_pro"
 
-  "google:gemini-2.5-pro?thinkhard":
+  "google:gemini-2.5-pro?high":
     provider: google
     model_id: gemini-2.5-pro
     capabilities:
@@ -36,7 +36,7 @@ models:
     metadata_ref: "google_gemini_25_pro"
 
   # Gemini 2.5 Flash reasoning variants
-  "google:gemini-2.5-flash?nothink":
+  "google:gemini-2.5-flash":
     provider: google
     model_id: gemini-2.5-flash
     capabilities:
@@ -51,7 +51,7 @@ models:
       reasoning_effort: none
     metadata_ref: "google_gemini_25_flash"
 
-  "google:gemini-2.5-flash?think":
+  "google:gemini-2.5-flash?low":
     provider: google
     model_id: gemini-2.5-flash
     capabilities:
@@ -63,11 +63,27 @@ models:
       output_cost_per_1m: 2.50  # $2.50 per 1M output tokens
       currency: USD
     default_params:
-      reasoning_effort: medium
+      reasoning_effort: low
     metadata_ref: "google_gemini_25_flash"
 
+  "google:gemini-2.5-flash?high":
+    provider: google
+    model_id: gemini-2.5-flash
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.30  # $0.30 per 1M input tokens
+      output_cost_per_1m: 2.50  # $2.50 per 1M output tokens
+      currency: USD
+    default_params:
+      reasoning_effort: high
+    metadata_ref: "google_gemini_25_flash"
+
+
   # Gemini 2.5 Flash Lite reasoning variants
-  "google:gemini-2.5-flash-lite?nothink":
+  "google:gemini-2.5-flash-lite":
     provider: google
     model_id: gemini-2.5-flash-lite
     capabilities:
@@ -82,7 +98,7 @@ models:
       reasoning_effort: none
     metadata_ref: "google_gemini_25_flash_lite"
 
-  "google:gemini-2.5-flash-lite?think":
+  "google:gemini-2.5-flash-lite?low":
     provider: google
     model_id: gemini-2.5-flash-lite
     capabilities:
@@ -94,5 +110,20 @@ models:
       output_cost_per_1m: 0.40  # $0.40 per 1M output tokens
       currency: USD
     default_params:
-      reasoning_effort: medium
+      reasoning_effort: low
+    metadata_ref: "google_gemini_25_flash_lite"
+
+  "google:gemini-2.5-flash-lite?high":
+    provider: google
+    model_id: gemini-2.5-flash-lite
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10  # $0.10 per 1M input tokens
+      output_cost_per_1m: 0.40  # $0.40 per 1M output tokens
+      currency: USD
+    default_params:
+      reasoning_effort: high
     metadata_ref: "google_gemini_25_flash_lite"

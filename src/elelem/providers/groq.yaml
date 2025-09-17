@@ -5,7 +5,7 @@ provider:
     service_tier: auto
 
 models:
-  "groq:openai/gpt-oss-120b":
+  "groq:openai/gpt-oss-120b?low":
     provider: groq
     model_id: openai/gpt-oss-120b  # GROQ's model ID format
     capabilities:
@@ -20,7 +20,22 @@ models:
       reasoning_effort: low
     metadata_ref: "openai_gpt_oss_120b"
 
-  "groq:openai/gpt-oss-20b":
+  "groq:openai/gpt-oss-120b?high":
+    provider: groq
+    model_id: openai/gpt-oss-120b  # GROQ's model ID format
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.75
+      currency: USD
+    default_params:
+      reasoning_effort: high
+    metadata_ref: "openai_gpt_oss_120b"    
+
+  "groq:openai/gpt-oss-20b?low":
     provider: groq
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -34,6 +49,21 @@ models:
     default_params:
       reasoning_effort: low
     metadata_ref: "openai_gpt_oss_20b"      
+
+  "groq:openai/gpt-oss-20b??high":
+    provider: groq
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.50
+      currency: USD
+    default_params:
+      reasoning_effort: high
+    metadata_ref: "openai_gpt_oss_20b"     
 
   "groq:moonshotai/kimi-k2-instruct":
     provider: groq

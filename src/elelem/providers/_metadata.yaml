@@ -23,7 +23,7 @@ model_metadata:
     license: "MIT"
     reasoning: "yes"
 
-  deepseek_v31-nothink: &deepseek-v31-nothink
+  deepseek_v31: &deepseek-v31-nothink
     model_owner: "DeepSeek"
     model_nickname: "deepseek-v3.1"
     model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3.1"

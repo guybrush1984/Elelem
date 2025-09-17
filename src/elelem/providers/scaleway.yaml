@@ -5,7 +5,7 @@ provider:
   default_params: {}
 
 models:
-  "scaleway:openai/gpt-oss-120b":
+  "scaleway:openai/gpt-oss-120b?low":
     metadata_ref: "openai_gpt_oss_120b"
     provider: scaleway
     model_id: gpt-oss-120b
@@ -19,6 +19,21 @@ models:
       currency: USD
     default_params:
       reasoning_effort: low      
+
+  "scaleway:openai/gpt-oss-120b?high":
+    metadata_ref: "openai_gpt_oss_120b"
+    provider: scaleway
+    model_id: gpt-oss-120b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.16   # €0.15 → $0.16 USD
+      output_cost_per_1m: 0.64  # €0.60 → $0.64 USD
+      currency: USD
+    default_params:
+      reasoning_effort: high   
 
   "scaleway:google/gemma-3-27b-it":
     metadata_ref: "google_gemma_3_27b"

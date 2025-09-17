@@ -5,7 +5,7 @@ provider:
   default_params: {}
 
 models:
-  "deepinfra:openai/gpt-oss-120b":
+  "deepinfra:openai/gpt-oss-120b?low":
     metadata_ref: "openai_gpt_oss_120b"
     provider: deepinfra
     model_id: openai/gpt-oss-120b
@@ -20,7 +20,22 @@ models:
     default_params:
       reasoning_effort: low
 
-  "deepinfra:openai/gpt-oss-20b":
+  "deepinfra:openai/gpt-oss-120b?high":
+    metadata_ref: "openai_gpt_oss_120b"
+    provider: deepinfra
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false  # DeepInfra doesn't support response_format
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.09
+      output_cost_per_1m: 0.45
+      currency: USD
+    default_params:
+      reasoning_effort: low
+
+  "deepinfra:openai/gpt-oss-20b?low":
     metadata_ref: "openai_gpt_oss_20b"
     provider: deepinfra
     model_id: openai/gpt-oss-20b
@@ -33,6 +48,20 @@ models:
       currency: USD
     default_params:
       reasoning_effort: low      
+
+  "deepinfra:openai/gpt-oss-20b?high":
+    metadata_ref: "openai_gpt_oss_20b"
+    provider: deepinfra
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.04
+      output_cost_per_1m: 0.16
+      currency: USD
+    default_params:
+      reasoning_effort: high        
 
   "deepinfra:meta-llama/llama-4-maverick-17b":
     metadata_ref: "meta_llama4_maverick"
@@ -82,8 +111,8 @@ models:
       output_cost_per_1m: 2.15
       currency: USD
 
-  "deepinfra:deepseek/deepseek-3.1?nothink":
-    metadata_ref: "deepseek_v31-nothink"
+  "deepinfra:deepseek/deepseek-3.1":
+    metadata_ref: "deepseek_v31"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-V3.1
     capabilities:

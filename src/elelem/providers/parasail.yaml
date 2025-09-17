@@ -4,7 +4,7 @@ provider:
   default_params: {}
 
 models:
-  "parasail:deepseek/deepseek-3.1?nothink":
+  "parasail:deepseek/deepseek-3.1":
     provider: parasail
     model_id: parasail-deepseek-31
     capabilities:
@@ -15,7 +15,7 @@ models:
       input_cost_per_1m: 0.64
       output_cost_per_1m: 1.65
       currency: USD
-    metadata_ref: "deepseek_v31-nothink"
+    metadata_ref: "deepseek_v31"
 
   "parasail:deepseek/deepseek-3.1?think":
     provider: parasail
@@ -33,7 +33,7 @@ models:
       chat_template_kwargs:
         thinking: true
 
-  "parasail:openai/gpt-oss-120b":
+  "parasail:openai/gpt-oss-120b?low":
     provider: parasail
     model_id: parasail-gpt-oss-120b
     capabilities:
@@ -47,3 +47,19 @@ models:
     metadata_ref: "openai_gpt_oss_120b"
     default_params:
       reasoning_effort: low
+
+
+  "parasail:openai/gpt-oss-120b?high":
+    provider: parasail
+    model_id: parasail-gpt-oss-120b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
+      currency: USD
+    metadata_ref: "openai_gpt_oss_120b"
+    default_params:
+      reasoning_effort: high

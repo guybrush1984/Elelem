@@ -96,7 +96,8 @@ class TelelemClient:
             api_base_url = f"{self.server_url}/v1"
             self._api_client = openai.AsyncOpenAI(
                 base_url=api_base_url,
-                api_key="not-needed"  # Elelem server handles provider keys
+                api_key="not-needed",  # Elelem server handles provider keys
+                max_retries=0  # Let Elelem server handle all retries
             )
 
             print(f"✅ Connected to Elelem server at {self.server_url}")

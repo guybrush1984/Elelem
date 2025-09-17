@@ -162,6 +162,14 @@ Every provider returns data differently. Elelem makes them all look like OpenAI:
 - Cost calculation? ✓ (because money matters)
 - Model metadata? ✓ (who made this model anyway?)
 
+**Token Structure Standardization**: All responses include consistent token reporting:
+- `input`: Prompt tokens (what you send)
+- `output`: Completion tokens (what you get back, including reasoning)
+- `reasoning`: Reasoning tokens (portion of output that's internal reasoning)
+- `total`: Input + output tokens (standard total across all providers)
+
+This means `reasoning` is always a breakdown of what portion of `output` was reasoning, ensuring consistent semantics regardless of how each provider structures their token reporting internally.
+
 ## What Elelem Is NOT
 
 - ❌ Not a model picker (that's your job)

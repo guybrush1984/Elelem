@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "deepinfra:moonshotai/kimi-k2-instruct",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Heat oven to 180 \u00b0C. Grease two 20 cm round tins, line bases with baking paper. Sift 200 g plain flour, 50 g cocoa, 2 tsp baking powder, 1 tsp bicarb, \u00bc tsp salt into a bowl. Whisk to combine dry ingredients evenly.\",\n  \"step2\": \"In another bowl, beat 200 g softened butter with 200 g caster sugar until pale and fluffy, about 3 min. Add 3 eggs one at a time, beating well after each. Stir in 1 tsp vanilla extract. Mixture should be smooth and glossy.\",\n  \"step3\": \"Fold dry ingredients into butter mixture in thirds, alternating with 150 ml buttermilk. Start and end with flour. Mix gently until just combined; avoid over-mixing to keep cake tender. Batter will be thick and silky.\",\n  \"step4\": \"Divide batter evenly between prepared tins. Smooth tops with spatula. Bake 25\u201330 min until centres spring back and skewer comes out clean. Cool in tins 10 min, then turn onto wire racks to cool completely.\",\n  \"step5\": \"For ganache, heat 200 ml double cream until just simmering. Pour over 200 g chopped dark chocolate. Let stand 1 min, then stir until glossy. Chill 20 min until spreadable. Reserve 3 tbsp for drizzling.\",\n  \"step6\": \"Sandwich cooled cakes with half the ganache. Spread remaining over top and sides. Pipe reserved ganache in rosettes. Chill 15 min to set. Serve in 8 generous slices. Store airtight 3 days or freeze 1 month.\"\n}",
+    "timestamp": "2025-09-17T17:48:01.875446"
+  },
+  "metrics": {
+    "duration_seconds": 65.65375685691833,
+    "input_tokens": 106,
+    "output_tokens": 351,
+    "reasoning_tokens": 0,
+    "total_tokens": 457
+  }
+}

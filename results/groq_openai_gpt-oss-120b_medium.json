@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "introduction": "Before transformers reshaped natural language processing in 2017, language models evolved through statistical and early neural methods constrained by limited data and compute. IBM's 1990s statistical alignment laid the groundwork for corpus‑based modeling, while the early 2000s saw smoothed n‑gram models, such as those using Kneser–Ney smoothing, achieve state‑of‑the‑art perplexities on large web‑derived corpora. The rise of the internet enabled massive text collections, prompting researchers to explore neural approaches around 2000, which later benefitted from deep learning breakthroughs in computer vision. This historical trajectory sets the stage for the transformer revolution and subsequent large language model (LLM) developments.",
+      "development": "The transition from n‑gram to neural language models began with early feed‑forward networks and accelerated after 2012 when deep convolutional networks demonstrated remarkable performance in image classification. Word embeddings like Word2Vec (2013) captured semantic relationships, and sequence‑to‑sequence (seq2seq) models employing LSTM encoders‑decoders facilitated tasks such as machine translation. In 2016, Google replaced statistical phrase‑based translation with neural machine translation (NMT) using LSTM architectures, marking the first large‑scale deployment of deep recurrent models. The pivotal 2017 NeurIPS paper \"Attention Is All You Need\" introduced the transformer, eliminating recurrence in favor of multi‑head self‑attention and positional encodings, dramatically improving training efficiency and scalability. BERT (2018) showcased the power of encoder‑only transformers for bidirectional context, quickly becoming ubiquitous in research and industry. Meanwhile, decoder‑only models like GPT‑1 (2018) and GPT‑2 (2019) demonstrated generative capabilities, with GPT‑2 raising concerns about misuse. GPT‑3 (2020) scaled to billions of parameters, offered only via API, and its ChatGPT interface (2022) sparked widespread public interest. GPT‑4 (2023) introduced multimodal abilities, though its architecture remained undisclosed. OpenAI's 2024 o1 model emphasized reasoning through chain‑of‑thought prompting. Parallel to proprietary models, open‑source efforts emerged: BLOOM, LLaMA, Mistral 7B, Mixtral 8x7b, and DeepSeek R1 (2025, 671 B parameters) provided competitive performance with permissive licensing. Since 2023, many LLMs have integrated multimodal processing, handling text, images, and audio, giving rise to large multimodal models (LMMs). While transformers dominate the largest models as of 2024, alternative architectures like recurrent variants and the state‑space Mamba model have also been explored, indicating a diversifying landscape of language model design.",
+      "conclusion": "From statistical n‑grams to transformer‑based LLMs, the field has progressed toward ever larger, multimodal, and open models, reshaping both research and everyday applications."
+    },
+    "created_at": "2025-09-14 18:46:17 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 1.5173802375793457,
+    "input_tokens": 1165,
+    "output_tokens": 655,
+    "total_tokens": 1820,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

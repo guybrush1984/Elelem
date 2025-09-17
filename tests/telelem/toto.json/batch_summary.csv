@@ -1,0 +1,5 @@
+model,success_rate,tokens_per_second,total_cost_usd,total_calls
+fireworks:openai/gpt-oss-120b,100.0%,330.9,0.001835,1
+deepinfra:openai/gpt-oss-120b,100.0%,67.8,0.000229,1
+deepinfra:openai/gpt-oss-20b,100.0%,168.9,0.000072,1
+parasail:deepseek/deepseek-3.1?nothink,100.0%,55.7,0.000623,1

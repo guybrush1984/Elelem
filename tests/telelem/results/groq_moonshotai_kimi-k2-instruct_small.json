@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "groq:moonshotai/kimi-k2-instruct",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat oven to 350°F. Grease two 9-inch round pans with butter, dust with cocoa powder. Mix 2 cups flour, 2 cups sugar, ¾ cup cocoa, 2 teaspoons baking powder, 1½ teaspoons baking soda, 1 teaspoon salt in large bowl.",
+      "step2": "Add 2 eggs, 1 cup milk, ½ cup vegetable oil, 2 teaspoons vanilla to dry ingredients. Beat with electric mixer on medium speed for 2 minutes until smooth and well combined.",
+      "step3": "Carefully stir in 1 cup boiling coffee until batter is thin and glossy. This enhances chocolate flavor and creates tender crumb. Divide batter evenly between prepared pans.",
+      "step4": "Bake for 30-35 minutes until toothpick inserted in center comes out clean. Cool in pans for 10 minutes, then turn onto wire racks to cool completely.",
+      "step5": "For frosting, beat 1 cup softened butter until creamy. Add 3½ cups powdered sugar, ¾ cup cocoa, ½ cup milk, 2 teaspoons vanilla. Beat until fluffy.",
+      "step6": "Place one cake layer on plate. Spread with frosting. Top with second layer. Frost top and sides. Decorate with chocolate shavings or sprinkles. Slice into 8 pieces."
+    },
+    "created_at": "2025-09-15 21:22:38 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 1.2023253440856934,
+    "input_tokens": 180,
+    "output_tokens": 289,
+    "total_tokens": 469,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

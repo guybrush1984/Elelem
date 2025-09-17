@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "openai:openai/gpt-4.1",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat your oven to 350°F (175°C). Grease and flour two 8-inch round cake pans. Gather ingredients: 1½ cups flour, 1 cup sugar, ½ cup unsweetened cocoa powder, 1½ tsp baking powder, ½ tsp baking soda, ½ tsp salt, 2 eggs, ¾ cup milk, ½ cup oil, 2 tsp vanilla, ¾ cup boiling water.",
+      "step2": "In a large mixing bowl, combine the flour, sugar, cocoa powder, baking powder, baking soda, and salt. Mix well to ensure even distribution of the dry ingredients. In another bowl, whisk together the eggs, milk, oil, and vanilla extract until thoroughly combined and smooth.",
+      "step3": "Pour the wet ingredients into the bowl with the dry ingredients. Mix gently with a spatula or hand mixer until the batter is mostly combined. Carefully pour in the boiling water and stir until the mixture is smooth and slightly thin. Do not overmix to avoid a dense cake.",
+      "step4": "Divide the batter evenly between the prepared pans. Tap each pan on the counter to remove any air bubbles. Place both pans in the oven and bake for 28-32 minutes, or until a toothpick inserted into the center comes out clean or with just a few crumbs.",
+      "step5": "Remove cakes from the oven and let them cool in the pans for 10 minutes, then transfer onto wire racks to cool completely. While the cakes cool, prepare chocolate buttercream: beat ½ cup softened butter, gradually add 1½ cups powdered sugar, ¼ cup cocoa powder, 2 tbsp milk, and 1 tsp vanilla.",
+      "step6": "Once cakes are completely cool, spread a layer of chocolate buttercream over one cake round. Place the second layer on top and cover the top and sides with remaining frosting. Decorate as desired with chocolate shavings or sprinkles. Slice and serve to 8 people. Enjoy your delicious chocolate cake!"
+    },
+    "created_at": "2025-09-15 21:22:47 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 5.928595304489136,
+    "input_tokens": 176,
+    "output_tokens": 424,
+    "total_tokens": 600,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

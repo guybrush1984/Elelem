@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat the oven to 350°F (175°C). Grease and flour two 8-inch round cake pans, lining the bottoms with parchment paper circles for easy release. Set aside and gather all ingredients: 2 cups flour, 1 ¾ cups sugar, half cup cocoa powder, 2 tsp baking soda, 1 tsp salt, 1 tsp vanilla, 2 tbsp buttermilk, 1 cup milk, ½ cup melted butter, 2 eggs, 1 cup boiling water, and a pinch of orange zest for subtle lift.",
+      "step2": "In a large mixing bowl whisk the dry ingredients: flour, sugar, cocoa powder, baking soda, salt, and vanilla until combined. Add the melted butter, milk, buttermilk, and eggs. Beat on medium speed until smooth and slightly glistening, about 2-3 minutes, ensuring no lumps remain.",
+      "step3": "Slowly pour in the boiling water, whisking until the batter is silky smooth. The batter will look a bit thin, but that’s normal. The hot water activates the cocoa and helps make the cake tender. Let the batter rest for 5 minutes to allow bubbles to settle.",
+      "step4": "Divide the batter evenly between the prepared cake pans. Tap the pans gently on the counter to remove air pockets. Place them in the oven and bake for 25-30 minutes, or until a toothpick inserted into the center comes out mostly clean with a few crumbs attached.",
+      "step5": "Remove cakes from oven and let them cool in the pans for 10 minutes. Then run a knife around edges, flip onto a wire rack, and continue cooling completely, about 15-20 minutes. Once cold, layer frosting of your choice: a classic buttercream or a chocolate ganache.",
+      "step6": "Decorate with fresh berries or chocolate shavings for elegance. Slice with a sharp knife, serve, and enjoy the moist, decadent chocolate cake that feeds eight guests perfectly. Enjoy!"
+    },
+    "created_at": "2025-09-15 21:21:09 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 2.13775897026062,
+    "input_tokens": 225,
+    "output_tokens": 428,
+    "total_tokens": 653,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

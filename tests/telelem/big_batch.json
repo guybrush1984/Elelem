@@ -1,0 +1,35 @@
+  {
+    "models": [
+      "groq:openai/gpt-oss-120b",
+      "fireworks:openai/gpt-oss-120b",
+      "parasail:openai/gpt-oss-120b",
+      "deepinfra:openai/gpt-oss-120b",
+      "scaleway:openai/gpt-oss-120b",
+
+      "groq:openai/gpt-oss-20b",
+      "deepinfra:openai/gpt-oss-20b",
+      "fireworks:openai/gpt-oss-20b",
+
+      "parasail:deepseek/deepseek-3.1?nothink",
+      "fireworks:deepseek/deepseek-3.1?nothink",
+      "deepinfra:deepseek/deepseek-3.1?nothink",
+
+      "deepinfra:meta-llama/llama-4-maverick-17b",
+      "groq:meta-llama/llama-4-maverick-17b",
+      "deepinfra:meta-llama/llama-4-scout-17b",
+      "groq:meta-llama/llama-4-scout-17b",
+
+      "deepinfra:moonshotai/kimi-k2-instruct",
+      "groq:moonshotai/kimi-k2-instruct",
+
+      "openai:openai/gpt-4.1",
+      "openai:openai/gpt-4.1-mini",
+      "openai:openai/gpt-5-mini",
+      "openai:openai/o3-mini"
+    ],
+    "prompts": [
+      "small.yaml",
+      "medium.yaml"
+    ],
+    "temperature": 0.1
+  }

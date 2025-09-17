@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "parasail:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat the oven to 350°F (175°C). Grease three 9‑inch round cake pans and line the bottoms with parchment paper. In a large bowl, whisk together 3 cups all‑purpose flour, 2 ½ cups granulated sugar, 1 ½ cups unsweetened cocoa powder, 2 ½ teaspoons baking soda, 1 ½ teaspoons baking powder, and 1  teaspoon salt until evenly combined.",
+      "step2": "In a separate mixing bowl, combine 1 cup buttermilk, 1 cup warm water, 1 cup vegetable oil, and 4 large eggs. Beat on medium speed for 2 minutes, then stir in 2 teaspoons vanilla extract. Slowly add the wet mixture to the dry ingredients, mixing until a smooth batter forms, without over‑mixing.",
+      "step3": "Divide the batter evenly among the prepared pans, smoothing the tops with a spatula. Tap the pans lightly on the counter to release any large air bubbles. Place the pans on the middle rack of the preheated oven and bake for 30‑35 minutes, or until a toothpick inserted in the center comes out clean.",
+      "step4": "While the cakes cool, prepare the chocolate frosting. Melt 1 cup semi‑sweet chocolate chips and ½ cup butter in a heat‑proof bowl over simmering water, stirring until smooth. Remove from heat and gradually whisk in 3 cups powdered sugar, ¼ cup heavy cream, and 1 teaspoon vanilla until light and fluffy.",
+      "step5": "Once the cakes have cooled completely on wire racks, remove the parchment paper and level the tops with a serrated knife if needed. Place one layer on a serving plate, spread a generous amount of frosting over the surface, then stack the second layer and repeat, finishing with the third layer on top.",
+      "step6": "Apply a thin crumb coat of frosting over the entire cake, chill for 15 minutes to set. Then spread the remaining frosting smoothly over the top and sides, creating swirls or decorations as desired. Slice, serve, and enjoy the rich, moist chocolate cake with friends."
+    },
+    "created_at": "2025-09-14 18:46:31 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 5.884928464889526,
+    "input_tokens": 240,
+    "output_tokens": 502,
+    "total_tokens": 742,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

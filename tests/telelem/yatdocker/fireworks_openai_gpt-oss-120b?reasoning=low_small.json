@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-120b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, tapping out excess flour. In a large bowl whisk together 2\u202f\u00bd cups all\u2011purpose flour, 2\u202f\u00bd teaspoons baking powder, \u00bd teaspoon baking soda, and \u00bd teaspoon salt. Set aside. Meanwhile, gather remaining ingredients for the batter and mix.\",\n  \"step2\": \"Combine wet components: In a separate bowl, beat 1 cup (240\u202fml) whole milk, \u00bd cup (120\u202fml) vegetable oil, 2 large eggs, and 2 teaspoons vanilla extract until smooth. Dissolve 1\u202f\u00bd cups granulated sugar into the mixture, whisking until fully incorporated and slightly glossy before proceeding to the next step today.\",\n  \"step3\": \"Gradually add dry ingredients to the wet mixture: Sprinkle flour blend over the batter, stirring gently with a rubber spatula. Alternate adding 1 cup (240\u202fml) hot water and the dry mixture, beginning and ending with flour. Mix just until no streaks remain, avoiding over\u2011mixing to ensure a tender crumb always.\",\n  \"step4\": \"Divide batter evenly between the prepared pans, using a spatula to smooth the tops. Tap pans lightly on the counter to release trapped air bubbles. Place pans on the middle rack of the preheated oven, ensuring sufficient space for even heat circulation and rise until golden brown and firm throughout.\",\n  \"step5\": \"After 30\u201135 minutes, test doneness with a toothpick inserted into the center; it should emerge with a few moist crumbs but no wet batter. Remove cakes from oven, let them cool in pans for ten minutes, then turn onto wire racks to cool completely before frosting and serve with joy.\",\n  \"step6\": \"Prepare chocolate frosting: Melt \u00bd cup (115\u202fg) unsalted butter and 1 cup (175\u202fg) semi\u2011sweet chocolate chips over low heat, stirring until smooth. Whisk in 2\u202f\u00bd cups powdered sugar, \u00bc cup (60\u202fml) heavy cream, and 1 teaspoon vanilla until fluffy. Frost cooled layers, garnish with chocolate shavings for extra decadence today.\"\n}",
+    "timestamp": "2025-09-17T17:16:10.081490"
+  },
+  "metrics": {
+    "duration_seconds": 6.085609436035156,
+    "input_tokens": 155,
+    "output_tokens": 1972,
+    "reasoning_tokens": 0,
+    "total_tokens": 2127
+  }
+}

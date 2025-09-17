@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "scaleway:openai/gpt-oss-120b?reasoning=high",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather ingredients for an eight\u2011serving chocolate cake: eight ounces dark chocolate, two and a half cups all\u2011purpose flour, two teaspoons baking powder, half teaspoon baking soda, one teaspoon salt, two cups granulated sugar, one cup softened butter, four large eggs, one cup milk, two teaspoons vanilla extract, and for later.\",\n  \"step2\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then line with parchment paper. Melt chocolate and butter together in a heat\u2011proof bowl over simmering water, stirring gently until smooth. Remove from heat; let cool slightly. Meanwhile, whisk flour, sugar, powder, soda, and salt together thoroughly.\",\n  \"step3\": \"In a large mixing bowl, beat softened butter and sugar until light and fluffy, about three minutes. Add eggs one at a time, incorporating fully after each. Stir in vanilla extract, then gradually pour cooled chocolate mixture, mixing until smooth. Finally, fold dry ingredients and milk together until just combined.\",\n  \"step4\": \"Divide batter evenly between prepared pans, smoothing tops with a spatula. Tap pans gently on the counter to release air bubbles. Bake in the preheated oven for 30\u201135 minutes, or until a toothpick inserted near the center emerges clean. Cool cakes in pans ten minutes, then transfer to a rack.\",\n  \"step5\": \"Prepare chocolate ganache: heat one cup heavy cream in a saucepan until simmering, then pour over eight ounces chopped dark chocolate in a bowl. Let sit one minute; stir until glossy and smooth. Allow ganache to cool to a spreadable consistency before drizzling over the fully cooled cakes and finished.\",\n  \"step6\": \"Once frosting sets, slice each cake into four pieces, yielding eight servings. Garnish with a dusting of cocoa powder or berries for contrast. Serve at room temperature, pairing with vanilla ice cream if desired. Store leftovers in an airtight container refrigerated to four days, or freeze for longer safe preservation.\"\n}",
+    "timestamp": "2025-09-17T16:15:34.890787"
+  },
+  "metrics": {
+    "duration_seconds": 43.412378787994385,
+    "input_tokens": 168,
+    "output_tokens": 7943,
+    "reasoning_tokens": 7422,
+    "total_tokens": 8111
+  }
+}

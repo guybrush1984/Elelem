@@ -23,7 +23,7 @@ import pandas as pd
 from jsonschema import validate, ValidationError
 from .config import Config
 from .metrics import MetricsStore
-from .reasoning_tokens import extract_reasoning_tokens
+from .reasoning_tokens import extract_token_counts
 
 
 class InfrastructureError(Exception):
@@ -372,8 +372,8 @@ class Elelem:
                         input_cost_usd = total_cost_usd / 2
                         output_cost_usd = total_cost_usd / 2
                     
-                    # Extract reasoning tokens if available
-                    reasoning_tokens = extract_reasoning_tokens(response, self.logger)
+                    # Extract normalized token counts
+                    input_tokens, output_tokens, reasoning_tokens, total_tokens = extract_token_counts(response, self.logger)
                     
                     # Extract provider information (which actual provider was used)
                     actual_provider = None
@@ -846,11 +846,8 @@ class Elelem:
                         else:
                             f.write(f"Response str: {response}\n")
 
-                    usage = response.usage
-
-                    input_tokens = getattr(usage, 'prompt_tokens', 0)
-                    output_tokens = getattr(usage, 'completion_tokens', 0)
-                    reasoning_tokens = extract_reasoning_tokens(response, self.logger)
+                    # Extract normalized token counts
+                    input_tokens, output_tokens, reasoning_tokens, total_tokens = extract_token_counts(response, self.logger)
                     
                     total_input_tokens += input_tokens
                     total_output_tokens += output_tokens

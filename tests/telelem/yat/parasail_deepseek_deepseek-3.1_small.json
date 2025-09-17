@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F. Grease two 8-inch round pans. Whisk 2 cups flour, 2 cups sugar, \u00be cup cocoa, 2 tsp baking soda, 1 tsp baking powder, and 1 tsp salt in a large bowl until well combined.\",\n  \"step2\": \"Add 1 cup buttermilk, 1 cup strong coffee (cooled), \u00bd cup vegetable oil, and 2 eggs to the dry ingredients. Mix on medium speed for 2 minutes until smooth and well incorporated, scraping the bowl as needed.\",\n  \"step3\": \"Divide the batter evenly between the prepared pans. Bake for 30-35 minutes, or until a toothpick inserted into the center comes out clean. Let cool in pans for 10 minutes.\",\n  \"step4\": \"Turn cakes out onto a wire rack to cool completely. While cooling, prepare frosting by beating 1 cup softened butter with 3 cups powdered sugar and \u00be cup cocoa until creamy.\",\n  \"step5\": \"Add \u2153 cup milk and 1 tsp vanilla to the frosting. Beat on high for 3 minutes until light and fluffy. If too thick, add more milk; if too thin, add more powdered sugar.\",\n  \"step6\": \"Place one cake layer on a plate. Spread with frosting. Top with second layer and frost the top and sides. Decorate as desired. Slice and serve to 8 happy guests!\"\n}",
+    "timestamp": "2025-09-17T16:42:42.608121"
+  },
+  "metrics": {
+    "duration_seconds": 6.64972710609436,
+    "input_tokens": 99,
+    "output_tokens": 309,
+    "reasoning_tokens": 0,
+    "total_tokens": 408
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "scaleway:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "error": {
+    "message": "Model configuration error: Model 'scaleway:openai/gpt-oss-120b' not found in configuration",
+    "type": "ValueError",
+    "timestamp": "2025-09-17T14:07:33.063661"
+  }
+}

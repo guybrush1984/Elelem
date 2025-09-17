@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "deepinfra:moonshotai/kimi-k2-instruct",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "introduction": "This article traces the evolution of large language models from early statistical n-gram systems in the 1990s to today’s transformer-based giants. It highlights pivotal shifts: IBM’s statistical foundations, neural networks’ entry in 2000, Word2Vec and LSTM breakthroughs, and the 2017 transformer revolution that redefined language AI. Key milestones include Google's 2016 neural translation, OpenAI's GPT series, and the rise of open-weight and multimodal models by 2024-25.",
+      "development": "1990s–2000s: IBM built statistical phrase-based models for translation; 2001 n-gram models trained on 300M tokens achieved state-of-the-art perplexity. With internet-scale corpora, \"web as corpus\" enabled larger datasets. Early 2000s shifted to neural language models—feed-forward nets, then word embeddings (Word2Vec 2013) and seq2seq LSTMs—leading to Google’s 2016 NMT rollout. 2017–2018: Google’s transformer paper introduced multi-head self-attention, eliminating recurrent loops. BERT (2018) generalized pre-training and fine-tuning, spawning encoder-based systems. Decoder-only GPT-1 (2018) and GPT-2 (2019) showcased scaling laws; GPT-2’s potency triggered responsible-release debates. GPT-3 (2020) delivered emergent few-shot prompting; ChatGPT (2022) sparked a consumer AI wave and broad LLM adoption across robotics, software, and ethics research. GPT-4 (2023) added multimodal perception and superior reasoning; architecture details remain closed. Concurrent research yielded alternatives (RNN variants, Mamba). Open-weight movement: LLaMA 2023, Mistral 7B, and DeepSeek R1 (2025) demonstrated competitive open-weight performance. Multimodal LLMs—or LMMs—now fuse vision, audio, and text, exemplified by GPT-4-Vision and Gemini, while specialized systems pivot to chain-of-thought reasoning (OpenAI o1). Despite computing costs and safety concerns, the transformer dominates the 2024 landscape, with 671B-parameter open models rivaling proprietary counterparts.",
+      "conclusion": "From statistical n-grams to trillion-parameter transformers and open-source multimodal giants, LLMs have transformed language technology, evidencing rapid cycles of innovation, scaling, and democratized access."
+    },
+    "created_at": "2025-09-15 21:22:37 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 9.73488974571228,
+    "input_tokens": 1071,
+    "output_tokens": 506,
+    "total_tokens": 1577,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

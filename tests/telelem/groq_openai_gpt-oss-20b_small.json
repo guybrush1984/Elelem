@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "```json\n{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C). Line two 8-inch round cake pans with parchment paper and lightly grease the sides. In a large bowl, sift 2 cups of all-purpose flour, 1 cup of cocoa powder, 1\u00bd teaspoons of baking soda, 1 teaspoon baking powder, and \u00bd teaspoon of salt. Combine thoroughly and set aside.\",\n  \"step2\": \"In a separate bowl, whisk 1\u00bd cups of granulated sugar with 2 large eggs until the mixture is pale and slightly frothy. Add 1 cup of whole milk, \u00bd cup of vegetable oil, and 2 teaspoons of pure vanilla extract. Stir until the liquid mixture is smooth and uniform, then gently fold into the dry ingredients until no streaks remain.\",\n  \"step3\": \"Divide the batter evenly between the prepared pans. Tap the pans lightly on the counter to release air bubbles and level the surface. Place the pans in the middle rack of the preheated oven and bake for 25-30 minutes, checking for doneness by inserting a toothpick into the center; it should come out clean or with a few moist crumbs.\",\n  \"step4\": \"While the cakes bake, prepare the frosting: beat \u00bd cup of softened butter until creamy. Gradually add 3 cups of powdered sugar, \u00bc cup of cocoa powder, and a pinch of salt. Mix until the frosting is light and fluffy, then fold in 1\u20132 teaspoons of milk or cream to achieve a spreadable consistency.\",\n  \"step5\": \"Remove the cakes from the oven and let them cool in the pans for 10 minutes. Then turn them onto a wire rack to cool completely, about 20 minutes. Once cooled, place one cake layer on a serving plate, spread a generous layer of frosting over the top, and carefully set the second layer on top.\",\n  \"step6\": \"Finish the assembled cake with a final thin coat of frosting on all sides, allowing the excess to drip slightly for a rustic look. Decorate with chocolate shavings or fresh berries if desired. Chill the cake for 15 minutes before slicing to help the frosting set and serve.\"\n}\n```",
+    "timestamp": "2025-09-17T13:50:55.626005"
+  },
+  "metrics": {
+    "duration_seconds": 0.8879604339599609,
+    "input_tokens": 169,
+    "output_tokens": 479,
+    "reasoning_tokens": 10,
+    "total_tokens": 648
+  }
+}

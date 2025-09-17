@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 8\u2011inch round cake pans. In a large bowl whisk together 1\u00bd cups flour, \u00be cup cocoa powder, 2 cups sugar, 1\u00bd tsp baking soda, 1 tsp baking powder, and 1 tsp salt. Set aside.\",\n  \"step2\": \"In a separate bowl, combine 1 cup buttermilk, \u00bd cup vegetable oil, 2 eggs, 2 tsp vanilla, and 1 cup hot water. Whisk until smooth. Pour the wet mixture into the dry ingredients, stirring until just combined\u2014no overmixing. The batter will be thin.\",\n  \"step3\": \"Divide batter evenly between the prepared pans. Tap pans gently on the counter to release air bubbles. Place in the oven and bake for 25\u201330 minutes, or until a toothpick inserted into the center comes out clean. Let cakes cool in pans for 10 minutes.\",\n  \"step4\": \"While cakes cool, prepare ganache: heat 1 cup heavy cream until simmering, then pour over 8 oz chopped dark chocolate in a bowl. Stir until smooth, then let sit 5 minutes to thicken slightly. Set aside to cool to spreadable consistency.\",\n  \"step5\": \"Remove cakes from pans and level tops with a knife. Place one layer on a serving plate, spread a thin layer of ganache. Top with second layer, then spread ganache over the entire cake, smoothing edges. Chill for 15 minutes to set the ganache.\",\n  \"step6\": \"Finish with chocolate shavings or cocoa powder dusting. Slice into eight equal portions, serve chilled or at room temperature. Enjoy a rich, moist chocolate cake that satisfies every craving!\"\n}",
+    "timestamp": "2025-09-16T08:54:41.714486"
+  },
+  "metrics": {
+    "duration_seconds": 2.3419978618621826,
+    "input_tokens": 168,
+    "output_tokens": 395,
+    "total_tokens": 563
+  }
+}

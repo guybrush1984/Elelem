@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "novita@openrouter:openai/gpt-oss-20b?low",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\"step1\":\"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour a 9\u2011inch round cake pan, then line with parchment for easy removal. Set aside; the batter will begin while the pan chills. This preparation ensures a moist crumb and prevents sticking, making the final cake rise evenly with a golden brown top.\",\"step2\":\"Using an electric mixer, cream \u00bd cup (113g) salted butter and \u00be cup (150g) brown sugar until light and fluffy, about 4\u20135 minutes. Add 1 teaspoon vanilla extract, then \u201cbeat in\u201d 2 large eggs, one at a time, ensuring each is fully incorporated before adding the next for a texture.\",\"step3\":\"Meanwhile, sift together 1\u00be cups (220g) all\u2011purpose flour, \u00be cup (75g) unsweetened cocoa powder, 2 teaspoons baking powder, \u00bd teaspoon baking soda, and a pinch of sea salt. Stir the mix until homogeneous, then gradually pour into the creamed base, alternating with \u00be cup (180ml) buttermilk, whisking just until combined.\",\"step4\":\"Pour the smooth batter evenly into the prepared pan, tapping the tin gently on the counter to release air bubbles. Fill the pan \u00be full to allow room for expansion. Place the pan in the preheated oven and bake for 30\u201335 minutes, watching the cake rise and turn golden safely.\",\"step5\":\"Remove the cake from the oven. Let it cool in the pan for 10 minutes, then turn onto a rack to cool. Prepare a chocolate ganache by whisking \u00bd cup (120ml) heavy cream and 1 cup (170g) melted dark chocolate over low heat. Drizzle over cake, allowing it to set with a finish for a sheen.\",\"step6\":\"Slice the cooled cake into 8 even layers, plating them on individual plates. Dust each slice with cocoa powder or powdered sugar for a touch of elegance. Serve at room temperature with chocolate coulis or a scoop of vanilla ice cream, ensuring every bite delivers silky, rich chocolate bliss today.\"}",
+    "timestamp": "2025-09-17T14:49:10.333670"
+  },
+  "metrics": {
+    "duration_seconds": 18.861262559890747,
+    "input_tokens": 238,
+    "output_tokens": 3326,
+    "reasoning_tokens": 2563,
+    "total_tokens": 3564
+  }
+}

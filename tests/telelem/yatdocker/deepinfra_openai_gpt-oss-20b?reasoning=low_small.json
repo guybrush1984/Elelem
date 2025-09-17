@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 8\u2011inch round cake pans. In a large bowl whisk together 1\u00bd cups flour, \u00be cup cocoa powder, 1\u00bd tsp baking powder, 1 tsp baking soda, and \u00bd tsp salt. Set aside.\",\n  \"step2\": \"In a separate bowl, beat 1 cup sugar and \u00bd cup butter until light and fluffy. Add 2 eggs, one at a time, mixing well after each. Stir in 1 tsp vanilla extract and \u00bd cup milk until smooth.\",\n  \"step3\": \"Gradually fold the dry ingredients into the wet mixture, alternating with \u00bd cup buttermilk. Mix until just combined; avoid over\u2011mixing. The batter should be thick but pourable.\",\n  \"step4\": \"Divide batter evenly between the prepared pans. Tap pans gently to release air bubbles. Bake for 25\u201130 minutes, or until a toothpick inserted in the center comes out clean. Let cakes cool in pans 10 minutes, then transfer to wire racks.\",\n  \"step5\": \"For frosting, beat \u00bd cup softened butter until creamy. Add 2 cups powdered sugar, \u00bc cup cocoa powder, 2 tbsp milk, and 1 tsp vanilla. Beat until smooth and spreadable. If desired, add a pinch of sea salt for contrast.\",\n  \"step6\": \"Place one cake layer on a serving plate, spread frosting over the top. Add second layer, then cover the entire cake with remaining frosting. Decorate with chocolate shavings or fresh berries. Chill briefly before serving to set the frosting.\"\n}",
+    "timestamp": "2025-09-17T17:16:06.573568"
+  },
+  "metrics": {
+    "duration_seconds": 2.489295721054077,
+    "input_tokens": 168,
+    "output_tokens": 368,
+    "reasoning_tokens": 0,
+    "total_tokens": 536
+  }
+}

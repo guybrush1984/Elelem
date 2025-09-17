@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1?reasoning",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "error": {
+    "message": "Error code: 500 - {'detail': {'error': {'message': 'API infrastructure error: Connection error.', 'type': 'server_error', 'code': 'completion_error'}}}",
+    "type": "InternalServerError",
+    "timestamp": "2025-09-17T18:38:33.649465"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "google:gemini-2.5-flash?think",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "```json\n{\n  \"step1\": \"Preheat your oven to 175\u00b0C (350\u00b0F). Grease and flour two 8-inch round cake pans. Gather ingredients: 1.5 cups all-purpose flour, 1.5 cups granulated sugar, 3/4 cup unsweetened cocoa powder, 1.5 tsp baking soda, 1 tsp baking powder, 1 tsp salt. This ensures everything is ready for a smooth baking process.\",\n  \"step2\": \"In a large bowl, whisk together the dry ingredients: flour, sugar, cocoa powder, baking soda, baking powder, and salt. Ensure there are no lumps and the mixture is well combined. In a separate bowl, combine 2 large eggs, 1 cup milk, 1/2 cup vegetable oil, and 2 teaspoons vanilla extract. Set aside.\",\n  \"step3\": \"Gradually add the wet ingredients to the dry ingredients, mixing on low speed until just combined. Do not overmix. Stir in 1 cup of boiling water (or hot strong coffee) last, mixing until the batter is smooth. The batter will be thin, which is normal for a moist cake.\",\n  \"step4\": \"Divide the batter evenly between the two prepared cake pans. Bake for 30-35 minutes, or until a wooden skewer inserted into the center of the cakes comes out clean. Avoid opening the oven door too frequently to maintain consistent temperature and ensure even baking.\",\n  \"step5\": \"Once baked, remove the cakes from the oven and let them cool in their pans on a wire rack for about 10-15 minutes. This allows the cakes to firm up slightly. Then, carefully invert them onto the wire rack to cool completely before frosting. Patience here prevents breakage.\",\n  \"step6\": \"Once completely cooled, frost the cake with your favorite chocolate buttercream or ganache. Stack the layers, apply frosting generously, and decorate as desired. Slice and serve your delicious homemade chocolate cake to 8 delighted guests. Enjoy every rich, moist bite!\"\n}\n```",
+    "timestamp": "2025-09-17T12:42:45.964217"
+  },
+  "metrics": {
+    "duration_seconds": 6.853869915008545,
+    "input_tokens": 108,
+    "output_tokens": 439,
+    "reasoning_tokens": 97,
+    "total_tokens": 547
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "total_tests": 12,
+  "test_results": {
+    "gemini-2.5-pro_none_no_thoughts": {
+      "model": "google:gemini-2.5-pro",
+      "reasoning_effort": null,
+      "include_thoughts": false,
+      "success": true,
+      "error": null,
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 670,
+        "total_tokens": 2197,
+        "reasoning_tokens": 0,
+        "has_completion_tokens_details": true,
+        "all_usage_keys": [
+          "completion_tokens",
+          "prompt_tokens",
+          "total_tokens",
+          "completion_tokens_details",
+          "prompt_tokens_details"
+        ]
+      }
+    },
+    "gemini-2.5-pro_none_with_thoughts": {
+      "model": "google:gemini-2.5-pro",
+      "reasoning_effort": null,
+      "include_thoughts": true,
+      "success": false,
+      "error": "API error: Error code: 400 - [{'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'description': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.'}]}]}}]"
+    },
+    "gemini-2.5-pro_low_no_thoughts": {
+      "model": "google:gemini-2.5-pro",
+      "reasoning_effort": "low",
+      "include_thoughts": false,
+      "success": true,
+      "error": null,
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 674,
+        "total_tokens": 1506,
+        "reasoning_tokens": 0,
+        "has_completion_tokens_details": true,
+        "all_usage_keys": [
+          "completion_tokens",
+          "prompt_tokens",
+          "total_tokens",
+          "completion_tokens_details",
+          "prompt_tokens_details"
+        ]
+      }
+    },
+    "gemini-2.5-pro_low_with_thoughts": {
+      "model": "google:gemini-2.5-pro",
+      "reasoning_effort": "low",
+      "include_thoughts": true,
+      "success": false,
+      "error": "API error: Error code: 400 - [{'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'description': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.'}]}]}}]"
+    },
+    "gemini-2.5-flash_none_no_thoughts": {
+      "model": "google:gemini-2.5-flash",
+      "reasoning_effort": null,
+      "include_thoughts": false,
+      "success": true,
+      "error": null,
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 530,
+        "total_tokens": 1586,
+        "reasoning_tokens": 0,
+        "has_completion_tokens_details": true,
+        "all_usage_keys": [
+          "completion_tokens",
+          "prompt_tokens",
+          "total_tokens",
+          "completion_tokens_details",
+          "prompt_tokens_details"
+        ]
+      }
+    },
+    "gemini-2.5-flash_none_with_thoughts": {
+      "model": "google:gemini-2.5-flash",
+      "reasoning_effort": null,
+      "include_thoughts": true,
+      "success": false,
+      "error": "API error: Error code: 400 - [{'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'description': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.'}]}]}}]"
+    },
+    "gemini-2.5-flash_low_no_thoughts": {
+      "model": "google:gemini-2.5-flash",
+      "reasoning_effort": "low",
+      "include_thoughts": false,
+      "success": true,
+      "error": null,
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 632,
+        "total_tokens": 1564,
+        "reasoning_tokens": 0,
+        "has_completion_tokens_details": true,
+        "all_usage_keys": [
+          "completion_tokens",
+          "prompt_tokens",
+          "total_tokens",
+          "completion_tokens_details",
+          "prompt_tokens_details"
+        ]
+      }
+    },
+    "gemini-2.5-flash_low_with_thoughts": {
+      "model": "google:gemini-2.5-flash",
+      "reasoning_effort": "low",
+      "include_thoughts": true,
+      "success": false,
+      "error": "API error: Error code: 400 - [{'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'description': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.'}]}]}}]"
+    },
+    "gemini-2.5-flash-lite_none_no_thoughts": {
+      "model": "google:gemini-2.5-flash-lite",
+      "reasoning_effort": null,
+      "include_thoughts": false,
+      "success": true,
+      "error": null,
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 390,
+        "total_tokens": 408,
+        "reasoning_tokens": 0,
+        "has_completion_tokens_details": true,
+        "all_usage_keys": [
+          "completion_tokens",
+          "prompt_tokens",
+          "total_tokens",
+          "completion_tokens_details",
+          "prompt_tokens_details"
+        ]
+      }
+    },
+    "gemini-2.5-flash-lite_none_with_thoughts": {
+      "model": "google:gemini-2.5-flash-lite",
+      "reasoning_effort": null,
+      "include_thoughts": true,
+      "success": false,
+      "error": "API error: Error code: 400 - [{'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'description': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.'}]}]}}]"
+    },
+    "gemini-2.5-flash-lite_low_no_thoughts": {
+      "model": "google:gemini-2.5-flash-lite",
+      "reasoning_effort": "low",
+      "include_thoughts": false,
+      "success": true,
+      "error": null,
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 423,
+        "total_tokens": 1120,
+        "reasoning_tokens": 0,
+        "has_completion_tokens_details": true,
+        "all_usage_keys": [
+          "completion_tokens",
+          "prompt_tokens",
+          "total_tokens",
+          "completion_tokens_details",
+          "prompt_tokens_details"
+        ]
+      }
+    },
+    "gemini-2.5-flash-lite_low_with_thoughts": {
+      "model": "google:gemini-2.5-flash-lite",
+      "reasoning_effort": "low",
+      "include_thoughts": true,
+      "success": false,
+      "error": "API error: Error code: 400 - [{'error': {'code': 400, 'message': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.', 'status': 'INVALID_ARGUMENT', 'details': [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'description': 'Invalid JSON payload received. Unknown name \"google\": Cannot find field.'}]}]}}]"
+    }
+  }
+}

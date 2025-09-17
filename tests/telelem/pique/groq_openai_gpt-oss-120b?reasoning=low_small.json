@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-120b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather ingredients: 2\u202f\u00bd cups all\u2011purpose flour, 2\u202fcups granulated sugar, \u00be cup unsweetened cocoa powder, 2 teaspoons baking powder, 1\u202f\u00bd teaspoons baking soda, 1 teaspoon salt, 1 cup buttermilk, \u00bd cup vegetable oil, 2 large eggs, 2 teaspoons vanilla extract, and 1\u202fcup hot water. Measure precisely for best texture and consistency.\",\n  \"step2\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then line bottoms with parchment paper. In a large bowl whisk dry ingredients together until uniform. In another bowl combine wet ingredients, then gradually blend wet into dry, creating a smooth batter that is glossy and thick.\",\n  \"step3\": \"Fold in 1 cup chocolate chips for extra richness. Divide batter evenly between prepared pans, smoothing tops with a spatula. Tap pans lightly on counter to release air bubbles. Place pans on middle oven rack, ensuring space for even heat circulation. Bake for 30\u201135 minutes until a toothpick emerges clean.\",\n  \"step4\": \"While cakes bake, prepare frosting: melt \u00bd cup butter, \u00bd cup heavy cream, and 1\u202fcup semi\u2011sweet chocolate chips over low heat, stirring until smooth. Remove from heat, whisk in 2 cups powdered sugar and 1 teaspoon vanilla until fluffy and glossy. Let it cool slightly before spreading on the cake.\",\n  \"step5\": \"Remove cakes from oven after 30\u201135 minutes; test with a toothpick\u2014should come out with few crumbs. Let cakes cool in pans for 10 minutes, then invert onto wire racks to cool completely. This prevents soggy bottoms and ensures structural stability for frosting and creates a firm surface for decoration today.\",\n  \"step6\": \"Spread a thin crumb coat of frosting over the first cake layer, place the second layer atop, then generously frost the top and sides. Smooth with an offset spatula, creating swirls if desired. Refrigerate 20 minutes to set, then serve slices to eight delighted guests. Enjoy the rich chocolate experience!\"\n}",
+    "timestamp": "2025-09-17T17:28:58.566812"
+  },
+  "metrics": {
+    "duration_seconds": 4.445001125335693,
+    "input_tokens": 169,
+    "output_tokens": 1947,
+    "reasoning_tokens": 0,
+    "total_tokens": 2116
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "request": {
+    "model": "openai:openai/o3",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "direct",
+    "elelem_server": null
+  },
+  "response": {
+    "content": {
+      "step1": "Gather ingredients: two cups all-purpose flour, two cups sugar, three-quarters cup cocoa powder, one tablespoon espresso powder, two teaspoons baking powder, one and a half teaspoons baking soda, one teaspoon salt, three eggs, one cup milk, half cup vegetable oil, two teaspoons vanilla extract, one cup hot water, room temperature.",
+      "step2": "Prepare the workspace: preheat oven to three hundred fifty degrees Fahrenheit, arrange rack in center position. Grease two nine-inch round cake pans with butter, line bottoms with parchment circles, then butter again. Lightly dust pans with cocoa powder, tapping out excess, ensuring smooth release and adding extra chocolate flavor throughout.",
+      "step3": "Combine dry ingredients in large bowl: flour, sugar, cocoa, espresso powder, baking powder, baking soda, salt. Whisk until uniformly blended, eliminating lumps. In separate bowl, beat eggs, milk, oil, vanilla until homogenous. Pour wet mixture into dry, mixing gently. Finally, stream hot water slowly, creating thin, glossy batter without overmixing.",
+      "step4": "Divide batter evenly between prepared pans, tapping each lightly on counter to release stubborn bubbles. Slide pans onto central oven rack, baking thirty-two to thirty-five minutes, until centers spring back and toothpick inserted emerges clean. Rotate pans halfway through for even rise. Remove, placing pans on wire rack to cool.",
+      "step5": "While cakes cool ten minutes, create silky frosting. Beat twelve tablespoons softened butter with two cups powdered sugar and half cup cocoa powder until fluffy. Gradually splash in quarter cup warm heavy cream plus teaspoon vanilla, achieving spreadable consistency. After ten minutes, invert cakes onto racks; let completely cool before.",
+      "step6": "Place first cake layer domed-side down on serving plate, spreading generous frosting layer across surface to edges. Position second layer upright, pressing gently to secure. Cloak top and sides with remaining frosting, swirling decorative ridges. Garnish with dark chocolate curls or berries if desired. Slice eight portions, enjoy celebration together."
+    },
+    "created_at": "2025-09-15 20:52:55 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 55.70125865936279,
+    "input_tokens": 175,
+    "output_tokens": 3837,
+    "total_tokens": 4012,
+    "cost_usd": 0.058182000000000005,
+    "provider_used": null
+  },
+  "analytics": {
+    "json_parse_retries": 0,
+    "json_schema_retries": 0,
+    "api_json_validation_retries": 0,
+    "rate_limit_retries": 0,
+    "total_retries": 0,
+    "temperature_reductions": 0,
+    "final_failures": 0,
+    "response_format_removals": 0,
+    "candidate_iterations": 0
+  }
+}

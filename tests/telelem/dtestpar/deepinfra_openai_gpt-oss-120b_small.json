@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-120b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather ingredients: 2\u202f\u00bd cups all\u2011purpose flour, 2\u202fcups granulated sugar, \u00be cup unsweetened cocoa powder, 2\u202fteaspoons baking powder, 1\u202f\u00bd teaspoons baking soda, 1\u202fteaspoon salt, 1\u202fcup buttermilk, \u00bd cup vegetable oil, 2 eggs, 2\u202fteaspoons vanilla extract, and 1\u202fcup hot water. Preheat oven to 350\u00b0F (175\u00b0C) and grease two 9\u2011inch round pans.\",\n  \"step2\": \"In a large mixing bowl, whisk together flour, cocoa powder, baking powder, baking soda, and salt until evenly combined. This dry mixture ensures a uniform texture and prevents clumps, which is essential for a tender crumb. Set aside while preparing the wet ingredients in a container, ready for later incorporation.\",\n  \"step3\": \"Combine wet ingredients: beat eggs, then add buttermilk, oil, and vanilla extract, mixing until smooth. Gradually pour in hot water, whisking continuously; the batter will be thin, which is normal for chocolate cake. This liquid phase enhances moisture and flavor. It also helps develop a glossy crumb and rich aroma.\",\n  \"step4\": \"Add the wet mixture to the dry ingredients, folding gently with a spatula until just combined; over\u2011mixing creates gluten and yields a dense cake. Pour the batter evenly into the prepared pans, smoothing tops with the spatula for uniform rise and ensure the batter reaches the edges for even baking.\",\n  \"step5\": \"Bake for 30\u201135 minutes, or until a toothpick inserted into the center emerges with a few moist crumbs. Rotate pans halfway for even coloring. Remove from oven, let cool in pans for 10 minutes, then transfer to a wire rack to cool completely. This period prevents the cake from collapsing.\",\n  \"step6\": \"Prepare frosting: melt \u00bd cup butter, stir in 2\u202fcups powdered sugar, \u00bc cup cocoa, 2\u202ftablespoons milk, and a pinch of salt until smooth. Spread over cooled layers, stacking them, then frost the sides and top. Garnish with chocolate shavings and serve. Enjoy this moist chocolate cake with glass of milk.\"\n}",
+    "timestamp": "2025-09-16T12:12:21.105377"
+  },
+  "metrics": {
+    "duration_seconds": 12.502194881439209,
+    "input_tokens": 168,
+    "output_tokens": 2252,
+    "total_tokens": 2420
+  }
+}

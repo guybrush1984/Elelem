@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "fireworks:deepseek/deepseek-3.1?nothink",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat oven to 350°F (175°C). Grease and line two 8-inch round cake pans with parchment paper. In a bowl, sift together 2 cups flour, 2 cups sugar, 3/4 cup cocoa powder, 2 tsp baking soda, and 1 tsp salt.",
+      "step2": "Add 2 large eggs, 1 cup buttermilk, 1 cup warm coffee, 1/2 cup vegetable oil, and 1 tsp vanilla extract to the dry ingredients. Mix with an electric mixer on medium speed until smooth and well combined, about 2 minutes.",
+      "step3": "Divide the batter evenly between the prepared pans. Smooth the tops with a spatula. Tap pans lightly on the counter to remove any air bubbles. Bake for 30-35 minutes, or until a toothpick comes out clean.",
+      "step4": "Let cakes cool in pans for 10 minutes, then turn out onto wire racks to cool completely. Once cooled, level the tops if needed for even layering. Prepare frosting while cakes cool.",
+      "step5": "For chocolate frosting, beat 1 cup softened butter until creamy. Gradually add 3 1/2 cups powdered sugar and 1 cup cocoa powder, alternating with 1/2 cup heavy cream. Mix in 2 tsp vanilla and a pinch of salt until fluffy.",
+      "step6": "Place one cake layer on a plate. Spread with frosting, top with second layer, and frost top and sides. Decorate as desired. Slice and serve, or store covered at room temperature for up to 3 days."
+    },
+    "created_at": "2025-09-15 21:21:33 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 3.341115951538086,
+    "input_tokens": 171,
+    "output_tokens": 347,
+    "total_tokens": 518,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

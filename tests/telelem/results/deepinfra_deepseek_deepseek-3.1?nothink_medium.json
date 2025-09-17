@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "deepinfra:deepseek/deepseek-3.1?nothink",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "introduction": "This article traces the evolution of large language models (LLMs) from early statistical approaches to modern transformer-based systems. It highlights key milestones, including IBM's word alignment techniques in the 1990s, neural network adoption in the 2000s, and the transformative impact of the 2017 transformer architecture. The narrative underscores how computational advances and growing datasets have driven progress in natural language processing.",
+      "development": "In the early 1990s, IBM pioneered statistical models for machine translation, introducing word alignment techniques that laid the foundation for corpus-based language modeling. By 2001, n-gram models with Kneser–Ney smoothing, trained on 300 million words, achieved state-of-the-art performance. The 2000s saw the compilation of massive web-based datasets, enabling more robust statistical models. A shift to neural networks began around 2000, accelerating after deep learning breakthroughs in image classification circa 2012. Key developments included Word2Vec embeddings (2013) and LSTM-based sequence-to-sequence models, leading to Google's adoption of neural machine translation in 2016. The 2017 transformer architecture, introduced in 'Attention Is All You Need,' revolutionized the field by relying solely on attention mechanisms. BERT (2018) became widely used as an encoder-only model, though decoder-only models like GPT gained prominence by 2023. GPT-2 (2019) and GPT-3 (2020) advanced capabilities, with ChatGPT (2022) bringing LLMs to public attention. GPT-4 (2023) offered multimodal features, while OpenAI o1 (2024) emphasized reasoning. Open-source models like BLOOM, LLaMA, and Mistral AI's offerings emerged, with DeepSeek R1 (2025) providing a cost-effective alternative. Recent trends include multimodal models (LMMs) processing images and audio, though transformers remain dominant despite emerging architectures like Mamba.",
+      "conclusion": "LLMs have evolved from statistical foundations to sophisticated transformer-based systems, driven by data growth and architectural innovations, with ongoing expansion into multimodal capabilities."
+    },
+    "created_at": "2025-09-15 21:21:57 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 12.27582049369812,
+    "input_tokens": 1056,
+    "output_tokens": 438,
+    "total_tokens": 1494,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

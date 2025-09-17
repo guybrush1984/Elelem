@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "groq:meta-llama/llama-4-scout-17b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "Here's a recipe for a delicious chocolate cake for 8 people:\n\n```\n{\n  \"step1\": \"Preheat oven to 350\u00b0F (180\u00b0C). Grease two 8-inch round cake pans and line bottoms with parchment paper. Prepare pans for even cake release.\",\n  \"step2\": \"Mix 2 1/4 cups all-purpose flour, 1 1/2 cups granulated sugar, 2 teaspoons baking powder, and 1 teaspoon salt in a large bowl. Combine dry ingredients.\",\n  \"step3\": \"In another bowl, whisk 1/2 cup unsweetened cocoa powder, 1 cup whole milk, and 2 large eggs. Add 1 teaspoon vanilla extract. Combine wet ingredients.\",\n  \"step4\": \"Pour wet ingredients into dry ingredients and mix until combined. Add 1/2 cup vegetable oil and mix until smooth. Ensure even batter consistency.\",\n  \"step5\": \"Divide batter evenly between prepared pans. Bake for 30-35 minutes or until a toothpick inserted comes out clean. Check for doneness and rotate pans.\",\n  \"step6\": \"Let cakes cool in pans for 10 minutes, then transfer to a wire rack to cool completely. Frost and decorate as desired. Serve and enjoy your chocolate cake!\"\n}\n```",
+    "timestamp": "2025-09-17T17:28:55.771160"
+  },
+  "metrics": {
+    "duration_seconds": 1.5511722564697266,
+    "input_tokens": 101,
+    "output_tokens": 265,
+    "reasoning_tokens": 0,
+    "total_tokens": 366
+  }
+}

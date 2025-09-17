@@ -6,8 +6,63 @@ provider implementations, each with their own token reporting structure.
 """
 
 import re
-from typing import Any, Optional, Set
+from typing import Any, Optional, Set, Tuple
 import logging
+
+
+def extract_token_counts(response: Any, logger: Optional[logging.Logger] = None) -> Tuple[int, int, int, int]:
+    """
+    Extract complete normalized token structure for all providers.
+
+    Returns consistent token semantics across all providers:
+    - input: prompt tokens (what you send)
+    - output: completion tokens (what you get back, including reasoning)
+    - reasoning: reasoning tokens (portion of output that's internal reasoning)
+    - total: input + output tokens (standard total across all providers)
+
+    This ensures reasoning_token_ratio = reasoning / output is always meaningful.
+
+    Args:
+        response: LLM response object with usage and choices
+        logger: Optional logger for debug output
+
+    Returns:
+        Tuple[int, int, int, int]: (input_tokens, output_tokens, reasoning_tokens, total_tokens)
+    """
+    if not response or not hasattr(response, 'usage'):
+        return 0, 0, 0, 0
+
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    usage = response.usage
+
+    # Extract raw token values
+    input_tokens = getattr(usage, 'prompt_tokens', 0)
+    raw_output_tokens = getattr(usage, 'completion_tokens', 0)
+    raw_total_tokens = getattr(usage, 'total_tokens', 0)
+
+    # Extract reasoning tokens using existing sophisticated logic
+    reasoning_tokens = extract_reasoning_tokens(response, logger)
+
+    # Normalize token structure for consistency across providers
+    if is_gemini_style_response(response):
+        # Gemini: completion_tokens is pure output, reasoning is separate
+        # Normalize: output should include reasoning to match other providers
+        output_tokens = raw_output_tokens + reasoning_tokens
+        total_tokens = input_tokens + output_tokens
+
+        logger.debug(f"Normalized Gemini tokens: raw_output={raw_output_tokens}, "
+                    f"reasoning={reasoning_tokens}, normalized_output={output_tokens}, total={total_tokens}")
+    else:
+        # Standard providers: completion_tokens already includes reasoning
+        output_tokens = raw_output_tokens
+        total_tokens = input_tokens + output_tokens
+
+        logger.debug(f"Standard tokens: input={input_tokens}, output={output_tokens}, "
+                    f"reasoning={reasoning_tokens}, total={total_tokens}")
+
+    return input_tokens, output_tokens, reasoning_tokens, total_tokens
 
 
 def extract_reasoning_tokens(response: Any, logger: Optional[logging.Logger] = None) -> int:

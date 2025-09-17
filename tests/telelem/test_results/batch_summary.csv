@@ -1,0 +1,3 @@
+model_name,model_owner,model_provider,license,model_variant,cost_per_1m_input,cost_per_1m_output,success_rate_percent,output_token_rate,real_output_token_rate,computed_cost_per_1m_actual_output_token,reasoning_token_ratio
+gpt-oss-20b,OpenAI,groq,Apache 2.0,reasoning=high,0.1,0.5,0,0,0,0,0
+gpt-oss-20b,OpenAI,groq,Apache 2.0,reasoning=low,0.1,0.5,0,0,0,0,0

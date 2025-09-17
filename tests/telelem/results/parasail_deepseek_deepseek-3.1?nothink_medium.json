@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1?nothink",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "introduction": "The history of large language models (LLMs) traces from statistical approaches in the 1990s to the revolutionary transformer architecture introduced in 2017. Early advancements included IBM’s word alignment and neural networks like LSTMs, but the transformer’s attention mechanism catalyzed rapid progress. Models like BERT, GPT, and multimodal systems have since dominated, with open-source and proprietary innovations continuing to shape the field into 2025.",
+      "development": "Before transformers, language modeling evolved through statistical techniques and early neural networks. In the 1990s, IBM pioneered word alignment for machine translation, while n-gram models with smoothing achieved state-of-the-art results on large corpora. The 2000s saw the rise of web-based datasets and neural networks, culminating in breakthroughs like Word2Vec (2013) and LSTM-based sequence-to-sequence models. Google’s shift to neural machine translation in 2016 marked a significant step. The 2017 transformer architecture, introduced in 'Attention Is All You Need,' replaced recurrent networks with self-attention, enabling parallel processing and greater scalability. This led to encoder-only models like BERT (2018) and decoder-only models like GPT. GPT-2 (2019) and GPT-3 (2020) gained notoriety for their capabilities and accessibility issues, while ChatGPT (2022) and GPT-4 (2023) brought LLMs to mainstream attention with improved accuracy and multimodality. Recent developments include open-source models (e.g., BLOOM, LLaMA, Mistral, and DeepSeek R1), reasoning enhancements like OpenAI o1 (2024), and the emergence of large multimodal models (LMMs) handling text, images, and audio. While transformers remain dominant, alternatives like Mamba (a state space model) are also being explored.",
+      "conclusion": "LLMs have progressed from statistical methods to transformative neural architectures, driving innovation in AI and expanding into multimodal applications."
+    },
+    "created_at": "2025-09-15 21:21:29 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 5.9258506298065186,
+    "input_tokens": 1054,
+    "output_tokens": 414,
+    "total_tokens": 1468,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

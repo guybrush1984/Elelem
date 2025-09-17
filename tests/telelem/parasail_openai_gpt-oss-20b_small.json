@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "parasail:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "error": {
+    "message": "Model configuration error: Model 'parasail:openai/gpt-oss-20b' not found in configuration",
+    "type": "ValueError",
+    "timestamp": "2025-09-17T13:52:05.798822"
+  }
+}

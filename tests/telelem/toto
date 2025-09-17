@@ -1,0 +1,69 @@
+2025-09-17 20:52:28,940 - elelem - DEBUG - Initialized scaleway provider
+2025-09-17 20:52:28,952 - elelem - DEBUG - Initialized deepinfra provider
+2025-09-17 20:52:28,963 - elelem - DEBUG - Initialized throughput@openrouter provider
+2025-09-17 20:52:28,975 - elelem - DEBUG - Initialized openrouter provider
+2025-09-17 20:52:28,987 - elelem - DEBUG - Initialized fireworks provider
+2025-09-17 20:52:28,998 - elelem - DEBUG - Initialized openai provider
+2025-09-17 20:52:29,010 - elelem - DEBUG - Initialized cerebras@openrouter provider
+2025-09-17 20:52:29,021 - elelem - DEBUG - Initialized google provider
+2025-09-17 20:52:29,033 - elelem - DEBUG - Initialized cost@openrouter provider
+2025-09-17 20:52:29,045 - elelem - DEBUG - Initialized parasail provider
+2025-09-17 20:52:29,056 - elelem - DEBUG - Initialized groq provider
+2025-09-17 20:52:29,059 - asyncio - DEBUG - Using selector: EpollSelector
+2025-09-17 20:52:29,059 - elelem - INFO - [2ca9f6ca] 🚀 Starting groq:openai/gpt-oss-20b?reasoning=low with 1 candidate(s)
+2025-09-17 20:52:29,059 - elelem - INFO - [2ca9f6ca] 🎯 Candidate 1/1: groq:openai/gpt-oss-20b (timeout=120s)
+2025-09-17 20:52:29,059 - elelem - DEBUG - [2ca9f6ca] Full candidate dict: {'provider': 'groq', 'model_id': 'openai/gpt-oss-20b', 'capabilities': {'supports_json_mode': True, 'supports_temperature': True, 'supports_system': True}, 'cost': {'input_cost_per_1m': 0.1, 'output_cost_per_1m': 0.5, 'currency': 'USD'}, 'default_params': {'reasoning_effort': 'low'}, 'display_metadata': {'model_owner': 'OpenAI', 'model_nickname': 'gpt-oss-20b', 'model_page': 'https://huggingface.co/openai/gpt-oss-20b', 'license': 'Apache 2.0', 'reasoning': 'yes', 'model_configuration': 'reasoning=low'}, 'timeout': None}
+2025-09-17 20:52:29,059 - elelem - DEBUG - [2ca9f6ca] Candidate key: groq:openai/gpt-oss-20b
+2025-09-17 20:52:29,059 - elelem - DEBUG - [2ca9f6ca] Capabilities passed to cleanup: {'supports_json_mode': True, 'supports_temperature': True, 'supports_system': True}
+2025-09-17 20:52:29,059 - elelem - DEBUG - [2ca9f6ca] Before cleanup - response_format in kwargs: False
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG] _cleanup_api_kwargs called for model 'groq:openai/gpt-oss-20b'
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG]   api_kwargs keys: ['temperature', 'service_tier', 'reasoning_effort']
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG]   response_format in api_kwargs: False
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG]   capabilities from model_config: {'supports_json_mode': True, 'supports_temperature': True, 'supports_system': True}
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG]   supports_json_mode: True
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG]   should_remove_rf: False
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG]   has response_format: False
+2025-09-17 20:52:29,059 - elelem - DEBUG - [DEBUG] NOT removing response_format - model supports JSON mode
+2025-09-17 20:52:29,060 - elelem - DEBUG - [DEBUG] NOT removing response_format - not present in kwargs
+2025-09-17 20:52:29,060 - elelem - DEBUG - [DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: False
+2025-09-17 20:52:29,060 - elelem - DEBUG - [2ca9f6ca] After cleanup - response_format in kwargs: False
+2025-09-17 20:52:29,060 - elelem - DEBUG - [2ca9f6ca] 🔄 Attempt 1/4 - temp=1.0
+2025-09-17 20:52:29,149 - openai._base_client - DEBUG - Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-e77efd2e-edf5-45ba-bb95-d6e3369fb346', 'json_data': {'messages': [{'role': 'system', 'content': '# Role\nYou are an assistant generating cake recipes. \n# Instructions\nGenerate recipes in 6 steps, 50 words each.\n# Output format\nYou need to answer with a json structure \n{\n  "step1": "...", \n  "step2": "...", \n  "step3": "...",\n  "step4": "...",\n  "step5": "...",\n  "step6": "..."\n}'}, {'role': 'user', 'content': 'I want a chocolate cake for 8.'}], 'model': 'openai/gpt-oss-20b', 'reasoning_effort': 'low', 'service_tier': 'auto', 'temperature': 1.0}}
+2025-09-17 20:52:29,150 - openai._base_client - DEBUG - Sending HTTP Request: POST https://api.groq.com/openai/v1/chat/completions
+2025-09-17 20:52:29,152 - httpcore.connection - DEBUG - connect_tcp.started host='api.groq.com' port=443 local_address=None timeout=600 socket_options=None
+2025-09-17 20:52:29,194 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7235c0797e90>
+2025-09-17 20:52:29,194 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x7235c0af18d0> server_hostname='api.groq.com' timeout=600
+2025-09-17 20:52:29,237 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7235c0a29190>
+2025-09-17 20:52:29,237 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-09-17 20:52:29,238 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-09-17 20:52:29,238 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-09-17 20:52:29,238 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-09-17 20:52:29,238 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-09-17 20:52:29,795 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Wed, 17 Sep 2025 18:52:29 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Content-Encoding', b'gzip'), (b'Cache-Control', b'private, max-age=0, no-store, no-cache, must-revalidate'), (b'vary', b'Origin'), (b'x-groq-region', b'fra'), (b'x-ratelimit-limit-requests', b'500000'), (b'x-ratelimit-limit-tokens', b'250000'), (b'x-ratelimit-remaining-requests', b'499999'), (b'x-ratelimit-remaining-tokens', b'249830'), (b'x-ratelimit-reset-requests', b'172.799999ms'), (b'x-ratelimit-reset-tokens', b'40.799999ms'), (b'x-request-id', b'req_01k5cgarphe9cbgcbb31jaeb21'), (b'via', b'1.1 google'), (b'cf-cache-status', b'DYNAMIC'), (b'Set-Cookie', b'__cf_bm=_7Yucm7Lcs4cOsg.FOSOaOLdxhD2p1ZNgvqRkKThTCQ-1758135149-1.0.1.1-wDimRCgrGnnuQ3TgQqT8pPrmuc417U6shHC9Nq8adRVq0hsQZOaEZ3C1n2TMt_toEIoU9b.En.aJWYdeWIlgFoNFwxL55RSRXyKfiR2RRjE; path=/; expires=Wed, 17-Sep-25 19:22:29 GMT; domain=.groq.com; HttpOnly; Secure; SameSite=None'), (b'Server', b'cloudflare'), (b'CF-RAY', b'980acd0ac87c9a9e-CDG'), (b'alt-svc', b'h3=":443"; ma=86400')])
+2025-09-17 20:52:29,796 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-17 20:52:29,796 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-09-17 20:52:29,796 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-09-17 20:52:29,796 - httpcore.http11 - DEBUG - response_closed.started
+2025-09-17 20:52:29,797 - httpcore.http11 - DEBUG - response_closed.complete
+2025-09-17 20:52:29,797 - openai._base_client - DEBUG - HTTP Response: POST https://api.groq.com/openai/v1/chat/completions "200 OK" Headers({'date': 'Wed, 17 Sep 2025 18:52:29 GMT', 'content-type': 'application/json', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'content-encoding': 'gzip', 'cache-control': 'private, max-age=0, no-store, no-cache, must-revalidate', 'vary': 'Origin', 'x-groq-region': 'fra', 'x-ratelimit-limit-requests': '500000', 'x-ratelimit-limit-tokens': '250000', 'x-ratelimit-remaining-requests': '499999', 'x-ratelimit-remaining-tokens': '249830', 'x-ratelimit-reset-requests': '172.799999ms', 'x-ratelimit-reset-tokens': '40.799999ms', 'x-request-id': 'req_01k5cgarphe9cbgcbb31jaeb21', 'via': '1.1 google', 'cf-cache-status': 'DYNAMIC', 'set-cookie': '__cf_bm=_7Yucm7Lcs4cOsg.FOSOaOLdxhD2p1ZNgvqRkKThTCQ-1758135149-1.0.1.1-wDimRCgrGnnuQ3TgQqT8pPrmuc417U6shHC9Nq8adRVq0hsQZOaEZ3C1n2TMt_toEIoU9b.En.aJWYdeWIlgFoNFwxL55RSRXyKfiR2RRjE; path=/; expires=Wed, 17-Sep-25 19:22:29 GMT; domain=.groq.com; HttpOnly; Secure; SameSite=None', 'server': 'cloudflare', 'cf-ray': '980acd0ac87c9a9e-CDG', 'alt-svc': 'h3=":443"; ma=86400'})
+2025-09-17 20:52:29,797 - openai._base_client - DEBUG - request_id: req_01k5cgarphe9cbgcbb31jaeb21
+2025-09-17 20:52:29,800 - elelem - DEBUG - [2ca9f6ca] RAW USAGE OBJECT: CompletionUsage(completion_tokens=406, prompt_tokens=169, total_tokens=575, completion_tokens_details=None, prompt_tokens_details=None, queue_time=0.037726665, prompt_time=0.010968577, completion_time=0.364499467, total_time=0.375468044)
+2025-09-17 20:52:29,800 - elelem - DEBUG - [2ca9f6ca] USAGE DICT: {'completion_tokens': 406, 'prompt_tokens': 169, 'total_tokens': 575, 'completion_tokens_details': None, 'prompt_tokens_details': None}
+2025-09-17 20:52:29,800 - elelem - DEBUG - Checking content for <think> tags, length: 1573
+2025-09-17 20:52:29,800 - elelem - DEBUG - Found 0 <think> matches
+2025-09-17 20:52:29,800 - elelem - DEBUG - Estimated reasoning tokens via char ratio: 9 (2.2% of 406 total)
+2025-09-17 20:52:29,800 - elelem - DEBUG - Full response JSON: {"id":"chatcmpl-b4d76aa7-bff5-4a7d-93b8-51396de00f5e","choices":[{"finish_reason":"stop","index":0,"logprobs":null,"message":{"content":"```json\n{\n  \"step1\": \"Preheat oven to 180°C (350°F). Line a 20cm (8-inch) round cake tin with parchment paper and lightly grease the sides. In a large bowl whisk together 200g all‑purpose flour, 50g cocoa powder, 1 tsp baking powder, 1 tsp baking soda, and a pinch of salt. Set aside.\",\n  \"step2\": \"In a separate bowl, beat 200g softened butter and 250g
+2025-09-17 20:52:29,800 - elelem - DEBUG - First choice type: <class 'openai.types.chat.chat_completion.Choice'>
+2025-09-17 20:52:29,800 - elelem - DEBUG - Message type: <class 'openai.types.chat.chat_completion_message.ChatCompletionMessage'>
+2025-09-17 20:52:29,800 - elelem - DEBUG - Message content: ```json
+{
+  "step1": "Preheat oven to 180°C (350°F). Line a 20cm (8-inch) round cake tin with parchment paper and lightly grease the sides. In a large bowl whisk together 200g all‑purpose flour, 50g cocoa powder, 1 tsp baking powder, 1 tsp baking soda, and a pinch of salt. Set aside.",
+  "step2": "In a separate bowl, beat 200g softened butter and 250g caster sugar until pale and fluffy. Add 2 eggs one at a time, mixing well after each addition. Stir in 1 tsp vanilla extract until fully incorporated. The batter should be smooth and glossy.",
+  "step3": "Gradually fold the dry ingredients into the wet mixture, alternating with 120ml warm milk. Begin and finish with flour to keep the batter light. Mix gently until just combined; avoid over‑mixing to ensure a tender crumb. The batter should be thick yet pourable.",
+  "step4": "Pour the batter into the prepared tin, smoothing the top with a spatula. Tap the tin lightly on the counter to release air bubbles. Bake for 25–30 minutes, or until a skewer inserted into the center comes out clean. Let the cake cool in the tin for 10 minutes.",
+  "step5": "Transfer the cake to a wire rack to cool completely. For a classic chocolate ganache, whisk together 200g dark chocolate chips and 100ml heavy cream until glossy. Pour the ganache over the cooled cake, allowing it to set before slicing.",
+  "step6": "Trim any uneven edges with a sharp knife, garnish with chocolate shavings or a dusting of powdered sugar, and serve. This recipe yields an 8‑piece chocolate cake that is moist, rich, and visually stunning."
+}
+```
+2025-09-17 20:52:29,800 - elelem - DEBUG - Message JSON: {"content":"```json\n{\n  \"step1\": \"Preheat oven to 180°C (350°F). Line a 20cm (8-inch) round cake tin with parchment paper and lightly grease the sides. In a large bowl whisk together 200g all‑purpose flour, 50g cocoa powder, 1 tsp baking powder, 1 tsp baking soda, and a pinch of salt. Set aside.\",\n  \"step2\": \"In a separate bowl, beat 200g softened butter and 250g caster sugar until pale and fluffy. Add 2 eggs one at a time, mixing well after each addition. Stir in 1 tsp vanilla extract
+2025-09-17 20:52:29,800 - elelem - INFO - [2ca9f6ca] ✅ SUCCESS - groq:openai/gpt-oss-20b in 0.74s

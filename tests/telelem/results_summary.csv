@@ -1,0 +1,22 @@
+model_name,model_owner,model_provider,license,reasoning,cost_per_1m_input,cost_per_1m_output,success_rate_percent,output_token_rate,real_output_token_rate,computed_cost_per_1m_actual_output_token,reasoning_token_ratio
+deepseek-v3.1,DeepSeek,deepinfra,MIT,False,0.3,1.0,100.0,37.9,37.9,1.0,0.0
+llama-4-maverick-17b,Meta,deepinfra,Llama 4 License,False,0.08,0.3,100.0,75.1,75.1,0.3,0.0
+llama-4-scout-17b,Meta,deepinfra,Llama 4 License,False,0.08,0.3,100.0,42.8,42.8,0.3,0.0
+kimi-k2-instruct,Moonshot AI,deepinfra,Apache 2.0,False,0.5,2.0,100.0,51.4,51.4,2.0,0.0
+gpt-oss-120b,OpenAI,deepinfra,Apache 2.0,True,0.09,0.45,100.0,151.0,60.9,1.783071,0.597
+gpt-oss-20b,OpenAI,deepinfra,Apache 2.0,True,0.04,0.16,100.0,109.2,107.7,0.164456,0.014
+deepseek-v3.1,DeepSeek,fireworks,MIT,False,0.56,1.68,100.0,95.0,95.0,1.68,0.0
+gpt-oss-120b,OpenAI,fireworks,Apache 2.0,True,0.15,0.6,100.0,259.3,245.8,0.66566,0.052
+gpt-oss-20b,OpenAI,fireworks,Apache 2.0,True,0.07,0.3,100.0,273.9,268.2,0.312681,0.021
+llama-4-maverick-17b,Meta,groq,Llama 4 License,False,0.2,0.6,100.0,371.5,371.5,0.6,0.0
+llama-4-scout-17b,Meta,groq,Llama 4 License,False,0.11,0.34,100.0,326.0,326.0,0.34,0.0
+kimi-k2-instruct,Moonshot AI,groq,Apache 2.0,False,1.0,3.0,100.0,195.8,195.8,3.0,0.0
+gpt-oss-120b,OpenAI,groq,Apache 2.0,True,0.15,0.75,100.0,386.0,369.8,0.815919,0.042
+gpt-oss-20b,OpenAI,groq,Apache 2.0,True,0.1,0.5,100.0,736.9,722.5,0.519904,0.02
+gpt-4.1,OpenAI,openai,Proprietary,False,2.0,8.0,100.0,70.7,70.7,8.0,0.0
+gpt-4.1-mini,OpenAI,openai,Proprietary,False,0.4,1.6,100.0,63.2,63.2,1.6,0.0
+gpt-5-mini,OpenAI,openai,Proprietary,True,0.25,2.0,100.0,77.6,10.6,27.289428,0.863
+o3-mini,OpenAI,openai,Proprietary,True,1.1,4.4,100.0,80.6,19.5,31.903663,0.758
+deepseek-v3.1,DeepSeek,parasail,MIT,False,0.64,1.65,100.0,60.3,60.3,1.65,0.0
+gpt-oss-120b,OpenAI,parasail,Apache 2.0,True,0.15,0.6,100.0,72.2,69.8,0.639805,0.032
+gpt-oss-120b,OpenAI,scaleway,Apache 2.0,True,0.16,0.64,100.0,170.3,75.0,2.265575,0.559

@@ -1,0 +1,27 @@
+[
+  {
+    "model": "groq:openai/gpt-oss-20b?reasoning=low",
+    "description": "GROQ with reasoning",
+    "error": "'groq'"
+  },
+  {
+    "model": "google:gemini-2.5-flash",
+    "description": "Gemini Flash without reasoning",
+    "error": "'google'"
+  },
+  {
+    "model": "google:gemini-2.5-flash?reasoning=low",
+    "description": "Gemini Flash with reasoning",
+    "error": "'google'"
+  },
+  {
+    "model": "deepinfra:openai/gpt-oss-20b?reasoning=low",
+    "description": "DeepInfra with reasoning",
+    "error": "'deepinfra'"
+  },
+  {
+    "model": "parasail:deepseek-3.1",
+    "description": "DeepSeek without thinking",
+    "error": "Model configuration error: Model 'parasail:deepseek-3.1' not found in configuration"
+  }
+]

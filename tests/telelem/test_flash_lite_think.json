@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "google:gemini-2.5-flash-lite?think",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "```json\n{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 8-inch round cake pans. You can also line the bottoms with parchment paper for easy removal. Proper pan preparation is key for a perfect cake release.\",\n  \"step2\": \"In a large bowl, whisk together 1 \u00be cups all-purpose flour, 2 cups granulated sugar, \u00be cup unsweetened cocoa powder, 1 \u00bd teaspoons baking soda, 1 \u00bd teaspoons baking powder, and 1 teaspoon salt. Ensure everything is well combined for an even texture.\",\n  \"step3\": \"In a separate bowl, whisk together 2 large eggs, 1 cup milk, \u00bd cup vegetable oil, and 2 teaspoons vanilla extract. Pour these wet ingredients into the dry ingredients and mix until just combined. Avoid overmixing the batter.\",\n  \"step4\": \"Carefully stir in 1 cup of boiling water or hot brewed coffee into the batter. Mix until smooth; the batter will be thin. This step blooms the cocoa, intensifying the chocolate flavor and creating a tender crumb.\",\n  \"step5\": \"Divide the batter evenly between the prepared pans. Bake for 30-35 minutes, or until a toothpick inserted into the center comes out clean. Let the cakes cool in the pans for 10 minutes before inverting onto a wire rack.\",\n  \"step6\": \"Allow cakes to cool completely on the wire rack. Once cooled, frost with your favorite chocolate frosting or ganache. This rich, moist chocolate cake is perfect for serving 8 people a generous slice each.\"\n}\n```",
+    "timestamp": "2025-09-17T12:57:07.916208"
+  },
+  "metrics": {
+    "duration_seconds": 6.762495994567871,
+    "input_tokens": 108,
+    "output_tokens": 348,
+    "reasoning_tokens": 742,
+    "total_tokens": 456
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "models": [
+      "parasail:deepseek/deepseek-3.1?reasoning",
+
+      "google:gemini-2.5-pro?reasoning=low",
+      "google:gemini-2.5-flash?reasoning=low",
+      "google:gemini-2.5-flash"
+  ],
+  "prompts": [
+    "small.yaml"
+  ],
+  "temperature": 0.1
+}

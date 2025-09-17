@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "google:gemini-2.5-flash?reasoning=low",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "```json\n{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 8-inch round pans. In a large bowl, whisk together 1 \u00be cups flour, 1 \u00be cups sugar, \u00be cup cocoa powder, 1 \u00bd tsp baking soda, 1 \u00bd tsp baking powder, and 1 tsp salt thoroughly.\",\n  \"step2\": \"In a separate medium bowl, combine 2 large eggs, 1 cup milk, \u00bd cup vegetable oil, and 2 teaspoons vanilla extract. Whisk these wet ingredients until well blended and smooth. Ensure all are at room temperature for optimal mixing and cake texture.\",\n  \"step3\": \"Gradually add the wet ingredients to the dry, mixing on low speed until just combined. Do not overmix. Stir in 1 cup of hot water or hot coffee last; this creates a very moist batter. The batter will be thin.\",\n  \"step4\": \"Divide the thin batter evenly between the prepared 8-inch round pans. Place them in the preheated oven. Bake for approximately 30-35 minutes, or until a wooden skewer inserted into the center of the cakes comes out clean.\",\n  \"step5\": \"Once baked, remove the cakes from the oven. Let them cool in their pans on a wire rack for about 10-15 minutes. Then, carefully invert the cakes onto the wire rack to cool completely. Ensure they are fully cooled before frosting.\",\n  \"step6\": \"Prepare your favorite chocolate frosting. Once cakes are completely cool, spread a generous layer of frosting between the two layers and over the top and sides of the cake. Decorate as desired. Slice and serve this delicious chocolate cake for 8!\"\n}\n```",
+    "timestamp": "2025-09-17T17:38:46.262086"
+  },
+  "metrics": {
+    "duration_seconds": 20.371842861175537,
+    "input_tokens": 108,
+    "output_tokens": 376,
+    "reasoning_tokens": 755,
+    "total_tokens": 484
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-120b?think",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather the ingredients: 2 cups all\u2011purpose flour, 1\u00bd cups granulated sugar, \u00be cup unsweetened cocoa powder, 1\u00bd teaspoons baking powder, 1\u00bd teaspoons baking soda, 1 teaspoon salt, 2 large eggs, 1 cup milk, \u00bd cup vegetable oil, 2 teaspoons vanilla, and 1 cup boiling water. Measure precisely for perfect texture.\",\n  \"step2\": \"Preheat your oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then line the bottoms with parchment paper. This ensures easy release and even baking. While the oven heats, organize all mixing bowls and utensils for a smooth workflow to avoid delays and maintain temperature consistency throughout.\",\n  \"step3\": \"In a large bowl, whisk together dry ingredients: flour, sugar, cocoa powder, baking powder, baking soda, and salt. Ensure they are well combined to prevent lumps. Then, create a well in the center for the wet ingredients, facilitating even incorporation by making a deep depression that will hold liquids uniformly.\",\n  \"step4\": \"In a separate medium bowl, beat eggs, then add milk, oil, and vanilla. Mix until smooth. Slowly pour the boiling water into this mixture, stirring cautiously as the batter will be thin. Combine wet and dry mixtures, stirring just until no streaks remain, avoiding over\u2011mixing for a tender crumb texture.\",\n  \"step5\": \"Divide batter evenly between the prepared pans, smoothing tops with a spatula. Tap pans gently on the counter to release air bubbles. Bake for 30\u201135 minutes, or until a toothpick inserted near the center emerges with a few moist crumbs. Rotate pans halfway for uniform browning and golden crust develops.\",\n  \"step6\": \"Allow cakes to cool in pans for 10 minutes, then transfer to a wire rack to cool completely. While cooling, prepare frosting by whisking powdered sugar, cocoa, butter, milk, and vanilla until fluffy. Frost the cooled layers, then slice, serve, and enjoy your moist chocolate cake with friends together tonight.\"\n}",
+    "timestamp": "2025-09-17T13:49:56.195838"
+  },
+  "metrics": {
+    "duration_seconds": 9.955238819122314,
+    "input_tokens": 169,
+    "output_tokens": 4638,
+    "reasoning_tokens": 4143,
+    "total_tokens": 4807
+  }
+}

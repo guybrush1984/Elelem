@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "groq:moonshotai/kimi-k2-instruct",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "introduction": "The evolution of large language models traces a path from 1990s statistical and n-gram systems to today’s transformer-based giants, with key shifts occurring approximately every decade. Each breakthrough—statistical alignment, neural embeddings, recurrent nets, self-attention, and scale—reshaped how machines learn language, culminating in pervasive, multimodal models that dominate research and industry.",
+      "development": "IBM’s 1990s statistical translation introduced corpus-driven ideas, while 300-million-word Kneser–Ney smoothed n-gram models set 2001 perplexity records. The 2000s ‘web-as-corpus’ supplied terabytes of raw text, enabling larger counts. Neural language modeling began around 2000, accelerated after ImageNet’s 2012 success: Word2Vec (2013) encoded semantic similarity; LSTM seq2seq models won machine-translation benchmarks, prompting Google’s 2016 shift to neural MT with deep recurrent encoder-decoders. That lineage peaked with Bahdanau attention but still processed sequences sequentially. In 2017 Google’s ‘Attention Is All You Need’ replaced recurrence with parallel multi-head self-attention, producing the transformer encoder-decoder stack that trains faster and scales gracefully. Open-source and industrial adoption followed swiftly: BERT (2018) applied bidirectional encoder pre-training to many NLP tasks, while decoder-only GPTs pursued generative scaling. GPT-1 showed proof-of-concept, GPT-2 (2019) startled with emergent few-shot ability, GPT-3 (2020) reached 175B parameters and API exclusivity, and ChatGPT (2022) packaged instruction tuning plus RLHF into an accessible chat interface that drew global media. GPT-4 (2023) added multimodal breadth, proprietary details and stronger benchmarks, accelerating LLM adoption across robotics, code generation and societal-impact research. To compete, open-weight alternatives emerged: BLOOM, LLaMA, Mistral 7B, Mixtral 8×7B, and DeepSeek R1 (671B, Jan 2025) matching OpenAI o1 reasoning at lower cost. Since 2023 vision-augmented transformers and large multimodal models ingest images, audio, video alongside text. Meanwhile researchers explore non-transformer architectures—recurrent refinements, state-space models like Mamba—and chain-of-thought training to maintain efficiency as parameter counts soar.",
+      "conclusion": "From statistical models to self-attention and now trillion-scale multimodal systems, transformer-based language models have rapidly become foundational AI infrastructure, shaping science, commerce and daily digital interaction."
+    },
+    "created_at": "2025-09-15 21:22:41 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 3.0576999187469482,
+    "input_tokens": 1075,
+    "output_tokens": 542,
+    "total_tokens": 1617,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

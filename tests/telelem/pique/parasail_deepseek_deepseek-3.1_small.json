@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F. Grease and line two 8-inch round cake pans. Sift together 2 cups flour, 1\u00be cups sugar, \u00be cup cocoa, 1\u00bd tsp baking soda, and 1 tsp salt in a large bowl.\",\n  \"step2\": \"Add 2 eggs, 1 cup milk, \u00bd cup vegetable oil, and 2 tsp vanilla to dry ingredients. Mix on medium speed until combined, about 2 minutes. Gradually add 1 cup boiling water, mixing until smooth (batter will be thin).\",\n  \"step3\": \"Divide batter evenly between prepared pans. Bake for 30-35 minutes until a toothpick inserted comes out clean. Cool in pans for 10 minutes, then transfer to wire racks to cool completely.\",\n  \"step4\": \"For frosting, beat 1 cup softened butter until creamy. Gradually add 3\u00bd cups powdered sugar and 1 cup cocoa, alternating with \u00bd cup milk. Mix in 2 tsp vanilla until smooth and spreadable.\",\n  \"step5\": \"Place one cake layer on serving plate. Spread with \u2153 of frosting. Top with second layer. Frost top and sides with remaining frosting, creating smooth or decorative swirls as desired.\",\n  \"step6\": \"Optional: garnish with chocolate shavings or sprinkles. Let cake set for 30 minutes before slicing. Serve at room temperature. Store covered at room temperature for up to 3 days.\"\n}",
+    "timestamp": "2025-09-17T17:29:03.398726"
+  },
+  "metrics": {
+    "duration_seconds": 9.18248200416565,
+    "input_tokens": 99,
+    "output_tokens": 315,
+    "reasoning_tokens": 0,
+    "total_tokens": 414
+  }
+}

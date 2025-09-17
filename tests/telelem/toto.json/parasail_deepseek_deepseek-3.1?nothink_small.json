@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1?nothink",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F. Grease and line two 8-inch round cake pans. Sift together 2 cups flour, 1\u00be cups sugar, \u00be cup cocoa powder, 1\u00bd tsp baking soda, 1 tsp baking powder, and 1 tsp salt into a large bowl.\",\n  \"step2\": \"Add 2 eggs, 1 cup milk, \u00bd cup vegetable oil, and 2 tsp vanilla to the dry ingredients. Mix on medium speed until just combined. Gradually pour in 1 cup boiling water, mixing until the batter is smooth and thin.\",\n  \"step3\": \"Divide the batter evenly between the prepared pans. Bake for 30-35 minutes, or until a toothpick inserted comes out clean. Let cakes cool in pans for 10 minutes, then transfer to a wire rack to cool completely.\",\n  \"step4\": \"For the frosting, beat 1 cup softened butter until creamy. Gradually add 3\u00bd cups powdered sugar and 1 cup cocoa powder, mixing well. Pour in \u00bd cup milk and 2 tsp vanilla, then beat until light and fluffy.\",\n  \"step5\": \"Place one cake layer on a serving plate. Spread a thick layer of frosting on top. Carefully place the second layer on top. Frost the top and sides of the entire cake with the remaining chocolate frosting.\",\n  \"step6\": \"Decorate with chocolate shavings or sprinkles if desired. Let the cake set for at least 30 minutes before slicing. Serve at room temperature. Store any leftovers covered at room temperature for up to 3 days.\"\n}",
+    "timestamp": "2025-09-16T08:54:47.803716"
+  },
+  "metrics": {
+    "duration_seconds": 6.0883095264434814,
+    "input_tokens": 99,
+    "output_tokens": 339,
+    "total_tokens": 438
+  }
+}

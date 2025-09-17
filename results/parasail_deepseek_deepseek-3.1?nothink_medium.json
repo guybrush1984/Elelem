@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1?nothink",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "introduction": "The history of language models has evolved significantly, from early statistical approaches to today's transformer-based systems. Before 2017, models like IBM's word-aligned systems and n-gram models laid foundations, while neural networks gained traction in the 2000s. The 2017 transformer breakthrough revolutionized the field, leading to models like BERT, GPT, and multimodal systems that dominate current research and applications.",
+      "development": "Early language modeling began with statistical techniques; IBM's word alignment methods in the 1990s enabled machine translation, and by 2001, n-gram models with Kneser-Ney smoothing on 300 million words achieved top performance. The proliferation of web data in the 2000s allowed larger corpora. Neural networks entered around 2000, with deep learning advancements post-2012 inspiring adaptations for language. Word2Vec (2013) and LSTM-based seq2seq models emerged, leading Google to adopt neural machine translation by 2016. The pivotal 2017 NeurIPS paper introduced the transformer architecture, leveraging attention mechanisms. In 2018, BERT became widespread as an encoder-only model, though decoder-only models like GPT gained prominence by 2023. GPT-2 (2019) and GPT-3 (2020) attracted attention for scale and capabilities, with ChatGPT (2022) achieving public fame. GPT-4 (2023) offered multimodal functions, while OpenAI o1 (2024) emphasized reasoning. Open-source models like BLOOM, LLaMA, and Mistral's Apache-licensed variants expanded access, with DeepSeek R1 (2025) providing cost-efficient performance. Multimodal models processing images/audio emerged, though transformers remain dominant, with some探索 of alternatives like Mamba.",
+      "conclusion": "Language models have progressed from statistical foundations to advanced transformers, enabling unprecedented capabilities in NLP and multimodal applications."
+    },
+    "created_at": "2025-09-14 18:47:23 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 5.309342861175537,
+    "input_tokens": 1054,
+    "output_tokens": 399,
+    "total_tokens": 1453,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

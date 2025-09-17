@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "cerebras@openrouter:openai/gpt-oss-120b?reasoning=high",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather all ingredients: 2\u202f\u00bd cups all\u2011purpose flour, 2\u202fcups granulated sugar, \u00be\u202fcup unsweetened cocoa powder, 2\u202fteaspoons baking powder, 1\u202f\u00bd teaspoons baking soda, 1\u202fteaspoon salt, 1\u202fcup buttermilk, 1\u202fcup warm water, \u00bd\u202fcup vegetable oil, 2 large eggs, and 1\u202fcup boiling water. Preheat oven to 350\u00b0F (175\u00b0C). Allow pans to warm slightly before greasing. Now\",\n  \"step2\": \"In a large bowl, whisk flour, sugar, cocoa powder, baking powder, baking soda, and salt until combined. Make a well, then add buttermilk, warm water, oil, eggs, and vanilla. Stir gently with a spatula until batter is smooth, glossy, and free of dry patches. It should be thick yet pourable.\",\n  \"step3\": \"Gradually whisk the boiling water into the batter, causing it to thin slightly; this enhances chocolate flavor and moisture. Simultaneously, grease two 9\u2011inch round cake pans with butter, then dust with flour, tapping out excess. Divide batter evenly between pans, smoothing tops with a spatula. No bubbles remain before baking.\",\n  \"step4\": \"Place pans on the middle rack of the preheated oven. Bake for 30\u201135 minutes, or until a toothpick inserted into the center emerges clean with only moist crumbs. Rotate pans halfway through baking for even heat distribution, then remove from oven and set aside to cool. Let them cool briefly.\",\n  \"step5\": \"While cakes cool, prepare chocolate ganache frosting. Heat 1\u202fcup heavy cream in a saucepan until just simmering, then pour over 8\u202founces chopped dark chocolate in a heat\u2011proof bowl. Let sit one minute, then whisk until glossy and smooth. Add a pinch of salt for depth. Cool slightly before spreading cakes.\",\n  \"step6\": \"Level each cake layer with a serrated knife, then place the first layer on a serving plate. Spread a generous layer of ganache over the top, then position the second layer. Frost the top and sides evenly, smoothing with an offset spatula. Refrigerate 20 minutes, slice, and enjoy. Serve immediately.\"\n}",
+    "timestamp": "2025-09-17T17:28:59.408524"
+  },
+  "metrics": {
+    "duration_seconds": 5.194000720977783,
+    "input_tokens": 169,
+    "output_tokens": 2739,
+    "reasoning_tokens": 0,
+    "total_tokens": 2908
+  }
+}

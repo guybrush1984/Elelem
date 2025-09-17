@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1?reasoning",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "error": {
+    "message": "Connection error.",
+    "type": "APIConnectionError",
+    "timestamp": "2025-09-17T17:30:14.181686"
+  }
+}

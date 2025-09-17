@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "google:gemini-2.5-flash",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat your oven to 350\u00b0F (175\u00b0C). Grease and flour two 8-inch round cake pans. In a medium bowl, whisk together 1 \u00be cups all-purpose flour, \u00be cup unsweetened cocoa powder, 1 \u00bd teaspoons baking soda, 1 \u00bd teaspoons baking powder, and 1 teaspoon salt. Set aside for later use.\",\n  \"step2\": \"In a large mixing bowl, cream together 1 cup (2 sticks) unsalted butter, softened, and 2 cups granulated sugar until light and fluffy. This process incorporates air, essential for a tender crumb. Ensure the butter is at room temperature for optimal creaming, preventing lumps.\",\n  \"step3\": \"Beat in 4 large eggs, one at a time, ensuring each is fully incorporated before adding the next. Stir in 2 teaspoons of pure vanilla extract. The mixture should be smooth and well-emulsified. Scrape down the sides of the bowl to ensure everything is evenly mixed.\",\n  \"step4\": \"Gradually add the dry ingredients to the wet ingredients, alternating with 1 cup of buttermilk, beginning and ending with the dry. Mix until just combined, being careful not to overmix. Overmixing can lead to a tough cake texture, so stop as soon as no dry streaks remain.\",\n  \"step5\": \"Divide the batter evenly between the two prepared cake pans. Bake for 30-35 minutes, or until a wooden skewer inserted into the center comes out clean. The cake should spring back lightly when touched. Avoid opening the oven door too often during baking.\",\n  \"step6\": \"Allow the cakes to cool in their pans on a wire rack for 10-15 minutes before inverting them onto the rack to cool completely. Once fully cooled, frost with your favorite chocolate ganache or buttercream. Serve immediately and enjoy your delicious homemade chocolate cake for eight!\"\n}",
+    "timestamp": "2025-09-17T10:56:08.652379"
+  },
+  "metrics": {
+    "duration_seconds": 5.246724367141724,
+    "input_tokens": 179,
+    "output_tokens": 411,
+    "total_tokens": 590
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "cerebras@openrouter:meta-llama/llama-4-maverick-17b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease two 8-inch round pans and line with parchment paper for easy cake release and cleanup.\",\n  \"step2\": \"Mix 1 1/2 cups all-purpose flour, 1 cup granulated sugar, 1/2 cup unsweetened cocoa powder, and 1 teaspoon baking powder in a large bowl.\",\n  \"step3\": \"In another bowl, whisk 1/2 cup whole milk, 2 large eggs, and 1 teaspoon vanilla extract until well combined and smooth.\",\n  \"step4\": \"Pour wet ingredients into dry ingredients and mix until just combined, being careful not to overmix the batter.\",\n  \"step5\": \"Divide batter evenly between prepared pans and bake for 25-30 minutes or until a toothpick inserted comes out clean.\",\n  \"step6\": \"Let cakes cool before frosting with your favorite chocolate frosting and serving to your guests of 8 people.\"\n}",
+    "timestamp": "2025-09-17T17:28:55.740681"
+  },
+  "metrics": {
+    "duration_seconds": 1.5215134620666504,
+    "input_tokens": 110,
+    "output_tokens": 206,
+    "reasoning_tokens": 0,
+    "total_tokens": 316
+  }
+}

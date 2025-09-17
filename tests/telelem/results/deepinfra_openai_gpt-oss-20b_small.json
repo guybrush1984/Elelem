@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat oven to 350°F (175°C). Line a 9-inch round cake pan with parchment or grease with butter and dust with flour. In a large bowl whisk together 1 ½ cups all-purpose flour, 1 cup and ¼ for cocoa, 1 cup sugar, 1 tsp baking powder, ½ tsp baking soda, and pinch of salt. Combine well and set aside.",
+      "step2": "In another bowl, whisk 3 eggs, 1 cup buttermilk, ½ cup melted unsalted butter, 1 tsp vanilla extract, and ½ tsp almond extract. Pour wet ingredients over dry mixture, stirring until just combined. Avoid overmixing to keep cake light and airy.",
+      "step3": "Add 1 cup hot coffee to batter, whisking until smooth and glossy. Then fold in ½ cup melted dark chocolate, whisking until fully incorporated. The coffee deepens flavor while the chocolate adds richness; ensure batter remains smooth for even rise.",
+      "step4": "Divide batter evenly into the prepared pan. Tap once to release air bubbles and smooth surface. Place pan in the preheated oven and bake for 30-35 minutes. Check doneness by inserting a toothpick in center; it should come out with few moist crumbs.",
+      "step5": "Remove cake from oven, let cool in pan for 10 minutes, then turn onto a wire rack. While still warm, drizzle a thin glaze of ¼ cup melted dark chocolate and ¼ cup heavy cream over the top, letting it set before frosting.",
+      "step6": "After icing has set, frosted cake with smooth swirl of chocolate ganache: whisk ⅔ cup melted chocolate with ¼ cup heavy cream, 1 tsp vanilla, drizzle over cake, and refrigerate briefly. Slice and serve with fresh berries or whipped cream if desired. Enjoy!"
+    },
+    "created_at": "2025-09-15 21:21:00 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 3.532236337661743,
+    "input_tokens": 238,
+    "output_tokens": 395,
+    "total_tokens": 633,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

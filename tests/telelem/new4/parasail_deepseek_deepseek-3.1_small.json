@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "parasail:deepseek/deepseek-3.1",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F. Grease and line two 8-inch round cake pans. Sift together 2 cups flour, 1\u00be cups sugar, \u00be cup cocoa powder, 1\u00bd tsp baking soda, 1 tsp baking powder, and 1 tsp salt into a large bowl.\",\n  \"step2\": \"In another bowl, whisk 2 large eggs, 1 cup milk, \u00bd cup vegetable oil, and 2 tsp vanilla extract until smooth. Gradually add wet ingredients to dry, mixing until just combined. Avoid overmixing to keep the cake tender.\",\n  \"step3\": \"Stir in 1 cup of boiling water until the batter is smooth and thin. The hot water enhances the chocolate flavor. Divide the batter evenly between the prepared pans, tapping to remove air bubbles.\",\n  \"step4\": \"Bake for 30-35 minutes, or until a toothpick inserted comes out clean. Let cakes cool in pans for 10 minutes, then turn out onto a wire rack to cool completely before frosting.\",\n  \"step5\": \"For frosting, beat 1 cup softened butter until creamy. Gradually add 3\u00bd cups powdered sugar and \u00bd cup cocoa powder, then \u00bc cup milk and 1 tsp vanilla. Whip until light and fluffy.\",\n  \"step6\": \"Place one cake layer on a plate, spread with frosting. Top with second layer, frost top and sides. Decorate with chocolate shavings if desired. Serve and enjoy your delicious chocolate cake!\"\n}",
+    "timestamp": "2025-09-17T16:18:40.204779"
+  },
+  "metrics": {
+    "duration_seconds": 6.117492914199829,
+    "input_tokens": 99,
+    "output_tokens": 322,
+    "reasoning_tokens": 0,
+    "total_tokens": 421
+  }
+}

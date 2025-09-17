@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "fireworks:deepseek/deepseek-3.1",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F. Grease and line two 8-inch round cake pans. Sift together 2 cups flour, 1\u00be cups sugar, \u00be cup cocoa powder, 1\u00bd tsp baking soda, 1\u00bd tsp baking powder, and 1 tsp salt into a large bowl.\",\n  \"step2\": \"Add 2 eggs, 1 cup milk, \u00bd cup vegetable oil, and 2 tsp vanilla to the dry ingredients. Mix on medium speed for 2 minutes until smooth. Gradually pour in 1 cup boiling water, mixing until the batter is thin but combined.\",\n  \"step3\": \"Divide the batter evenly between the prepared pans. Bake for 30-35 minutes, or until a toothpick inserted into the center comes out clean. Allow the cakes to cool in the pans for 10 minutes.\",\n  \"step4\": \"Turn the cakes out onto a wire rack to cool completely. While cooling, prepare the frosting by beating 1 cup softened butter with 3\u00bd cups powdered sugar, \u00bd cup cocoa, and \u00bd tsp salt until creamy.\",\n  \"step5\": \"Add 2 tsp vanilla and 4-6 tbsp milk to the frosting, beating until light and fluffy. If the frosting is too thick, add more milk one tablespoon at a time until spreadable consistency is achieved.\",\n  \"step6\": \"Place one cake layer on a serving plate. Spread a layer of frosting on top. Add the second layer and frost the top and sides. Decorate with chocolate shavings or sprinkles if desired. Serve and enjoy!\"\n}",
+    "timestamp": "2025-09-17T17:28:58.682896"
+  },
+  "metrics": {
+    "duration_seconds": 4.465822458267212,
+    "input_tokens": 99,
+    "output_tokens": 338,
+    "reasoning_tokens": 0,
+    "total_tokens": 437
+  }
+}

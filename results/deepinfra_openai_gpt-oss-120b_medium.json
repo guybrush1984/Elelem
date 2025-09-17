@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "introduction": "The evolution of language models spans from early statistical approaches in the 1990s to today’s massive transformer-based systems. Initial breakthroughs involved IBM’s word‑alignment models and smoothed n‑gram techniques trained on hundreds of millions of words. The rise of the internet enabled the creation of web‑scale corpora, fueling larger statistical models. Around 2000, neural networks entered the field, leading to word embeddings and sequence‑to‑sequence architectures that set the stage for modern deep learning.",
+      "development": "In the early 2010s, deep neural networks, inspired by advances in computer vision, were adapted for language tasks. Word2Vec (2013) and LSTM‑based seq2seq models became staples, and Google’s 2016 shift to neural machine translation replaced phrase‑based systems with recurrent encoder‑decoder networks. The pivotal moment arrived at NeurIPS 2017 when Google introduced the transformer architecture, eliminating recurrent components and relying solely on attention mechanisms. This design enabled parallel processing and superior performance, spawning encoder‑only models like BERT (2018) and decoder‑only models such as the GPT series. GPT‑1 (2018) laid groundwork, but GPT‑2 (2019) and GPT‑3 (2020) garnered public attention for their size and capabilities, culminating in ChatGPT (2022) and GPT‑4 (2023) which introduced multimodal reasoning and heightened accuracy. OpenAI’s later release of the reasoning‑focused o1 model (2024) demonstrated the trend toward chain‑of‑thought generation. Concurrently, open‑source alternatives emerged: BLOOM and LLaMA (2022) offered large‑scale models with usage restrictions, while Mistral AI provided permissively‑licensed 7B and 8x7B models. In 2025, DeepSeek R1 delivered a 671‑billion‑parameter open‑weight system rivaling proprietary models at lower cost. Since 2023, many LLMs have become large multimodal models (LMMs), integrating vision and audio processing. Although transformers dominate the largest models as of 2024, research continues into alternative architectures like recurrent variants and the state‑space Mamba model.",
+      "conclusion": "From statistical n‑grams to transformer‑driven multimodal giants, language modeling has rapidly advanced, with both proprietary and open‑source models pushing the boundaries of scale and capability."
+    },
+    "created_at": "2025-09-14 18:46:46 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 2.222135066986084,
+    "input_tokens": 1136,
+    "output_tokens": 520,
+    "total_tokens": 1656,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "openai:openai/o3-mini",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C) and grease two 9-inch round cake pans with butter or nonstick spray. In a large bowl, whisk together 2 cups all-purpose flour, 1 \u00be cups sugar, \u00be cup unsweetened cocoa powder, 1 \u00bd teaspoons baking soda, 1 teaspoon baking powder, and \u00bd teaspoon salt.\",\n  \"step2\": \"Combine three large eggs, 1 cup whole milk, \u00bd cup vegetable oil, and 2 teaspoons vanilla extract in a separate bowl. Stir the mixture until smooth. Gradually blend the wet ingredients into the dry ingredients. Finally, add 1 cup boiling water slowly to create a luscious, silky batter with care.\",\n  \"step3\": \"Pour the batter evenly into the prepared pans. Tap gently on the countertop to release air bubbles. Bake the cakes in the preheated oven for approximately 30-35 minutes, or until a toothpick inserted in the center emerges clean and firm without any moist crumbs remaining, ensuring perfect doneness overall indeed.\",\n  \"step4\": \"Remove the cakes from the oven and allow them to cool in the pans for 10 minutes. Then, transfer the cakes onto a cooling rack and let them cool completely. Meanwhile, prepare your desired chocolate frosting by mixing butter, cocoa powder, confectioners\u2019 sugar, milk, and vanilla until creamy with care.\",\n  \"step5\": \"Once cakes have cooled completely, level the tops if needed using a serrated knife. Place one cake layer onto a serving plate and spread a generous layer of chocolate frosting across its surface. Top with the second cake layer, then ice the top and sides smoothly for a flawless finish.\",\n  \"step6\": \"Decorate the chocolate cake with chocolate shavings, fresh berries, or a dusting of powdered sugar for extra flair. Carefully slice the cake into eight equal pieces and arrange them on elegant dessert plates. Enjoy this rich, moist treat created with passion and superior ingredients for every celebration, serving pure delight.\"\n}",
+    "timestamp": "2025-09-17T17:47:40.468969"
+  },
+  "metrics": {
+    "duration_seconds": 44.15248966217041,
+    "input_tokens": 105,
+    "output_tokens": 3760,
+    "reasoning_tokens": 0,
+    "total_tokens": 3865
+  }
+}

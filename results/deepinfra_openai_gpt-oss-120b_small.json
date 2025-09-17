@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat the oven to 350°F (175°C). Grease and flour two 9‑inch round cake pans, then line the bottoms with parchment paper. In a large bowl, whisk together 2 ½ cups all‑purpose flour, 2 ½ teaspoons baking powder, ½ teaspoon baking soda, and ½ teaspoon salt to ensure even mixing and flavor distribution.",
+      "step2": "Combine 1 ½ cups granulated sugar, ¾ cup brown sugar, and ¾ cup vegetable oil in a mixing bowl. Add 4 large eggs, one at a time, beating after each addition. Stir in 2 teaspoons vanilla extract, then gradually blend in 1 cup buttermilk until batter is smooth and glossy perfectly.",
+      "step3": "Sift together the dry ingredients from step 1: flour, cocoa powder, baking powder, baking soda, and salt. Gently fold the dry mixture into the wet batter, alternating with the remaining half cup of buttermilk, to keep the crumb tender. Mix just until no flour streaks remain in the final mixture smoothly.",
+      "step4": "Divide batter evenly between the prepared pans, smoothing tops with a spatula. Tap pans lightly on the counter to release air bubbles. Place pans on the middle rack of the preheated oven and bake for 30‑35 minutes, or until a toothpick inserted in the center emerges clean and golden brown.",
+      "step5": "While cakes cool in their pans for ten minutes, prepare the chocolate ganache. Heat 1 ½ cups heavy cream in a saucepan until simmering, then pour over 12 ounces chopped dark chocolate in a heatproof bowl. Stir until glossy and fully melted, then let cool slightly to achieve the desired consistency.",
+      "step6": "Level the cooled cakes with a serrated knife, then spread a thin layer of ganache between them, creating a sandwich. Frost the top and sides generously with remaining ganache, using an offset spatula for smoothness. Refrigerate for 20 minutes before serving, allowing the chocolate to set and enhance flavor richness."
+    },
+    "created_at": "2025-09-15 08:17:25 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 11.206602096557617,
+    "input_tokens": 238,
+    "output_tokens": 1927,
+    "total_tokens": 2165,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

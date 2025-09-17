@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "openai:openai/gpt-5-mini",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 175\u00b0C (350\u00b0F). Grease and line two 20cm (8-inch) round cake pans. Weigh or measure ingredients for eight servings: 225g flour, 200g sugar, 75g cocoa powder, 2 teaspoons baking powder, 1 teaspoon baking soda, \u00bd teaspoon salt. Gather eggs, milk, oil, vanilla and prepare a cooling rack.\",\n  \"step2\": \"Sift together the flour, cocoa, baking powder, baking soda and salt into a large bowl. Whisk in sugar until evenly distributed. Ensure there are no lumps of cocoa. Stir gently to incorporate. Set the dry mixture aside while you prepare wet ingredients and equipment for mixing the batter right away.\",\n  \"step3\": \"In a separate bowl whisk together eggs, whole milk, vegetable oil, and vanilla until homogeneous. Warm the milk slightly if using melted chocolate later. Pour the wet mixture into the dry ingredients in thirds, stirring after each addition until just combined. Avoid overmixing to keep crumb tender and moist please\",\n  \"step4\": \"Enhance chocolate flavor by folding in 60ml strong brewed coffee or espresso dissolved in a tablespoon of cocoa, or use hot water. Fold quickly but gently until batter is uniform. If adding chocolate chips or chopped chocolate, toss them in a little flour fold in to prevent sinking during baking.\",\n  \"step5\": \"Divide batter evenly between prepared pans, smoothing tops with an offset spatula. Bake in the preheated oven for 25\u201330 minutes, rotating halfway for even coloring. Insert a toothpick near centers; it should come out with moist crumbs but not raw batter. Allow edges to pull from pans before cooling briefly.\",\n  \"step6\": \"Cool cakes in pans ten minutes, then invert onto a wire rack to cool completely. Prepare chocolate buttercream or ganache: beat softened butter with cocoa and sugar, or melt chocolate with cream for ganache. Spread filling between layers, frost outside, decorate simply. Slice into eight equal portions and serve warm.\"\n}",
+    "timestamp": "2025-09-17T17:47:57.576971"
+  },
+  "metrics": {
+    "duration_seconds": 61.26101756095886,
+    "input_tokens": 105,
+    "output_tokens": 3058,
+    "reasoning_tokens": 0,
+    "total_tokens": 3163
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-20b?reasoning=medium",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "error": {
+    "message": "Model configuration error: Model 'groq:openai/gpt-oss-20b?reasoning=medium' not found in configuration",
+    "type": "ValueError",
+    "timestamp": "2025-09-17T21:07:06.767472"
+  }
+}

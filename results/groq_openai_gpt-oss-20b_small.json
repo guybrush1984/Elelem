@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat oven to 350°F (175°C). Grease a 9-inch round pan, line bottom with parchment paper. In a large bowl, sift together 1¾ cups flour, 1 cup sugar, ¾ cup cocoa, 1 tsp baking soda, ½ tsp baking powder, and pinch of salt. Mix until uniform.",
+      "step2": "In a separate bowl, whisk 1 cup milk, ½ cup melted butter, 2 eggs, 2 tsp vanilla, and 1 tsp white vinegar. Combine wet ingredients into dry mixture, stirring until smooth. The vinegar reacts with baking soda, creating light, airy batter.",
+      "step3": "Pour batter into prepared pan, smoothing top with spatula. Tap lightly on counter to release air bubbles. Let batter rest for 5 minutes; this allows gluten to relax, ensuring a tender crumb. Avoid opening oven door during baking.",
+      "step4": "Bake 30-35 minutes. Check doneness by inserting a toothpick; it should come out clean or with a few crumbs. For extra moistness, brush the top with ¼ cup milk after removing from oven and allow to cool 10 minutes.",
+      "step5": "Cool cake in pan for 10 minutes, then invert onto wire rack. Spread ½ cup chocolate ganache over the top, letting it set slightly before slicing. This ganache adds rich flavor and glossy finish.",
+      "step6": "Serve slices with whipped cream or fresh berries for contrast. Store leftovers in airtight container at room temperature for up to 3 days, or refrigerate and enjoy within a week. Enjoy your homemade chocolate delight!"
+    },
+    "created_at": "2025-09-14 18:46:59 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 0.6031713485717773,
+    "input_tokens": 267,
+    "output_tokens": 354,
+    "total_tokens": 621,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

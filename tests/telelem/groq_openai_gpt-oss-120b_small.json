@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "error": {
+    "message": "API error: Error code: 400 - {'error': {'message': '`reasoning_effort` must be one of `low`, `medium`, or `high`', 'type': 'invalid_request_error'}}",
+    "type": "ModelError",
+    "timestamp": "2025-09-17T13:50:08.354666"
+  }
+}

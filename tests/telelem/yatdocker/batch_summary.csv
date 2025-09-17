@@ -1,0 +1,4 @@
+model_name,model_owner,model_provider,license,model_configuration,model_page,cost_per_1m_input,cost_per_1m_output,success_rate_percent,output_token_rate,real_output_token_rate,computed_cost_per_1m_actual_output_token,reasoning_token_ratio
+gpt-oss-120b,OpenAI,fireworks,Apache 2.0,reasoning=low,https://huggingface.co/openai/gpt-oss-120b,0.15,0.6,100.0,293.3,118.3,2.376048,0.597
+deepseek-v3.1,DeepSeek,parasail,MIT,none,https://huggingface.co/deepseek-ai/DeepSeek-V3.1,0.64,1.65,100.0,67.0,67.0,1.65,0.0
+gpt-oss-20b,OpenAI,deepinfra,Apache 2.0,reasoning=low,https://huggingface.co/openai/gpt-oss-20b,0.04,0.16,100.0,153.6,149.0,0.16986,0.03

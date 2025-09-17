@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-20b?reasoning=high",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease a 9-inch round cake pan, line bottom with parchment. In a mixing bowl, whisk together 2 cups all-purpose flour, 1\u00be cups sugar, \u00be cup unsweetened cocoa powder, 1\u00bd teaspoons baking powder, 1 teaspoon baking soda, \u00bd teaspoon salt and mix until smooth for 8.\",\n  \"step2\": \"Add 1 cup milk, \u00bd cup vegetable oil, 2 large eggs, 2 teaspoons vanilla extract. Pour mixture into dry ingredients, stir until just combined. Add 1 cup boiling water, mix until batter smooth, thin. Let batter rest briefly before pouring into prepared pan for even rise in the oven today.\",\n  \"step3\": \"Place pan in preheated oven. Bake 30\u201335 minutes or until toothpick inserted near center emerges clean. Rotate pan halfway through baking to ensure even browning. Remove from oven, cool pan 10 minutes, then invert onto wire rack to cool completely before frosting with rich buttercream frosting and sprinkled chocolate shavings.\",\n  \"step4\": \"While cake cools, melt \u00bd cup butter. Whisk in 3 cups powdered sugar, \u00bc cup cocoa powder, \u00bc cup milk, 1 teaspoon vanilla, pinch salt. Beat until light, fluffy. If too thick, add extra milk a tablespoon at a time. Cool frosting slightly before spreading on the cool cake today.\",\n  \"step5\": \"Once cake and frosting are ready, spread frosting evenly on top, then coat sides. Use spatula for smooth finish. Decorate with chocolate shavings or sprinkles for extra flair. Chill cake in fridge 15 minutes to set frosting. Serve chilled or at room temperature and enjoy with friends and family today.\",\n  \"step6\": \"Let cake rest at least 10 minutes before slicing. Use a serrated knife for clean cuts. Present slices on decorative plate. Pair with hot coffee, tea, or a splash of milk for classic combo. Store leftovers wrapped tightly in refrigerator for up to 3 days, and enjoy any time today.\"\n}",
+    "timestamp": "2025-09-17T21:07:22.735398"
+  },
+  "metrics": {
+    "duration_seconds": 8.326740264892578,
+    "input_tokens": 169,
+    "output_tokens": 8855,
+    "reasoning_tokens": 8297,
+    "total_tokens": 9024
+  }
+}

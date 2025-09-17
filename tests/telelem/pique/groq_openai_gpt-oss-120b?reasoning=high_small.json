@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "groq:openai/gpt-oss-120b?reasoning=high",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then line the bottoms with parchment paper. Gather all ingredients: flour, sugar, cocoa, baking powder, baking soda, salt, eggs, milk, oil, vanilla, and boiling water. Measure each ingredient precisely to ensure consistent texture and flavor throughout.\",\n  \"step2\": \"In a large mixing bowl, sift together 2 cups all\u2011purpose flour, 2 cups granulated sugar, \u00be cup unsweetened cocoa powder, 1\u00bd teaspoons baking powder, 1\u00bd teaspoons baking soda, and 1 teaspoon salt. Whisk thoroughly to eliminate lumps and evenly distribute leavening agents. It ensures even flavor and proper rise throughout.\",\n  \"step3\": \"In a separate bowl, whisk 2 large eggs until light, then add 1 cup whole milk, \u00bd cup vegetable oil, and 2 teaspoons pure vanilla extract. Beat until the mixture becomes smooth and slightly frothy, indicating proper emulsification for a tender crumb. This wet blend later combines with dry components.\",\n  \"step4\": \"Gradually pour the wet mixture into the dry bowl, stirring gently with a spatula. Once combined, slowly whisk in 1 cup boiling water, creating a thin batter. The batter will appear liquid, which is essential for a moist, airy crumb. Avoid overmixing to prevent gluten development. Mix just until smooth.\",\n  \"step5\": \"Divide batter evenly between the prepared pans, smoothing tops with a spatula. Place in the preheated oven and bake for 30\u201135 minutes, or until a toothpick inserted into the center emerges with a few moist crumbs. Rotate pans halfway for even browning. Avoid opening the door early to keep heat.\",\n  \"step6\": \"Allow cakes to cool in pans for 10 minutes, then transfer to a wire rack to cool completely. Frost with a rich chocolate buttercream: beat \u00bd cup softened butter, 2 cups powdered sugar, \u00bc cup cocoa, 2 tbsp milk, and a pinch of salt until fluffy. Slice and serve immediately.\"\n}",
+    "timestamp": "2025-09-17T17:29:07.740476"
+  },
+  "metrics": {
+    "duration_seconds": 13.53080129623413,
+    "input_tokens": 169,
+    "output_tokens": 6410,
+    "reasoning_tokens": 0,
+    "total_tokens": 6579
+  }
+}

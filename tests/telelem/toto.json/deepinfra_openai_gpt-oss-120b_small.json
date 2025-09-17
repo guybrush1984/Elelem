@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-120b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C). Grease two 9\u2011inch round cake pans and line the bottoms with parchment paper. In a large bowl whisk together 2\u202f\u00bd cups all\u2011purpose flour, 2\u202f\u00bd cups granulated sugar, \u00be cup unsweetened cocoa powder, 2\u202ftsp baking soda, 1\u202ftsp baking powder, and 1\u202ftsp salt until evenly combined.\",\n  \"step2\": \"In a separate bowl combine 1\u202fcup buttermilk, 1\u202fcup warm water, \u00bd cup vegetable oil, 2 large eggs, and 2\u202ftsp vanilla extract. Beat with a whisk until smooth. Slowly pour the wet mixture into the dry ingredients, stirring gently until just incorporated; avoid over\u2011mixing to keep the crumb tender.\",\n  \"step3\": \"Divide the batter evenly between the prepared pans, smoothing the tops with a spatula. Tap the pans lightly on the counter to release any air bubbles. Place the pans on the middle rack of the preheated oven and bake for 30\u201135 minutes, or until a toothpick inserted into the center comes out clean.\",\n  \"step4\": \"While the cakes cool, prepare the chocolate frosting. Melt 1\u202fcup semi\u2011sweet chocolate chips with \u00bd cup heavy cream in a saucepan over low heat, stirring constantly. Once smooth, remove from heat and whisk in \u00bd cup softened butter, 2\u202fcups powdered sugar, and 1\u202ftsp vanilla until fluffy and glossy.\",\n  \"step5\": \"Allow the cakes to cool in the pans for 10 minutes, then turn them out onto a wire rack to cool completely. Once cooled, place one layer on a serving plate, spread a generous amount of frosting over the top, then carefully position the second layer and repeat the frosting on top and sides.\",\n  \"step6\": \"Decorate the finished cake with chocolate shavings, fresh berries, or a dusting of cocoa powder if desired. Slice into eight equal portions, serve at room temperature, and enjoy the rich, moist chocolate flavor with every bite.\"\n}",
+    "timestamp": "2025-09-16T08:54:39.371848"
+  },
+  "metrics": {
+    "duration_seconds": 6.8561437129974365,
+    "input_tokens": 168,
+    "output_tokens": 465,
+    "total_tokens": 633
+  }
+}

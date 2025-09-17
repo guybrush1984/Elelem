@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-120b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then set aside. In a large bowl, whisk together 2\u202f\u00bd cups all\u2011purpose flour, 2\u202f\u00bd teaspoons baking powder, \u00bd teaspoon baking soda, and \u00bd teaspoon salt. This dry mix ensures even leavening.\",\n  \"step2\": \"In a separate bowl, combine 1\u202f\u00be cups granulated sugar, \u00be cup unsweetened cocoa powder, and 1\u202f\u00bd cups melted butter. Beat in 4 large eggs, one at a time, until the mixture is smooth and glossy. Add 2 teaspoons vanilla extract for aromatic depth.\",\n  \"step3\": \"Gradually add the dry flour mixture to the wet cocoa\u2011butter blend, alternating with 1\u202fcup whole milk. Begin and end with the flour, stirring gently after each addition to avoid over\u2011mixing. The batter should be thick yet pourable, with a deep chocolate sheen.\",\n  \"step4\": \"Divide the batter evenly between the prepared pans, smoothing the tops with a spatula. Tap the pans lightly on the counter to release any air bubbles. Place them in the preheated oven and bake for 30\u201135 minutes, or until a toothpick inserted in the center emerges clean.\",\n  \"step5\": \"Allow the cakes to cool in the pans for 10 minutes, then turn them onto a wire rack to cool completely. While cooling, prepare a frosting by beating 1\u202fcup softened butter, 3\u202fcups powdered sugar, \u00bd cup cocoa powder, 2\u202ftablespoons heavy cream, and a pinch of salt until fluffy.\",\n  \"step6\": \"Once the layers are fully cooled, spread a generous layer of frosting on the bottom cake, place the second layer on top, and frost the top and sides evenly. Garnish with chocolate shavings or fresh berries, slice, and serve to eight delighted guests.\"\n}",
+    "timestamp": "2025-09-17T17:29:08.822332"
+  },
+  "metrics": {
+    "duration_seconds": 14.60937237739563,
+    "input_tokens": 168,
+    "output_tokens": 434,
+    "reasoning_tokens": 0,
+    "total_tokens": 602
+  }
+}

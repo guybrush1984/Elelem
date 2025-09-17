@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "google:gemini-2.5-flash?reasoning=low",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat your oven to 350\u00b0F (175\u00b0C). Grease and flour two 8-inch round cake pans, or line the bottoms with parchment paper. This preparation ensures your chocolate cake layers won't stick, making them easy to remove. Gather all your ingredients beforehand, ideally at room temperature, for a smooth baking process and optimal mixing results.\",\n  \"step2\": \"In a large mixing bowl, whisk together 1 \u00be cups all-purpose flour, \u00be cup unsweetened cocoa powder, 2 cups granulated sugar, 1 \u00bd teaspoons baking soda, 1 teaspoon baking powder, and 1 teaspoon salt. Sifting these dry ingredients thoroughly helps to eliminate any lumps and ensures a consistent distribution, which is crucial for a beautifully textured cake crumb.\",\n  \"step3\": \"In a separate large bowl, cream together 1 cup (2 sticks) softened unsalted butter and 2 large eggs, one at a time, beating well after each addition. Stir in 1 teaspoon pure vanilla extract. This step creates a light and airy foundation for your cake, incorporating essential air for a tender and moist final product.\",\n  \"step4\": \"Gradually add the dry ingredients mixture to the wet ingredients, alternating with 1 cup buttermilk (or milk mixed with 1 tbsp vinegar). Begin and end with the dry ingredients, mixing on low speed until just combined after each addition. Be careful not to overmix the batter, as this can develop the gluten too much, resulting in a tougher cake.\",\n  \"step5\": \"Divide the prepared chocolate cake batter evenly between your two 8-inch cake pans. Bake for 30-35 minutes, or until a wooden skewer or toothpick inserted into the center of a cake comes out clean. The rich aroma filling your kitchen will be a delightful sign. Avoid opening the oven door frequently to maintain consistent baking temperature.\",\n  \"step6\": \"Allow the cake layers to cool in their pans for 10-15 minutes before carefully inverting them onto a wire rack to cool completely. Once the layers are thoroughly cooled, frost your delicious chocolate cake with your favorite chocolate ganache, buttercream, or cream cheese frosting. Slice and serve this delightful dessert to 8 eager guests.\"\n}",
+    "timestamp": "2025-09-17T22:35:00.422713"
+  },
+  "metrics": {
+    "duration_seconds": 10.748018264770508,
+    "input_tokens": 179,
+    "output_tokens": 1247,
+    "reasoning_tokens": 771,
+    "total_tokens": 1426
+  }
+}

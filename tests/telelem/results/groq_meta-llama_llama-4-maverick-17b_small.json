@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "groq:meta-llama/llama-4-maverick-17b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat oven to 350°F. Grease two 8-inch round pans, line with parchment.",
+      "step2": "Mix 1 1/2 cups all-purpose flour, 1 cup granulated sugar, 2 teaspoons baking powder.",
+      "step3": "In another bowl, whisk 1/2 cup unsweetened cocoa powder, 1/2 cup whole milk, 2 large eggs.",
+      "step4": "Combine wet and dry ingredients, mix until smooth, then add 1/4 cup vegetable oil.",
+      "step5": "Divide batter evenly between prepared pans, bake for 30-35 minutes or until a toothpick comes out clean.",
+      "step6": "Let cool, then frost with chocolate buttercream and decorate as desired for serving."
+    },
+    "created_at": "2025-09-15 21:22:03 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 0.6004810333251953,
+    "input_tokens": 184,
+    "output_tokens": 167,
+    "total_tokens": 351,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

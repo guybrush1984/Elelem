@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather all ingredients: eight large eggs, 2 cups granulated sugar, 2 cups all\u2011purpose flour, \u00be cup unsweetened cocoa powder, 2 teaspoons baking powder, 1 teaspoon baking soda, 1 teaspoon salt, 1 cup whole milk, \u00bd cup vegetable oil, 2 cups boiling water, and 2 teaspoons vanilla extract. Preheat oven to 350\u202f\u00b0F (175\u202f\u00b0C) and prepare a greased 9\u2011inch round pan well.\",\n  \"step2\": \"In a large mixing bowl, sift together flour, cocoa powder, baking powder, baking soda, and salt to ensure even distribution and remove lumps. Whisk these dry components for about thirty seconds, creating a uniform powder. This step guarantees a light crumb and prevents dense pockets in the final cake properly.\",\n  \"step3\": \"In another bowl, beat eggs with sugar until pale and fluffy, about three minutes. Gradually stream in milk, oil, and vanilla, mixing continuously. Slowly pour the wet mixture into the dry ingredients, stirring gently. Finally, carefully incorporate boiling water, creating a thin batter that yields moist, tender crumb for everyone.\",\n  \"step4\": \"Transfer the smooth batter into the prepared greased pan, spreading evenly with a spatula. Tap the pan lightly on the countertop to release air bubbles. Place it in the preheated oven, baking for thirty\u2011five minutes or until a toothpick inserted in the center emerges clean, indicating doneness and perfect texture.\",\n  \"step5\": \"While the cake cools, prepare a rich chocolate ganache: heat heavy cream to a simmer, then pour over chopped dark chocolate, stirring until glossy and smooth. Allow mixture to thicken slightly, then whisk in a pinch of salt and a splash of vanilla for depth to drizzle over slices later.\",\n  \"step6\": \"Once the cake is completely cooled, invert it onto a serving plate. Spread the ganache evenly over the top and sides, allowing it to cascade down the edges. Garnish with shaved chocolate or fresh berries, slice into eight generous portions, and enjoy the moist, decadent chocolate delight with friends tonight.\"\n}",
+    "timestamp": "2025-09-17T17:28:59.496535"
+  },
+  "metrics": {
+    "duration_seconds": 5.282513618469238,
+    "input_tokens": 169,
+    "output_tokens": 2893,
+    "reasoning_tokens": 0,
+    "total_tokens": 3062
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Line an 8\u2011inch round baking pan with parchment paper, tap out excess. Cream \u00bd\u202fcup butter and 1\u202fcup sugar until light and fluffy. Gradually beat in 2 eggs, one at a time, then stir in 1\u202ftsp vanilla.\",\n  \"step2\": \"In a separate bowl whisk together 1\u202f\u00bd cups all\u2011purpose flour, \u00be cup unsweetened cocoa powder, 1\u202ftsp baking powder, \u00bd\u202ftsp baking soda, and \u00bc tsp salt. Add \u00be cup whole\u2011milk, \u00bd cup sour cream, and \u00bd cup boiling water, mixing until smooth.\",\n  \"step3\": \"Combine the dry mixture with the wet batter. Fold gently until just combined, being careful not to over\u2011mix. Pour batter into prepared pan, tapping lightly on the counter to release air bubbles. Bake 30\u201135 minutes, or until a toothpick comes out mostly clean.\",\n  \"step4\": \"While cake cools, whisk together 3\u202foz bittersweet chocolate, \u00bc cup heavy cream, 1\u202ftbsp butter, and pinch of salt. Heat over low, stirring until smooth. Let cool to room temperature before stirring in 2 tbsp powdered sugar to thicken slightly.\",\n  \"step5\": \"Once the cake is cool, level the top with a knife if needed, then cut into eight equal wedges. Spread a thin layer of chocolate ganache over each wedge, allowing excess to drip down the sides. Let set until firm.\",\n  \"step6\": \"Optional: Decorate with fresh berries or shaved chocolate for an elegant finish. Serve at room temperature or slightly chilled. Enjoy a rich, moist chocolate cake perfect for eight guests.\"\n}",
+    "timestamp": "2025-09-17T13:53:53.276227"
+  },
+  "metrics": {
+    "duration_seconds": 2.964940309524536,
+    "input_tokens": 168,
+    "output_tokens": 401,
+    "reasoning_tokens": 16,
+    "total_tokens": 569
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-120b?low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "direct"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then line the bottoms with parchment paper. In a large bowl whisk together 2\u202f\u00bd cups all\u2011purpose flour, 2\u202f\u00bd teaspoons baking powder, \u00bd teaspoon baking soda, and \u00bd teaspoon salt for balanced flavor and texture. Set aside.\",\n  \"step2\": \"Combine wet ingredients in another bowl: melt 1 cup (2 sticks) unsalted butter, then stir in 1\u202f\u00be cups granulated sugar until smooth. Beat in 4 large eggs one at a time, adding 2 teaspoons vanilla extract. Finally, mix in 1 cup sour cream for moisture to enhance richness and tenderness.\",\n  \"step3\": \"Gradually add the dry flour mixture to the wet bowl, folding gently with a spatula to avoid over\u2011mixing. Pour in \u00be cup unsweetened cocoa powder, \u00bd cup hot water, and \u00bd cup melted dark chocolate, stirring until the batter is glossy, thick, and uniformly combined for deep chocolate flavor experience.\",\n  \"step4\": \"Divide the batter evenly between the prepared pans, smoothing the tops with the back of a spoon. Tap each pan lightly on the counter to release air bubbles. Place the pans on the middle rack of the preheated oven, ensuring even heat distribution for consistent baking throughout the process. Enjoy!\",\n  \"step5\": \"Bake for 30\u201135 minutes, or until a toothpick inserted into the center emerges with a few moist crumbs. Remove the cakes from the oven and let them cool in the pans for ten minutes. Then run a thin knife around the edges and invert onto wire racks to cool completely.\",\n  \"step6\": \"Prepare frosting by whisking \u00bd cup softened butter, 1\u202f\u00bd cups powdered sugar, \u00bc cup cocoa powder, 2 tablespoons heavy cream, and a pinch of salt until light and fluffy. Spread a generous layer between cake layers, then coat the top and sides. Garnish with chocolate shavings or fresh berries today.\"\n}",
+    "timestamp": "2025-09-17T15:23:55.298024"
+  },
+  "metrics": {
+    "duration_seconds": 5.996370553970337,
+    "input_tokens": 155,
+    "output_tokens": 1704,
+    "reasoning_tokens": 1203,
+    "total_tokens": 1859
+  }
+}

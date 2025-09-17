@@ -1,0 +1,14 @@
+{
+  "request": {
+    "model": "google:gemini-2.5-flash",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "error": {
+    "message": "Error code: 500 - {'detail': {'error': {'message': \"'google'\", 'type': 'server_error', 'code': 'completion_error'}}}",
+    "type": "InternalServerError",
+    "timestamp": "2025-09-17T18:40:32.105182"
+  }
+}

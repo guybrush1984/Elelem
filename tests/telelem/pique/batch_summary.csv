@@ -1,0 +1,4 @@
+model_name,model_owner,model_provider,license,model_configuration,model_page,cost_per_1m_input,cost_per_1m_output,success_rate_percent,output_token_rate,real_output_token_rate,computed_cost_per_1m_actual_output_token,reasoning_token_ratio
+gemini-2.5-flash,Google,google,Proprietary,reasoning=low,https://ai.google.dev/gemini-api/docs/models,0.3,2.5,0,0,0,0,0
+gemini-2.5-flash,Google,google,Proprietary,none,https://ai.google.dev/gemini-api/docs/models,0.3,2.5,0,0,0,0,0
+gemini-2.5-pro,Google,google,Proprietary,reasoning=low,https://ai.google.dev/gemini-api/docs/models,1.25,10.0,0,0,0,0,0

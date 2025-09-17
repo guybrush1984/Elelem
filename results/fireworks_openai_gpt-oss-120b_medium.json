@@ -1,0 +1,23 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-120b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": "",
+    "created_at": "2025-09-14 18:46:25 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 2.549525737762451,
+    "input_tokens": 1123,
+    "output_tokens": 702,
+    "total_tokens": 1825,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-20b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "```json\n{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans. In a large bowl whisk together 2 cups all\u2011purpose flour, 1 \u00be cups sugar, \u00be cup unsweetened cocoa powder, 2 teaspoons baking powder, 1 teaspoon baking soda, and \u00bd teaspoon salt. Set aside.\",\n  \"step2\": \"In a separate bowl, combine 1 cup whole milk, \u00bd cup vegetable oil, 2 large eggs, and 2 teaspoons vanilla extract. Whisk until smooth. Pour the wet mixture into the dry ingredients, stirring gently until just combined; avoid overmixing to keep the batter light.\",\n  \"step3\": \"Divide the batter evenly between the prepared pans. Tap pans lightly on the counter to release air bubbles. Place in the oven and bake for 25\u201330 minutes, or until a toothpick inserted into the center comes out clean. Let cakes cool in pans for 10 minutes before transferring to wire racks.\",\n  \"step4\": \"While cakes cool, prepare the frosting: beat \u00bd cup softened butter until creamy. Gradually add 3 cups powdered sugar, \u00bc cup cocoa powder, 1 teaspoon vanilla, and 2\u20133 tablespoons milk. Beat until fluffy and spreadable, adjusting consistency with more milk or sugar as needed.\",\n  \"step5\": \"Once cakes are completely cooled, level the tops with a serrated knife if necessary. Place one cake layer on a serving plate, spread a generous layer of frosting over the top. Add the second layer, then cover the entire cake with a thin crumb coat of frosting. Chill for 15 minutes to set the crumb coat.\",\n  \"step6\": \"Finish with a final thick layer of frosting, smoothing with a spatula. Decorate with chocolate shavings, sprinkles, or fresh berries if desired. Slice, serve, and enjoy the moist, rich chocolate cake with a perfect balance of sweetness and cocoa flavor.\"\n}\n```",
+    "timestamp": "2025-09-17T17:28:56.383469"
+  },
+  "metrics": {
+    "duration_seconds": 2.1676528453826904,
+    "input_tokens": 155,
+    "output_tokens": 440,
+    "reasoning_tokens": 0,
+    "total_tokens": 595
+  }
+}

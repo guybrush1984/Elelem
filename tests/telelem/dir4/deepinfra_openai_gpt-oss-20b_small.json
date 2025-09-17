@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 8\u2011inch round cake pans. In a large bowl whisk together 1\u00bd cups flour, \u00be cup cocoa powder, 2 cups sugar, 1\u00bd tsp baking soda, 1 tsp baking powder, and 1 tsp salt. Set aside.\",\n  \"step2\": \"In a separate bowl, combine 1 cup milk, \u00bd cup vegetable oil, 2 eggs, 2 tsp vanilla, and 1 cup boiling water. Whisk until smooth. Pour the wet mixture into the dry ingredients, stirring until just combined; the batter will be thin.\",\n  \"step3\": \"Divide batter evenly between the prepared pans. Tap pans gently on the counter to release air bubbles. Bake for 30\u201335 minutes, or until a toothpick inserted into the center comes out clean. Let cakes cool in pans for 10 minutes, then transfer to wire racks to cool completely.\",\n  \"step4\": \"While cakes cool, prepare frosting: beat \u00bd cup softened butter until creamy. Gradually add 3 cups powdered sugar, \u00bc cup cocoa powder, 2 tbsp milk, and 1 tsp vanilla. Beat until light and fluffy, adding more milk if needed for desired consistency.\",\n  \"step5\": \"Place one cake layer on a serving plate. Spread a generous layer of frosting over the top. Add the second layer, then apply a thin crumb coat around the entire cake. Chill for 15 minutes to set the crumb coat before applying the final thick frosting layer.\",\n  \"step6\": \"Finish with decorative chocolate shavings or sprinkles. Slice, serve, and enjoy the moist, rich chocolate cake with a velvety frosting\u2014perfect for 8 guests.\"\n}",
+    "timestamp": "2025-09-16T12:39:35.930188"
+  },
+  "metrics": {
+    "duration_seconds": 4.222868204116821,
+    "input_tokens": 168,
+    "output_tokens": 391,
+    "total_tokens": 559
+  }
+}

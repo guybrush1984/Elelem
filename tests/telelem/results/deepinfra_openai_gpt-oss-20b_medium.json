@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "introduction": "This article traces the evolution of language modeling from early statistical methods to today’s powerful transformer-based artificial intelligence systems. Beginning with IBM’s pioneering word alignment work in the 1990s, it highlights the transition from n‑gram models—especially those using Kneser‑Ney smoothing—to neural approaches that emerged in the 2000s. It then discusses how deep learning breakthroughs shaped natural language processing (NLP) with word embeddings and recurrent sequence models, culminating in the transformer architecture unveiled in 2017. Finally, it explores the rapid expansion and diversification of large language models (LLMs) across open‑source and proprietary platforms, noting recent multimodal strides and alternatives such as state‑space models.",
+      "development": "In the early 1990s, IBM’s statistical machine‑translation systems introduced word‑alignment techniques that laid foundational work for corpus‑based language modeling. By 2001, smoothed n‑gram models—especially Kneser–Ney smoothing—were trained on datasets of 300 million words, achieving unparalleled perplexity scores. The 2000s witnessed the rise of large‑scale web‑corpus compilation, vastly increasing the data available for statistical models. Researchers moved beyond n‑grams, employing neural networks from 2000 onward. The discovery of word embeddings (e.g., Word2Vec, 2013) and LSTM‑based seq2seq models shifted focus from surface N‑gram counts to distributed representations and recurrent architectures. In 2016, Google transitioned its translation service entirely to neural machine translation, illustrating the practical power of deep recurrent networks. The watershed moment arrived at NeurIPS 2017 with Google’s “Attention Is All You Need” paper, introducing the transformer architecture that eliminated recurrence in favor of self‑attention. This allowed parallel training and superior performance, especially on long‑range dependencies. BERT emerged in 2018 as an encoder‑only transformer, quickly dominating academic benchmarks. Concurrently, decoder‑only GPT series progressed rapidly: GPT‑2 (2019) captivated the public as a potent but partially withheld system; GPT‑3 (2020) became a commercial API. The consumer‑facing ChatGPT (2022) drew extensive media attention, reinforcing the appeal of prompt‑based inference. GPT‑4 (2023) was lauded for its advanced multimodal capabilities, though its internals remain proprietary. The release of OpenAI’s reasoning model o1 (2024) introduced explicit chain‑of‑thought generation, raising expectations for higher‑order reasoning. Parallel to these proprietary developments, an ecosystem of source‑available LLMs emerged: BLOOM, LLaMA, Mistral 7B, Mixtral 8x7B, DeepSeek R1, and others. Some of these models adopted permissive licenses, fostering broader collaboration and industry adoption. Many recent LLMs also integrate multimodal inputs—images, audio, and text—expanding their applicability beyond purely textual tasks. Despite the dominance of transformer‑based designs, experimental variants such as recurrent neural networks, Mamba (a state‑space model), and other novel architectures have begun to appear, hinting at diverse future research directions. In sum, the trajectory of language modeling demonstrates an ongoing pivot toward larger, more capable, and more versatile systems, grounded in transformer attention mechanisms while continually exploring alternative neural frameworks.",
+      "conclusion": "The landscape of language models has shifted from early statistical foundations to cutting‑edge transformer‑based architectures, now encompassing both proprietary and open‑source multimodal systems. Continued innovation in model design and training data promises new frontiers in AI and a growing integration across many fields of knowledge."
+    },
+    "created_at": "2025-09-15 21:21:07 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 7.153212547302246,
+    "input_tokens": 1136,
+    "output_tokens": 770,
+    "total_tokens": 1906,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

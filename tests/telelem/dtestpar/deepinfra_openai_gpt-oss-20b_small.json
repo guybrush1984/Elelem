@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-20b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat oven to 350\u00b0F (175\u00b0C). Grease and flour two 8\u2011inch round cake pans. In a large bowl whisk together 1\u00bd cups flour, \u00be cup cocoa powder, 1\u00bd tsp baking soda, \u00bd tsp baking powder, and \u00bd tsp salt. Set aside.\",\n  \"step2\": \"In a separate bowl, beat 1 cup sugar and \u00bd cup melted butter until light. Add 2 eggs, one at a time, mixing well after each. Stir in 1 tsp vanilla and 1 cup buttermilk, blending until smooth.\",\n  \"step3\": \"Combine dry and wet mixtures, pouring the batter into the prepared pans. Gently swirl with a knife to remove air pockets. Tap pans lightly on the counter to level the batter and release trapped bubbles.\",\n  \"step4\": \"Bake for 25\u201330 minutes, or until a toothpick inserted in the center comes out clean. Let cakes cool in pans for 10 minutes, then turn onto wire racks to cool completely before frosting.\",\n  \"step5\": \"Whip \u00bd cup softened butter, 3 cups powdered sugar, \u00bc cup cocoa powder, 2 tbsp milk, and 1 tsp vanilla until fluffy. Spread a thin layer on the first cake, stack the second, and apply a crumb coat. Chill 15 minutes to set the coat.\",\n  \"step6\": \"Finish frosting with the remaining buttercream, smoothing edges with a spatula. Decorate with chocolate shavings or sprinkles. Slice, serve, and enjoy a moist, rich chocolate cake for eight guests.\"\n}",
+    "timestamp": "2025-09-16T12:12:11.598914"
+  },
+  "metrics": {
+    "duration_seconds": 2.9947826862335205,
+    "input_tokens": 168,
+    "output_tokens": 360,
+    "total_tokens": 528
+  }
+}

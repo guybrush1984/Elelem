@@ -1,0 +1,30 @@
+{
+  "request": {
+    "model": "deepinfra:deepseek/deepseek-3.1?nothink",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "tests/telelem/small.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "localhost:8000"
+  },
+  "response": {
+    "content": {
+      "step1": "Preheat oven to 350°F (175°C). Grease and flour two 8-inch round cake pans. Sift together 2 cups flour, 1¾ cups sugar, ¾ cup cocoa powder, 2 tsp baking soda, 1 tsp baking powder, and 1 tsp salt into a large bowl.",
+      "step2": "Add 2 large eggs, 1 cup buttermilk, ½ cup vegetable oil, and 2 tsp vanilla extract to the dry ingredients. Mix on medium speed until just combined. Gradually add 1 cup boiling water, mixing until smooth—batter will be thin.",
+      "step3": "Divide batter evenly between prepared pans. Bake for 30-35 minutes, or until a toothpick inserted comes out clean. Cool cakes in pans for 10 minutes, then turn out onto wire racks to cool completely.",
+      "step4": "For frosting, beat 1 cup softened butter until creamy. Gradually add 4 cups powdered sugar, 1 cup cocoa powder, and a pinch of salt. Mix on low until combined, then increase speed to medium.",
+      "step5": "Add ½ cup milk and 2 tsp vanilla extract to frosting. Beat on high until light and fluffy, about 3 minutes. If too thick, add more milk; if too thin, add more powdered sugar until spreadable consistency.",
+      "step6": "Place one cake layer on a plate. Spread with frosting. Top with second layer. Frost top and sides. Decorate with chocolate shavings or sprinkles if desired. Chill for 30 minutes before slicing. Serves 8."
+    },
+    "created_at": "2025-09-14 18:47:55 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 19.529926538467407,
+    "input_tokens": 173,
+    "output_tokens": 346,
+    "total_tokens": 519,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

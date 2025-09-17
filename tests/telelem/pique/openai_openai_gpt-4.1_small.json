@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "openai:openai/gpt-4.1",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat your oven to 180\u00b0C (350\u00b0F). Grease and line a 23cm (9-inch) round cake pan. Gather ingredients: 200g flour, 200g sugar, 75g cocoa powder, 1.5 tsp baking powder, 1.5 tsp baking soda, 2 eggs, 240ml milk, 120ml oil, 2 tsp vanilla, 240ml boiling water.\",\n  \"step2\": \"In a large bowl, sift together the flour, cocoa powder, sugar, baking powder, and baking soda. Mix well to combine all the dry ingredients evenly. This ensures your cake will rise properly and have a uniform chocolate flavor throughout.\",\n  \"step3\": \"Add eggs, milk, oil, and vanilla extract to the dry ingredients. Beat with an electric mixer on medium speed for 2 minutes until the batter is smooth and well combined. Scrape down the sides of the bowl as needed to ensure everything is mixed thoroughly.\",\n  \"step4\": \"Carefully pour in the boiling water and mix on low speed until just combined. The batter will be thin, but this is normal and helps create a moist cake. Pour the batter into the prepared cake pan, smoothing the top with a spatula.\",\n  \"step5\": \"Bake in the preheated oven for 35-40 minutes, or until a toothpick inserted into the center comes out clean. Remove the cake from the oven and let it cool in the pan for 10 minutes, then turn out onto a wire rack to cool completely.\",\n  \"step6\": \"Once the cake is completely cool, frost with your favorite chocolate icing or ganache. Slice into 8 generous pieces and serve. Enjoy your rich, moist chocolate cake with friends or family, perfect for any celebration or gathering.\"\n}",
+    "timestamp": "2025-09-17T17:29:04.217783"
+  },
+  "metrics": {
+    "duration_seconds": 9.994444847106934,
+    "input_tokens": 106,
+    "output_tokens": 376,
+    "reasoning_tokens": 0,
+    "total_tokens": 482
+  }
+}

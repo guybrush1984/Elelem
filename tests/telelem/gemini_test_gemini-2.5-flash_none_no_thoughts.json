@@ -1,0 +1,58 @@
+{
+  "test_config": {
+    "model": "google:gemini-2.5-flash",
+    "reasoning_effort": null,
+    "include_thoughts": false
+  },
+  "raw_response": {
+    "id": "s3vKaMeiHK_9kdUPveLq-Q8",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "Let's calculate 17 * 23 step by step using the standard multiplication method.\n\nWe will multiply 23 by 17.\n\n```\n  23\nx 17\n----\n```\n\n**Step 1: Multiply the top number (23) by the unit digit of the bottom number (7).**\n\n*   First, multiply 7 by 3:\n    7 * 3 = 21\n    Write down '1' in the units place and carry over '2' to the tens place.\n\n*   Next, multiply 7 by 2 (which is 20):\n    7 * 2 = 14\n    Add the carried '2': 14 + 2 = 16\n    Write down '16'.\n\n    So, 7 * 23 = 161.\n\n    ```\n      23\n    x 17\n    ----\n     161  (This is 7 * 23)\n    ```\n\n**Step 2: Multiply the top number (23) by the tens digit of the bottom number (1, which represents 10).**\n\n*   Since we are multiplying by a tens digit, first place a '0' in the units place below the '1'.\n\n*   Next, multiply 1 by 3:\n    1 * 3 = 3\n    Write down '3' in the tens place.\n\n*   Next, multiply 1 by 2:\n    1 * 2 = 2\n    Write down '2' in the hundreds place.\n\n    So, 10 * 23 = 230.\n\n    ```\n      23\n    x 17\n    ----\n     161\n    230   (This is 10 * 23)\n    ```\n\n**Step 3: Add the results from Step 1 and Step 2.**\n\n*   Add 161 and 230:\n\n    ```\n      161\n    + 230\n    -----\n    ```\n\n*   1 + 0 = 1\n*   6 + 3 = 9\n*   1 + 2 = 3\n\n    ```\n      161\n    + 230\n    -----\n      391\n    ```\n\nTherefore, 17 * 23 = **391**.",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": null,
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1758100403,
+    "model": "gemini-2.5-flash",
+    "object": "chat.completion",
+    "service_tier": null,
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 530,
+      "prompt_tokens": 18,
+      "total_tokens": 1586,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": null
+    },
+    "elelem_metrics": {
+      "request_duration_seconds": 14.100882768630981,
+      "provider_used": "google",
+      "model_used": "google:gemini-2.5-flash",
+      "tokens": {
+        "input": 18,
+        "output": 530,
+        "reasoning": 0,
+        "total": 548
+      },
+      "costs_usd": {
+        "input_cost_usd": 5.4e-06,
+        "output_cost_usd": 0.001325,
+        "reasoning_cost_usd": 0.0,
+        "total_cost_usd": 0.0013304
+      },
+      "actual_provider": null
+    }
+  },
+  "success": true,
+  "error": null
+}

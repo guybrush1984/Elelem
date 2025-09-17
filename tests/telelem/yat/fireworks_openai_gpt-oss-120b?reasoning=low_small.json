@@ -1,0 +1,20 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-120b?reasoning=low",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Preheat the oven to 350\u00b0F (175\u00b0C). Grease and flour two 9\u2011inch round cake pans, then line the bottoms with parchment paper. In a large bowl whisk together 2\u202f\u00bd cups all\u2011purpose flour, 2\u202f\u00bd teaspoons baking powder, \u00bd teaspoon baking soda, and \u00bd teaspoon salt to ensure even distribution and proper rise.\",\n  \"step2\": \"In another bowl, combine 1\u202f\u00be cups granulated sugar, \u00be cup brown sugar, and \u00be cup unsweetened cocoa powder. Add 1 cup melted butter, 4 large eggs, and 2 teaspoons vanilla extract. Beat until smooth, then gradually stir in the dry mixture until just incorporated for a rich chocolate texture and moist.\",\n  \"step3\": \"Fold in 1 cup chocolate chips and \u00bd cup chopped walnuts, if desired, distributing evenly. Divide batter between the prepared pans, smoothing tops with a spatula. Tap pans lightly on the counter to release air bubbles. Place pans on a baking sheet for stability during baking to ensure even rise and perfect texture result.\",\n  \"step4\": \"Bake in the preheated oven for 30\u201135 minutes, or until a toothpick inserted into the center comes out with a few moist crumbs. Rotate pans halfway through baking for even browning. Remove from oven and let cakes cool in pans for 10 minutes before transferring to a wire rack carefully.\",\n  \"step5\": \"Prepare frosting by melting \u00bd cup butter, then whisking in 1\u202f\u00bd cups powdered sugar, \u00bc cup cocoa powder, and 2 tablespoons heavy cream. Add 1 teaspoon vanilla extract, whisk until smooth and glossy. Adjust consistency with extra cream or sugar as needed, achieving a spreadable yet firm texture for perfect.\",\n  \"step6\": \"Once cakes are completely cooled, spread a generous layer of chocolate frosting on the first layer, then place the second layer on top. Frost the top and sides evenly, creating a smooth finish. Garnish with additional chocolate shavings or walnuts, slice, serve, and enjoy with a glass of milk together.\"\n}",
+    "timestamp": "2025-09-17T16:42:41.593066"
+  },
+  "metrics": {
+    "duration_seconds": 5.7353527545928955,
+    "input_tokens": 155,
+    "output_tokens": 1805,
+    "reasoning_tokens": 0,
+    "total_tokens": 1960
+  }
+}

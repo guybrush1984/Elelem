@@ -1,0 +1,334 @@
+{
+  "batch_config": "batch.json",
+  "timestamp": "2025-09-16 10:39:45 UTC",
+  "elelem_mode": "api",
+  "elelem_server": "http://localhost:9200",
+  "test_start_time": "2025-09-16T12:39:31.604773",
+  "models": {
+    "deepinfra:openai/gpt-oss-120b": {
+      "total_calls": 1,
+      "total_successes": 1,
+      "total_failures": 0,
+      "success_rate": 1.0,
+      "input_tokens": {
+        "total": 168.0,
+        "avg": 168.0,
+        "min": 168.0,
+        "max": 168.0
+      },
+      "output_tokens": {
+        "total": 2226.0,
+        "avg": 2226.0,
+        "min": 2226.0,
+        "max": 2226.0
+      },
+      "reasoning_tokens": {
+        "total": 1675.0,
+        "avg": 1675.0,
+        "min": 1675.0,
+        "max": 1675.0
+      },
+      "input_cost_usd": {
+        "total": 1.512e-05,
+        "avg": 1.512e-05,
+        "min": 1.512e-05,
+        "max": 1.512e-05
+      },
+      "output_cost_usd": {
+        "total": 0.00175545,
+        "avg": 0.00175545,
+        "min": 0.00175545,
+        "max": 0.00175545
+      },
+      "reasoning_cost_usd": {
+        "total": 0.0007537500000000001,
+        "avg": 0.0007537500000000001,
+        "min": 0.0007537500000000001,
+        "max": 0.0007537500000000001
+      },
+      "total_cost_usd": {
+        "total": 0.00177057,
+        "avg": 0.00177057,
+        "min": 0.00177057,
+        "max": 0.00177057
+      },
+      "duration_seconds": {
+        "total": 13.203197240829468,
+        "avg": 13.203197240829468,
+        "min": 13.203197240829468,
+        "max": 13.203197240829468
+      },
+      "retry_analytics": {
+        "json_parse_retries": 0,
+        "json_schema_retries": 0,
+        "api_json_validation_retries": 0,
+        "rate_limit_retries": 0,
+        "total_retries": 0,
+        "temperature_reductions": 0,
+        "final_failures": 0,
+        "response_format_removals": 0,
+        "candidate_iterations": 0
+      }
+    },
+    "deepinfra:openai/gpt-oss-20b": {
+      "total_calls": 1,
+      "total_successes": 1,
+      "total_failures": 0,
+      "success_rate": 1.0,
+      "input_tokens": {
+        "total": 168.0,
+        "avg": 168.0,
+        "min": 168.0,
+        "max": 168.0
+      },
+      "output_tokens": {
+        "total": 391.0,
+        "avg": 391.0,
+        "min": 391.0,
+        "max": 391.0
+      },
+      "reasoning_tokens": {
+        "total": 10.0,
+        "avg": 10.0,
+        "min": 10.0,
+        "max": 10.0
+      },
+      "input_cost_usd": {
+        "total": 6.72e-06,
+        "avg": 6.72e-06,
+        "min": 6.72e-06,
+        "max": 6.72e-06
+      },
+      "output_cost_usd": {
+        "total": 6.416e-05,
+        "avg": 6.416e-05,
+        "min": 6.416e-05,
+        "max": 6.416e-05
+      },
+      "reasoning_cost_usd": {
+        "total": 1.6000000000000001e-06,
+        "avg": 1.6000000000000001e-06,
+        "min": 1.6000000000000001e-06,
+        "max": 1.6000000000000001e-06
+      },
+      "total_cost_usd": {
+        "total": 7.088e-05,
+        "avg": 7.088e-05,
+        "min": 7.088e-05,
+        "max": 7.088e-05
+      },
+      "duration_seconds": {
+        "total": 4.1170737743377686,
+        "avg": 4.1170737743377686,
+        "min": 4.1170737743377686,
+        "max": 4.1170737743377686
+      },
+      "retry_analytics": {
+        "json_parse_retries": 0,
+        "json_schema_retries": 0,
+        "api_json_validation_retries": 0,
+        "rate_limit_retries": 0,
+        "total_retries": 0,
+        "temperature_reductions": 0,
+        "final_failures": 0,
+        "response_format_removals": 0,
+        "candidate_iterations": 0
+      }
+    },
+    "fireworks:openai/gpt-oss-120b": {
+      "total_calls": 1,
+      "total_successes": 1,
+      "total_failures": 0,
+      "success_rate": 1.0,
+      "input_tokens": {
+        "total": 155.0,
+        "avg": 155.0,
+        "min": 155.0,
+        "max": 155.0
+      },
+      "output_tokens": {
+        "total": 2160.0,
+        "avg": 2160.0,
+        "min": 2160.0,
+        "max": 2160.0
+      },
+      "reasoning_tokens": {
+        "total": 1652.0,
+        "avg": 1652.0,
+        "min": 1652.0,
+        "max": 1652.0
+      },
+      "input_cost_usd": {
+        "total": 2.325e-05,
+        "avg": 2.325e-05,
+        "min": 2.325e-05,
+        "max": 2.325e-05
+      },
+      "output_cost_usd": {
+        "total": 0.0022871999999999997,
+        "avg": 0.0022871999999999997,
+        "min": 0.0022871999999999997,
+        "max": 0.0022871999999999997
+      },
+      "reasoning_cost_usd": {
+        "total": 0.0009912,
+        "avg": 0.0009912,
+        "min": 0.0009912,
+        "max": 0.0009912
+      },
+      "total_cost_usd": {
+        "total": 0.0023104499999999995,
+        "avg": 0.0023104499999999995,
+        "min": 0.0023104499999999995,
+        "max": 0.0023104499999999995
+      },
+      "duration_seconds": {
+        "total": 6.590218782424927,
+        "avg": 6.590218782424927,
+        "min": 6.590218782424927,
+        "max": 6.590218782424927
+      },
+      "retry_analytics": {
+        "json_parse_retries": 0,
+        "json_schema_retries": 0,
+        "api_json_validation_retries": 0,
+        "rate_limit_retries": 0,
+        "total_retries": 0,
+        "temperature_reductions": 0,
+        "final_failures": 0,
+        "response_format_removals": 0,
+        "candidate_iterations": 0
+      }
+    },
+    "parasail:deepseek/deepseek-3.1?nothink": {
+      "total_calls": 1,
+      "total_successes": 1,
+      "total_failures": 0,
+      "success_rate": 1.0,
+      "input_tokens": {
+        "total": 99.0,
+        "avg": 99.0,
+        "min": 99.0,
+        "max": 99.0
+      },
+      "output_tokens": {
+        "total": 323.0,
+        "avg": 323.0,
+        "min": 323.0,
+        "max": 323.0
+      },
+      "reasoning_tokens": {
+        "total": 0.0,
+        "avg": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "input_cost_usd": {
+        "total": 6.336e-05,
+        "avg": 6.336e-05,
+        "min": 6.336e-05,
+        "max": 6.336e-05
+      },
+      "output_cost_usd": {
+        "total": 0.0005329499999999999,
+        "avg": 0.0005329499999999999,
+        "min": 0.0005329499999999999,
+        "max": 0.0005329499999999999
+      },
+      "reasoning_cost_usd": {
+        "total": 0.0,
+        "avg": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "total_cost_usd": {
+        "total": 0.00059631,
+        "avg": 0.00059631,
+        "min": 0.00059631,
+        "max": 0.00059631
+      },
+      "duration_seconds": {
+        "total": 5.796548128128052,
+        "avg": 5.796548128128052,
+        "min": 5.796548128128052,
+        "max": 5.796548128128052
+      },
+      "retry_analytics": {
+        "json_parse_retries": 0,
+        "json_schema_retries": 0,
+        "api_json_validation_retries": 0,
+        "rate_limit_retries": 0,
+        "total_retries": 0,
+        "temperature_reductions": 0,
+        "final_failures": 0,
+        "response_format_removals": 0,
+        "candidate_iterations": 0
+      }
+    }
+  },
+  "overall": {
+    "total_calls": 4,
+    "total_successes": 4,
+    "total_failures": 0,
+    "success_rate": 1.0,
+    "input_tokens": {
+      "total": 590.0,
+      "avg": 147.5,
+      "min": 99.0,
+      "max": 168.0
+    },
+    "output_tokens": {
+      "total": 5100.0,
+      "avg": 1275.0,
+      "min": 323.0,
+      "max": 2226.0
+    },
+    "reasoning_tokens": {
+      "total": 3337.0,
+      "avg": 834.25,
+      "min": 0.0,
+      "max": 1675.0
+    },
+    "input_cost_usd": {
+      "total": 0.00010845000000000001,
+      "avg": 2.7112500000000002e-05,
+      "min": 6.72e-06,
+      "max": 6.336e-05
+    },
+    "output_cost_usd": {
+      "total": 0.00463976,
+      "avg": 0.00115994,
+      "min": 6.416e-05,
+      "max": 0.0022871999999999997
+    },
+    "reasoning_cost_usd": {
+      "total": 0.0017465500000000001,
+      "avg": 0.00043663750000000004,
+      "min": 0.0,
+      "max": 0.0009912
+    },
+    "total_cost_usd": {
+      "total": 0.004748209999999999,
+      "avg": 0.0011870524999999998,
+      "min": 7.088e-05,
+      "max": 0.0023104499999999995
+    },
+    "duration_seconds": {
+      "total": 29.707037925720215,
+      "avg": 7.426759481430054,
+      "min": 4.1170737743377686,
+      "max": 13.203197240829468
+    },
+    "retry_analytics": {
+      "json_parse_retries": 0,
+      "json_schema_retries": 0,
+      "api_json_validation_retries": 0,
+      "rate_limit_retries": 0,
+      "total_retries": 0,
+      "temperature_reductions": 0,
+      "final_failures": 0,
+      "response_format_removals": 0,
+      "candidate_iterations": 0
+    }
+  }
+}

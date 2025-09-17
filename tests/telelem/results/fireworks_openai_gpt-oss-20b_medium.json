@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "fireworks:openai/gpt-oss-20b",
+    "temperature": 1.0,
+    "json_mode": true,
+    "prompt_file": "medium.yaml",
+    "elelem_mode": "api",
+    "elelem_server": "http://localhost:9000"
+  },
+  "response": {
+    "content": {
+      "introduction": "Since the early‑1990s, language modeling has evolved from IBM’s statistical word‑alignment work to the sophisticated transformer‑based systems of today. Early n‑gram models, notably a Kneser–Ney smoothed model trained on 300 million words in 2001, set perplexity benchmarks and were later expanded with web‑scale corpora. Neural approaches emerged in the 2000s, culminating in word embeddings and LSTM seq2seq models that powered Google’s 2016 neural machine translation. The 2017 “Attention Is All You Need” paper introduced the transformer, which spurred models like BERT, GPT‑2/3/4, and a wave of open‑weight variants. These developments have reshaped research across robotics, software engineering, and societal impact studies.",
+      "development": "In the early 1990s IBM pioneered statistical models that aligned words for machine translation, laying the groundwork for corpus‑based language modeling. By 2001, a smoothed n‑gram model using Kneser–Ney smoothing trained on 300 million words achieved state‑of‑the‑art perplexity on benchmarks. With the rise of internet access in the 2000s, researchers compiled massive web‑scale corpora—coined “web‑as‑corpus”—to train larger statistical language models. The 2000s also saw the first neural language models; after deep neural networks revolutionized image classification in 2012, similar architectures were adapted for language, leading to word embeddings (Word2Vec, 2013) and LSTM‑based sequence‑to‑sequence models. Google’s 2016 transition to neural machine translation replaced phrase‑based statistical models with deep recurrent networks. The 2017 NeurIPS paper “Attention Is All You Need” introduced the transformer, a pure attention‑based architecture that eliminated recurrence and improved seq2seq performance. BERT (2018), an encoder‑only transformer, quickly became ubiquitous in academia, though its use declined in 2023 as decoder‑only models like GPT demonstrated strong prompting capabilities. GPT‑1 (2018) was followed by GPT‑2 (2019), which gained notoriety for its potential misuse; GPT‑3 (2020) moved to API‑only access, and GPT‑4 (2023) was praised for multimodal capabilities, though OpenAI withheld architecture details. The public release of ChatGPT in 2022 spurred widespread LLM adoption across computer science subfields. In 2024 OpenAI introduced a reasoning model, o1, that generates long chains of thought before answering. Parallel to proprietary models, source‑available models such as BLOOM, LLaMA, and Mistral’s 7B/Mixtral 8x7B gained popularity, with DeepSeek’s 2025 R1 offering 671 billion parameters at lower cost. Since 2023, many LLMs have become multimodal (LMMs), processing images and audio. As of 2024, transformer‑based architectures dominate, though variations like recurrent neural networks, Mamba, and other state‑space models are emerging.",
+      "conclusion": "The trajectory from early statistical n‑grams to today’s transformer‑driven, multimodal large language models illustrates rapid progress fueled by data scale, architectural innovation, and open‑weight initiatives, reshaping both research and industry applications."
+    },
+    "created_at": "2025-09-15 21:21:16 UTC"
+  },
+  "metrics": {
+    "duration_seconds": 7.398348331451416,
+    "input_tokens": 1123,
+    "output_tokens": 719,
+    "total_tokens": 1842,
+    "cost_usd": 0.0,
+    "provider_used": null
+  },
+  "analytics": {}
+}

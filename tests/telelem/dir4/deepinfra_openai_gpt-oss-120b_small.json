@@ -1,0 +1,19 @@
+{
+  "request": {
+    "model": "deepinfra:openai/gpt-oss-120b",
+    "temperature": 0.1,
+    "json_mode": false,
+    "prompt_file": "small.yaml",
+    "mode": "api"
+  },
+  "response": {
+    "content": "{\n  \"step1\": \"Gather ingredients: 2\u202f\u00bd cups all\u2011purpose flour, 2\u202fcups granulated sugar, \u00be cup unsweetened cocoa powder, 2\u202fteaspoons baking powder, 1\u202f\u00bd teaspoons baking soda, 1\u202fteaspoon salt, 1\u202fcup buttermilk, \u00bd cup vegetable oil, 2 eggs, 2\u202fteaspoons vanilla extract, and 1\u202fcup hot water. Preheat oven to 350\u00b0F (175\u00b0C) and grease two 9\u2011inch round pans.\",\n  \"step2\": \"In a large mixing bowl, whisk together flour, sugar, cocoa powder, baking powder, baking soda, and salt until evenly combined. This dry mixture ensures uniform texture and prevents clumps, creating a smooth batter foundation for the chocolate cake that will rise beautifully and retain moisture throughout baking in the oven.\",\n  \"step3\": \"Create a well in the center of the dry ingredients and pour in buttermilk, vegetable oil, eggs, and vanilla. Using a handheld mixer on medium speed, blend for one minute until the mixture is smooth, then gradually drizzle in the hot water while continuing to mix until batter is silky.\",\n  \"step4\": \"Divide the batter evenly between the prepared pans, smoothing the tops with a spatula. Tap the pans gently on the counter to release any trapped air bubbles, ensuring a uniform rise. Place pans on the middle rack of the preheated oven and bake for the time specified in the next step.\",\n  \"step5\": \"Bake for 30\u201135 minutes, or until a toothpick inserted into the center comes out with only a few moist crumbs. Remove the pans from the oven, set them on a wire rack, and let cool for 10 minutes before turning the cakes out to ensure they set properly and are.\",\n  \"step6\": \"Prepare frosting: melt \u00bd cup butter, stir in 2\u202fcups powdered sugar, \u00bc cup cocoa, 2\u202ftablespoons milk, and a pinch of salt until smooth. Spread frosting over the cooled layers, stack them, and decorate with chocolate shavings or fresh berries for eight servings. Enjoy the rich, moist chocolate cake with friends.\"\n}",
+    "timestamp": "2025-09-16T12:39:45.009384"
+  },
+  "metrics": {
+    "duration_seconds": 13.302861213684082,
+    "input_tokens": 168,
+    "output_tokens": 2226,
+    "total_tokens": 2394
+  }
+}

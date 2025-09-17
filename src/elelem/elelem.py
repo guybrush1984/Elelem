@@ -490,96 +490,123 @@ class Elelem:
         self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
     
     def _extract_reasoning_tokens(self, response) -> int:
-        """Extract reasoning tokens from response object.
-        
-        This handles all provider formats:
-        - OpenAI: response.usage.completion_tokens_details.reasoning_tokens
-        - GROQ: response.usage.output_tokens_details.reasoning_tokens  
-        - DeepSeek/others: response.usage.reasoning_tokens
-        - Any provider: proportional estimation from reasoning content fields (fallback)
-        - Any future nested structure containing reasoning_tokens
+        """Universal reasoning token extraction for all providers.
+
+        Uses mathematical relationship: reasoning_tokens = total_tokens - prompt_tokens - completion_tokens
+        This works for:
+        - Explicit providers (OpenAI, GROQ, DeepSeek): validates against explicit fields
+        - Implicit providers (Gemini): calculates from hidden tokens in total_tokens
+        - Non-reasoning providers: correctly returns 0
         """
         if not response or not hasattr(response, 'usage'):
             return 0
-            
+
         usage = response.usage
-        def _recursive_search(obj, target_field="reasoning_tokens", visited=None, depth=0):
-            """Recursively search for a field in nested objects/dicts."""
-            if visited is None:
-                visited = set()
-            
-            # Prevent infinite recursion
-            if depth > 10 or obj is None or id(obj) in visited:
-                return 0
-            
-            visited.add(id(obj))
-                
-            # If it's a dict, check keys
-            if isinstance(obj, dict):
-                if target_field in obj:
-                    value = obj[target_field]
-                    return int(value) if isinstance(value, (int, float)) and value > 0 else 0
-                # Recursively search nested dicts
-                for value in obj.values():
-                    result = _recursive_search(value, target_field, visited, depth + 1)
-                    if result > 0:
-                        return result
-                        
-            # If it's an object with attributes, check attributes
-            elif hasattr(obj, '__dict__') or hasattr(obj, '__getattribute__'):
-                # Direct attribute check
-                if hasattr(obj, target_field):
-                    value = getattr(obj, target_field, 0)
-                    return int(value) if isinstance(value, (int, float)) and value > 0 else 0
-                    
-                # Search nested attributes (only common usage-related attributes)
-                common_attrs = ['completion_tokens_details', 'output_tokens_details', 
-                               'usage_details', 'token_details', 'details']
-                for attr_name in common_attrs:
-                    if hasattr(obj, attr_name):
-                        try:
-                            attr_value = getattr(obj, attr_name)
-                            if not callable(attr_value):
-                                result = _recursive_search(attr_value, target_field, visited, depth + 1)
-                                if result > 0:
-                                    return result
-                        except (AttributeError, TypeError):
-                            continue
-                            
+
+        # Method 1: Universal calculation from total_tokens (primary method)
+        prompt_tokens = getattr(usage, 'prompt_tokens', 0)
+        completion_tokens = getattr(usage, 'completion_tokens', 0)
+        total_tokens = getattr(usage, 'total_tokens', 0)
+
+        if total_tokens > 0 and prompt_tokens >= 0 and completion_tokens >= 0:
+            calculated_reasoning = max(0, total_tokens - prompt_tokens - completion_tokens)
+            if calculated_reasoning > 0:
+                self.logger.debug(f"Calculated reasoning tokens from total: {calculated_reasoning} "
+                                f"(total: {total_tokens}, prompt: {prompt_tokens}, completion: {completion_tokens})")
+                return calculated_reasoning
+
+        # Method 2: Explicit field search (for validation and legacy support)
+        explicit_reasoning = self._recursive_search_reasoning_tokens(usage)
+        if explicit_reasoning > 0:
+            self.logger.debug(f"Found explicit reasoning tokens: {explicit_reasoning}")
+            return explicit_reasoning
+
+        # Method 3: Content-based extraction (fallback for models with <think> tags)
+        content_reasoning = self._extract_reasoning_from_content(response)
+        if content_reasoning > 0:
+            return content_reasoning
+
+        return 0
+
+    def _recursive_search_reasoning_tokens(self, obj, target_field="reasoning_tokens", visited=None, depth=0):
+        """Recursively search for explicit reasoning_tokens field in nested objects/dicts."""
+        if visited is None:
+            visited = set()
+
+        # Prevent infinite recursion
+        if depth > 10 or obj is None or id(obj) in visited:
             return 0
-        
-        # First try to find explicit reasoning_tokens field
-        reasoning_tokens = _recursive_search(usage)
-        if reasoning_tokens > 0:
-            return reasoning_tokens
-            
+
+        visited.add(id(obj))
+
+        # If it's a dict, check keys
+        if isinstance(obj, dict):
+            if target_field in obj:
+                value = obj[target_field]
+                return int(value) if isinstance(value, (int, float)) and value > 0 else 0
+            # Recursively search nested dicts
+            for value in obj.values():
+                result = self._recursive_search_reasoning_tokens(value, target_field, visited, depth + 1)
+                if result > 0:
+                    return result
+
+        # If it's an object with attributes, check attributes
+        elif hasattr(obj, '__dict__') or hasattr(obj, '__getattribute__'):
+            # Direct attribute check
+            if hasattr(obj, target_field):
+                value = getattr(obj, target_field, 0)
+                return int(value) if isinstance(value, (int, float)) and value > 0 else 0
+
+            # Search nested attributes (only common usage-related attributes)
+            common_attrs = ['completion_tokens_details', 'output_tokens_details',
+                           'usage_details', 'token_details', 'details']
+            for attr_name in common_attrs:
+                if hasattr(obj, attr_name):
+                    try:
+                        attr_value = getattr(obj, attr_name)
+                        if not callable(attr_value):
+                            result = self._recursive_search_reasoning_tokens(attr_value, target_field, visited, depth + 1)
+                            if result > 0:
+                                return result
+                    except (AttributeError, TypeError):
+                        continue
+
+        return 0
+
+    def _extract_reasoning_from_content(self, response) -> int:
+        """Extract reasoning tokens from content analysis (for models with <think> tags)."""
+        if not response or not hasattr(response, 'usage'):
+            return 0
+
+        usage = response.usage
+
         # Check for <think> tags in response content (Parasail DeepSeek, etc.)
-        if response and hasattr(response, 'choices') and response.choices:
+        if hasattr(response, 'choices') and response.choices:
             first_choice = response.choices[0]
             if hasattr(first_choice, 'message') and first_choice.message.content:
                 content = first_choice.message.content
                 self.logger.debug(f"Checking content for <think> tags, length: {len(content)}")
-                
+
                 # Extract reasoning content from <think> tags
                 import re
                 think_pattern = r'<think>(.*?)</think>'
                 think_matches = re.findall(think_pattern, content, re.DOTALL)
-                
+
                 self.logger.debug(f"Found {len(think_matches)} <think> matches")
-                
+
                 if think_matches:
                     reasoning_content = think_matches[0].strip()
                     if reasoning_content:
                         # Estimate reasoning tokens using character count ratio
                         reasoning_chars = len(reasoning_content)
-                        
+
                         # Get actual response content (everything after </think>)
                         actual_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
                         actual_chars = len(actual_content)
                         total_chars = reasoning_chars + actual_chars
-                        
+
                         self.logger.debug(f"Reasoning chars: {reasoning_chars}, Actual chars: {actual_chars}")
-                        
+
                         if total_chars > 0:
                             reasoning_ratio = reasoning_chars / total_chars
                             total_completion_tokens = getattr(usage, 'completion_tokens', 0)

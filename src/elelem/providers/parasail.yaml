@@ -15,9 +15,10 @@ models:
       input_cost_per_1m: 0.64
       output_cost_per_1m: 1.65
       currency: USD
-    metadata_ref: "deepseek_v31"
+    metadata:
+      model_reference: "deepseek_v31"
 
-  "parasail:deepseek/deepseek-3.1?think":
+  "parasail:deepseek/deepseek-3.1?reasoning":
     provider: parasail
     model_id: parasail-deepseek-31
     capabilities:
@@ -28,12 +29,14 @@ models:
       input_cost_per_1m: 0.64
       output_cost_per_1m: 1.65
       currency: USD
-    metadata_ref: "deepseek_v31-think"
+    metadata:
+      model_reference: "deepseek_v31-think"
+      model_configuration: "reasoning"
     extra_body:
       chat_template_kwargs:
         thinking: true
 
-  "parasail:openai/gpt-oss-120b?low":
+  "parasail:openai/gpt-oss-120b?reasoning=low":
     provider: parasail
     model_id: parasail-gpt-oss-120b
     capabilities:
@@ -44,12 +47,14 @@ models:
       input_cost_per_1m: 0.15
       output_cost_per_1m: 0.60
       currency: USD
-    metadata_ref: "openai_gpt_oss_120b"
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=low"
     default_params:
       reasoning_effort: low
 
 
-  "parasail:openai/gpt-oss-120b?high":
+  "parasail:openai/gpt-oss-120b?reasoning=high":
     provider: parasail
     model_id: parasail-gpt-oss-120b
     capabilities:
@@ -60,6 +65,8 @@ models:
       input_cost_per_1m: 0.15
       output_cost_per_1m: 0.60
       currency: USD
-    metadata_ref: "openai_gpt_oss_120b"
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=high"
     default_params:
       reasoning_effort: high

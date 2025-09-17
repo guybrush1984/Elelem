@@ -1249,8 +1249,10 @@ class Elelem:
                     model_entry["nickname"] = metadata["model_nickname"]
                 if "license" in metadata:
                     model_entry["license"] = metadata["license"]
-                if "reasoning" in metadata:
-                    model_entry["reasoning"] = metadata["reasoning"] == "yes"
+                if "model_configuration" in metadata:
+                    model_entry["model_configuration"] = metadata["model_configuration"]
+                else:
+                    model_entry["model_configuration"] = "none"
                 if "model_page" in metadata:
                     model_entry["model_page"] = metadata["model_page"]
 

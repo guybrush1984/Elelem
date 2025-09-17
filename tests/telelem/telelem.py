@@ -530,7 +530,7 @@ def generate_csv_summary(summary, csv_file, elelem_server):
                 "owned_by": model_config.get("display_metadata", {}).get("model_owner", "unknown"),
                 "provider": model_config.get("provider", "unknown"),
                 "license": model_config.get("display_metadata", {}).get("license", "unknown"),
-                "reasoning": model_config.get("display_metadata", {}).get("reasoning", "no"),
+                "model_configuration": model_config.get("display_metadata", {}).get("model_configuration", "none"),
                 "cost": cost_data
             }
 
@@ -574,7 +574,7 @@ def generate_csv_summary(summary, csv_file, elelem_server):
             "model_owner": model_info.get("owned_by", "unknown"),
             "model_provider": model_info.get("provider", "unknown"),
             "license": model_info.get("license", "unknown"),
-            "reasoning": model_info.get("reasoning", "no"),
+            "model_configuration": model_info.get("model_configuration", "none"),
             "cost_per_1m_input": input_cost_per_1m,
             "cost_per_1m_output": output_cost_per_1m,
             "success_rate_percent": round(success_rate, 1),
@@ -588,7 +588,7 @@ def generate_csv_summary(summary, csv_file, elelem_server):
     if csv_rows:
         with open(csv_file, 'w', newline='', encoding='utf-8') as f:
             fieldnames = [
-                "model_name", "model_owner", "model_provider", "license", "reasoning",
+                "model_name", "model_owner", "model_provider", "license", "model_configuration",
                 "cost_per_1m_input", "cost_per_1m_output", "success_rate_percent",
                 "output_token_rate", "real_output_token_rate", "computed_cost_per_1m_actual_output_token",
                 "reasoning_token_ratio"

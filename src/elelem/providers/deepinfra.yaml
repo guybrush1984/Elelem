@@ -5,8 +5,10 @@ provider:
   default_params: {}
 
 models:
-  "deepinfra:openai/gpt-oss-120b?low":
-    metadata_ref: "openai_gpt_oss_120b"
+  "deepinfra:openai/gpt-oss-120b?reasoning=low":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=low"
     provider: deepinfra
     model_id: openai/gpt-oss-120b
     capabilities:
@@ -20,8 +22,10 @@ models:
     default_params:
       reasoning_effort: low
 
-  "deepinfra:openai/gpt-oss-120b?high":
-    metadata_ref: "openai_gpt_oss_120b"
+  "deepinfra:openai/gpt-oss-120b?reasoning=high":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=high"
     provider: deepinfra
     model_id: openai/gpt-oss-120b
     capabilities:
@@ -35,8 +39,10 @@ models:
     default_params:
       reasoning_effort: low
 
-  "deepinfra:openai/gpt-oss-20b?low":
-    metadata_ref: "openai_gpt_oss_20b"
+  "deepinfra:openai/gpt-oss-20b?reasoning=low":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=low"
     provider: deepinfra
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -49,8 +55,10 @@ models:
     default_params:
       reasoning_effort: low      
 
-  "deepinfra:openai/gpt-oss-20b?high":
-    metadata_ref: "openai_gpt_oss_20b"
+  "deepinfra:openai/gpt-oss-20b?reasoning=high":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=high"
     provider: deepinfra
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -64,7 +72,8 @@ models:
       reasoning_effort: high        
 
   "deepinfra:meta-llama/llama-4-maverick-17b":
-    metadata_ref: "meta_llama4_maverick"
+    metadata:
+      model_reference: "meta_llama4_maverick"
     provider: deepinfra
     model_id: meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8
     capabilities:
@@ -76,7 +85,8 @@ models:
       currency: USD
 
   "deepinfra:meta-llama/llama-4-scout-17b":
-    metadata_ref: "meta_llama4_scout"
+    metadata:
+      model_reference: "meta_llama4_scout"
     provider: deepinfra
     model_id: meta-llama/Llama-4-Scout-17B-16E-Instruct
     capabilities:
@@ -88,7 +98,8 @@ models:
       currency: USD
 
   "deepinfra:moonshotai/kimi-k2-instruct":
-    metadata_ref: "moonshot_kimi_k2"
+    metadata:
+      model_reference: "moonshot_kimi_k2"
     provider: deepinfra
     model_id: moonshotai/Kimi-K2-Instruct
     capabilities:
@@ -100,7 +111,8 @@ models:
       currency: USD
 
   "deepinfra:deepseek/deepseek-r1-0528":
-    metadata_ref: "deepseek_r1_0528"
+    metadata:
+      model_reference: "deepseek_r1_0528"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-0528
     capabilities:
@@ -112,7 +124,8 @@ models:
       currency: USD
 
   "deepinfra:deepseek/deepseek-3.1":
-    metadata_ref: "deepseek_v31"
+    metadata:
+      model_reference: "deepseek_v31"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-V3.1
     capabilities:
@@ -124,7 +137,8 @@ models:
       currency: USD
 
   "deepinfra:deepseek/deepseek-r1-distill-llama-70b":
-    metadata_ref: "deepseek_r1_distill_llama_70b"
+    metadata:
+      model_reference: "deepseek_r1_distill_llama_70b"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
     capabilities:
@@ -136,7 +150,8 @@ models:
       currency: USD
 
   "deepinfra:deepseek/deepseek-r1-distill-qwen-32b":
-    metadata_ref: "deepseek_r1_distill_qwen_32b"
+    metadata:
+      model_reference: "deepseek_r1_distill_qwen_32b"
     provider: deepinfra
     model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
     capabilities:

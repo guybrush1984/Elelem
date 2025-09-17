@@ -5,7 +5,7 @@ provider:
     service_tier: auto
 
 models:
-  "groq:openai/gpt-oss-120b?low":
+  "groq:openai/gpt-oss-120b?reasoning=low":
     provider: groq
     model_id: openai/gpt-oss-120b  # GROQ's model ID format
     capabilities:
@@ -18,9 +18,11 @@ models:
       currency: USD
     default_params:
       reasoning_effort: low
-    metadata_ref: "openai_gpt_oss_120b"
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=low"
 
-  "groq:openai/gpt-oss-120b?high":
+  "groq:openai/gpt-oss-120b?reasoning=high":
     provider: groq
     model_id: openai/gpt-oss-120b  # GROQ's model ID format
     capabilities:
@@ -33,9 +35,11 @@ models:
       currency: USD
     default_params:
       reasoning_effort: high
-    metadata_ref: "openai_gpt_oss_120b"    
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=high"    
 
-  "groq:openai/gpt-oss-20b?low":
+  "groq:openai/gpt-oss-20b?reasoning=low":
     provider: groq
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -48,9 +52,11 @@ models:
       currency: USD
     default_params:
       reasoning_effort: low
-    metadata_ref: "openai_gpt_oss_20b"      
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=low"      
 
-  "groq:openai/gpt-oss-20b??high":
+  "groq:openai/gpt-oss-20b?reasoning=high":
     provider: groq
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -63,7 +69,9 @@ models:
       currency: USD
     default_params:
       reasoning_effort: high
-    metadata_ref: "openai_gpt_oss_20b"     
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=high"     
 
   "groq:moonshotai/kimi-k2-instruct":
     provider: groq
@@ -76,7 +84,8 @@ models:
       input_cost_per_1m: 1.00
       output_cost_per_1m: 3.00
       currency: USD
-    metadata_ref: "moonshot_kimi_k2"
+    metadata:
+      model_reference: "moonshot_kimi_k2"
 
   "groq:meta-llama/llama-4-maverick-17b":
     provider: groq
@@ -89,7 +98,8 @@ models:
       input_cost_per_1m: 0.20
       output_cost_per_1m: 0.60
       currency: USD
-    metadata_ref: "meta_llama4_maverick"
+    metadata:
+      model_reference: "meta_llama4_maverick"
 
   "groq:meta-llama/llama-4-scout-17b":
     provider: groq
@@ -102,4 +112,5 @@ models:
       input_cost_per_1m: 0.11
       output_cost_per_1m: 0.34
       currency: USD
-    metadata_ref: "meta_llama4_scout"
+    metadata:
+      model_reference: "meta_llama4_scout"

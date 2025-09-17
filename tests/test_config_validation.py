@@ -39,7 +39,7 @@ class TestConfigValidation:
             pytest.fail(f"Model structure issues found:\n" + "\n".join(f"  - {issue}" for issue in issues))
 
     def test_all_metadata_references_exist(self, config):
-        """Test that all metadata_ref values reference existing metadata."""
+        """Test that all metadata.model_reference values reference existing metadata."""
         models = config.models
         issues = []
 
@@ -55,12 +55,12 @@ class TestConfigValidation:
             except Exception as e:
                 pytest.fail(f"Could not load metadata definitions: {e}")
 
-        # Check each model's metadata_ref
+        # Check each model's metadata.model_reference
         for model_name, model_config in models.items():
-            if 'metadata_ref' in model_config:
-                metadata_ref = model_config['metadata_ref']
-                if metadata_ref not in metadata_definitions:
-                    issues.append(f"Model '{model_name}' references non-existent metadata '{metadata_ref}'")
+            if 'metadata' in model_config and isinstance(model_config['metadata'], dict):
+                model_reference = model_config['metadata'].get('model_reference')
+                if model_reference and model_reference not in metadata_definitions:
+                    issues.append(f"Model '{model_name}' references non-existent metadata '{model_reference}'")
 
         if issues:
             pytest.fail(f"Metadata reference issues found:\n" + "\n".join(f"  - {issue}" for issue in issues))

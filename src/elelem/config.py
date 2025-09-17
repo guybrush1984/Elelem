@@ -96,14 +96,21 @@ class Config:
                     # Merge models and resolve metadata references
                     if 'models' in provider_config:
                         for model_key, model_config in provider_config['models'].items():
-                            # Check for metadata_ref and resolve it
-                            if 'metadata_ref' in model_config and model_config['metadata_ref'] in metadata_definitions:
-                                metadata = metadata_definitions[model_config['metadata_ref']].copy()
-                                # Merge metadata into display_metadata
-                                model_config.setdefault('display_metadata', {}).update(metadata)
-                                # Remove the reference
-                                del model_config['metadata_ref']
-                            
+                            # Handle new metadata structure with model_reference
+                            if 'metadata' in model_config and isinstance(model_config['metadata'], dict):
+                                metadata_obj = model_config['metadata']
+                                model_reference = metadata_obj.get('model_reference')
+                                model_configuration = metadata_obj.get('model_configuration')
+
+                                if model_reference and model_reference in metadata_definitions:
+                                    metadata = metadata_definitions[model_reference].copy()
+                                    # Merge metadata into display_metadata
+                                    model_config.setdefault('display_metadata', {}).update(metadata)
+
+                                # Add model_configuration to display_metadata if present
+                                if model_configuration:
+                                    model_config.setdefault('display_metadata', {})['model_configuration'] = model_configuration
+
                             merged_config['models'][model_key] = model_config
             
             return merged_config

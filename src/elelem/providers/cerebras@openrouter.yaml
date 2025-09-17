@@ -14,8 +14,10 @@ provider:
       allow_fallbacks: false
 
 models:
-  "cerebras@openrouter:openai/gpt-oss-120b?low":
-    metadata_ref: "openai_gpt_oss_120b"
+  "cerebras@openrouter:openai/gpt-oss-120b?reasoning=low":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=low"
     provider: cerebras@openrouter
     model_id: openai/gpt-oss-120b
     capabilities:
@@ -28,8 +30,10 @@ models:
         reasoning:
           effort: "low"
 
-  "cerebras@openrouter:openai/gpt-oss-120b?high":
-    metadata_ref: "openai_gpt_oss_120b"
+  "cerebras@openrouter:openai/gpt-oss-120b?reasoning=high":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=high"
     provider: cerebras@openrouter
     model_id: openai/gpt-oss-120b
     capabilities:
@@ -50,7 +54,8 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
-    metadata_ref: "meta_llama4_maverick"
+    metadata:
+      model_reference: "meta_llama4_maverick"
 
   "cerebras@openrouter:meta-llama/llama-4-scout-17b":
     provider: cerebras@openrouter
@@ -60,4 +65,5 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
-    metadata_ref: "meta_llama4_scout"  
+    metadata:
+      model_reference: "meta_llama4_scout"  

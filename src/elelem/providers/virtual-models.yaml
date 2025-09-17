@@ -4,7 +4,8 @@
 models:
   # Virtual model for DeepSeek variants across providers
   "virtual:deepseek-v3.1-cheap":
-    metadata_ref: "deepseek_v31"
+    metadata:
+      model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.1"
@@ -15,7 +16,8 @@ models:
         timeout: 120s
 
   "virtual:deepseek-v3.1-quick":
-    metadata_ref: "deepseek_v31"
+    metadata:
+      model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
       - model: "fireworks:deepseek/deepseek-3.1"
@@ -27,48 +29,52 @@ models:
 
   # Cost-optimized routing (cheapest first)
   "virtual:gpt-oss-120b-cheap":
-    metadata_ref: "openai_gpt_oss_120b"
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
-      - model: "deepinfra:openai/gpt-oss-120b?low"
+      - model: "deepinfra:openai/gpt-oss-120b?reasoning=low"
         timeout: 120s
-      - model: "fireworks:openai/gpt-oss-120b?low"
+      - model: "fireworks:openai/gpt-oss-120b?reasoning=low"
         timeout: 120s
-      - model: "parasail:openai/gpt-oss-120b?low"
+      - model: "parasail:openai/gpt-oss-120b?reasoning=low"
         timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:gpt-oss-120b-quick":
-    metadata_ref: "openai_gpt_oss_120b"
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
-      - model: "groq:openai/gpt-oss-120b?low"
+      - model: "groq:openai/gpt-oss-120b?reasoning=low"
         timeout: 120s   
-      - model: "fireworks:openai/gpt-oss-120b?low"    
+      - model: "fireworks:openai/gpt-oss-120b?reasoning=low"    
         timeout: 120s
-      - model: "parasail:openai/gpt-oss-120b?low"     
+      - model: "parasail:openai/gpt-oss-120b?reasoning=low"     
         timeout: 120s
 
   # Cost-optimized routing (cheapest first)
   "virtual:gpt-oss-20b-cheap":
-    metadata_ref: "openai_gpt_oss_20b"
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
     timeout: 120s
     candidates:
-      - model: "deepinfra:openai/gpt-oss-20b?low"
+      - model: "deepinfra:openai/gpt-oss-20b?reasoning=low"
         timeout: 120s
-      - model: "fireworks:openai/gpt-oss-20b?low"
+      - model: "fireworks:openai/gpt-oss-20b?reasoning=low"
         timeout: 120s
-      - model: "groq:openai/gpt-oss-20b?low"
+      - model: "groq:openai/gpt-oss-20b?reasoning=low"
         timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:gpt-oss-20b-quick":
-    metadata_ref: "openai_gpt_oss_20b"
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
     timeout: 120s
     candidates:
-      - model: "groq:openai/gpt-oss-20b?low"
+      - model: "groq:openai/gpt-oss-20b?reasoning=low"
         timeout: 120s
-      - model: "fireworks:openai/gpt-oss-20b?low"
+      - model: "fireworks:openai/gpt-oss-20b?reasoning=low"
         timeout: 120s
-      - model: "deepinfra:openai/gpt-oss-20b?low"
+      - model: "deepinfra:openai/gpt-oss-20b?reasoning=low"
         timeout: 120s

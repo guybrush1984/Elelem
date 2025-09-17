@@ -5,8 +5,10 @@ provider:
   default_params: {}
 
 models:
-  "scaleway:openai/gpt-oss-120b?low":
-    metadata_ref: "openai_gpt_oss_120b"
+  "scaleway:openai/gpt-oss-120b?reasoning=low":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=low"
     provider: scaleway
     model_id: gpt-oss-120b
     capabilities:
@@ -20,8 +22,10 @@ models:
     default_params:
       reasoning_effort: low      
 
-  "scaleway:openai/gpt-oss-120b?high":
-    metadata_ref: "openai_gpt_oss_120b"
+  "scaleway:openai/gpt-oss-120b?reasoning=high":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=high"
     provider: scaleway
     model_id: gpt-oss-120b
     capabilities:
@@ -36,7 +40,8 @@ models:
       reasoning_effort: high   
 
   "scaleway:google/gemma-3-27b-it":
-    metadata_ref: "google_gemma_3_27b"
+    metadata:
+      model_reference: "google_gemma_3_27b"
     provider: scaleway
     model_id: gemma-3-27b-it
     capabilities:
@@ -49,7 +54,8 @@ models:
       currency: USD
 
   "scaleway:mistralai/mistral-small-3.2-24b-instruct":
-    metadata_ref: "mistral_small_32"
+    metadata:
+      model_reference: "mistral_small_32"
     provider: scaleway
     model_id: mistral-small-3.2-24b-instruct-2506
     capabilities:
@@ -62,7 +68,8 @@ models:
       currency: USD
 
   "scaleway:alibaba/qwen3-235b-a22b-instruct":
-    metadata_ref: "alibaba_qwen3_235b"
+    metadata:
+      model_reference: "alibaba_qwen3_235b"
     provider: scaleway
     model_id: qwen3-235b-a22b-instruct-2507
     capabilities:

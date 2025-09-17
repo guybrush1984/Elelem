@@ -19,8 +19,8 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = Field(default=1.0, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(default=None, gt=0)
     top_p: Optional[float] = Field(default=1.0, ge=0.0, le=1.0)
-    frequency_penalty: Optional[float] = Field(default=0.0, ge=-2.0, le=2.0)
-    presence_penalty: Optional[float] = Field(default=0.0, ge=-2.0, le=2.0)
+    frequency_penalty: Optional[float] = Field(default=None, ge=-2.0, le=2.0)
+    presence_penalty: Optional[float] = Field(default=None, ge=-2.0, le=2.0)
     stop: Optional[Union[str, List[str]]] = None
     stream: Optional[bool] = False
     response_format: Optional[Dict[str, Any]] = None

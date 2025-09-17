@@ -1,31 +1,29 @@
-# Elelem 🎪 The "It Just Works™" Multi-Provider LLM Gateway
+# Elelem - Multi-Provider LLM Gateway
 
-> *Because managing 47 models across 8 providers shouldn't require a PhD in API archaeology*
+> *Managing 47 models across 8 providers with automatic failover and JSON reliability*
 
-## Why Elelem Exists (A Love Story)
+## Why Elelem Exists
 
-Once upon a time, I just wanted my LLMs to return JSON. Simple, right? **WRONG.**
+Elelem started from a simple need: reliable JSON responses from LLMs. Different providers handle JSON mode differently:
 
-- OpenAI wants `response_format: {type: "json_object"}`
-- Groq wants it but sometimes doesn't support it
-- DeepInfra laughs at your JSON dreams
-- Fireworks needs `stream: true` even when you don't want streaming
-- Don't even get me started on reasoning tokens...
+- OpenAI uses `response_format: {type: "json_object"}`
+- Groq supports it but with varying reliability
+- DeepInfra has limited JSON mode support
+- Fireworks has specific streaming requirements
+- And reasoning tokens are handled differently everywhere
 
-So Elelem was born - not to pick the best model (that's your job), but to make sure when sh*t hits the fan with Provider A, you can seamlessly fail over to Provider B, C, or even D. It's about **infrastructure redundancy**, not model selection.
+Elelem was built to solve this through **infrastructure redundancy**, not model selection. When Provider A fails, you automatically failover to Provider B, C, or D.
 
 Think of it as:
-- 🎯 A very tiny [LiteLLM](https://github.com/BerriAI/litellm), but obsessed with JSON
-- 🌐 Your own local [OpenRouter](https://openrouter.ai/) (which btw, is also an Elelem provider!)
-- 🤹 A circus juggler that never drops the JSON ball
+- 🎯 A lightweight [LiteLLM](https://github.com/BerriAI/litellm) focused on JSON reliability
+- 🌐 Your own local [OpenRouter](https://openrouter.ai/) (OpenRouter is also an Elelem provider)
+- 🔄 A failover system that prioritizes reliability
 
-### The Never-Ending Quest
+This project is actively evolving - new providers and models are added regularly as the LLM landscape changes.
 
-Started as a pet project to figure out why one could return JSON but the other would rather write poetry about JSON. Now it's a never-ending quest to tame the wild west of LLM APIs. Very, very far from complete - new providers break things weekly, and so do I! 🎢
+## Key Features
 
-## Key Features (The Good Stuff)
-
-### 🎭 Virtual Models - Your Failover Safety Net
+### 🎭 Virtual Models - Automatic Failover
 
 Define virtual models that iterate through different providers until one works:
 
@@ -46,24 +44,24 @@ models:
 # Just use it like any other model
 response = await elelem.create_chat_completion(
     model="virtual:gpt-oss-120b-reliable",
-    messages=[{"role": "user", "content": "Never fail me!"}]
+    messages=[{"role": "user", "content": "Your request"}]
 )
-# Elelem handles the provider dance for you
+# Elelem handles the provider failover automatically
 ```
 
 ### 🚀 Dynamic Models - Create Virtual Models on the Fly
 
 ```python
-# When you need a custom failover RIGHT NOW
+# Define failover models at runtime
 response = await elelem.create_chat_completion(
     model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout: 30s}",
-    messages=[{"role": "user", "content": "I'm dynamically redundant!"}]
+    messages=[{"role": "user", "content": "Your request"}]
 )
 ```
 
-### 🎯 JSON Mode That Actually Works
+### 🎯 Reliable JSON Mode
 
-Elelem is paranoid about JSON. It will:
+Elelem provides robust JSON handling by:
 1. Try the native JSON mode if supported
 2. Strip markdown code blocks if the model gets creative
 3. Fix common JSON errors (trailing commas, single quotes)
@@ -71,12 +69,12 @@ Elelem is paranoid about JSON. It will:
 5. Validate against your schema (if provided)
 
 ```python
-# This WILL return valid JSON, or die trying (it won't die, it'll failover)
+# Returns valid JSON with automatic error handling and retries
 response = await elelem.create_chat_completion(
     model="any-model-really",
     messages=[{"role": "user", "content": "Return a JSON with name and age"}],
-    response_format={"type": "json_object"},  # Elelem handles model quirks
-    json_schema={  # Optional but recommended
+    response_format={"type": "json_object"},  # Elelem handles provider differences
+    json_schema={  # Optional validation
         "type": "object",
         "properties": {
             "name": {"type": "string"},

@@ -1,1 +1,0 @@
-2025-09-17 20:55:20,709 - elelem - DEBUG - [cf42d839] RAW USAGE OBJECT: CompletionUsage(completion_tokens=461, prompt_tokens=108, total_tokens=1319, completion_tokens_details=None, prompt_tokens_details=None)

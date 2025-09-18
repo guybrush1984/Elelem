@@ -24,7 +24,10 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime
+    cost:
+      input_cost_per_1m: 0.35
+      output_cost_per_1m: 0.75
+      currency: USD
     default_params:
       extra_body:
         reasoning:
@@ -40,7 +43,9 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime
+    cost:
+      input_cost_per_1m: 0.35
+      output_cost_per_1m: 0.75
     default_params:
       extra_body:
         reasoning:
@@ -53,7 +58,9 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.60
     metadata:
       model_reference: "meta_llama4_maverick"
 
@@ -64,6 +71,8 @@ models:
       supports_json_mode: false
       supports_temperature: true
       supports_system: true
-    cost: runtime
+    cost:
+      input_cost_per_1m: 0.65
+      output_cost_per_1m: 0.85
     metadata:
       model_reference: "meta_llama4_scout"  

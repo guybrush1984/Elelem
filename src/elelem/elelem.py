@@ -912,11 +912,8 @@ class Elelem:
                 # Update response content
                 response.choices[0].message.content = content
 
-                # Convert response to dict for modification
-                response_dict = response.model_dump() if hasattr(response, 'model_dump') else response.__dict__
-
-                # Add Elelem-specific metrics
-                response_dict["elelem_metrics"] = {
+                # Add Elelem-specific metrics to the response object
+                response.elelem_metrics = {
                     "request_duration_seconds": duration,
                     "provider_used": provider_name,
                     "model_used": stats_model_name,
@@ -930,7 +927,7 @@ class Elelem:
                     "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
                 }
 
-                return response_dict
+                return response
                 
             except (InfrastructureError, ModelError):
                 # Re-raise classification errors as-is

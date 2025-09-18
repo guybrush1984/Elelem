@@ -485,7 +485,7 @@ Creates a chat completion with automatic candidate iteration and fallback.
 - `**kwargs`: Additional OpenAI API parameters
 
 **Returns:**
-- OpenAI-compatible response with `choices[0]["message"]["content"]` access
+- OpenAI-compatible response with `choices[0].message.content` access
 
 #### `get_stats()`
 

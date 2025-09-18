@@ -67,3 +67,31 @@ Use these commands:
 - Or using uv CLI:
     - `uv add package-name --script script.py`
     - `uv remove package-name --script script.py`
+
+# Git Commit Strategy - CRITICAL
+
+**🚨 NEVER use `git add .` or `git add -A` - This leads to disasters!**
+
+## Commit Best Practices
+
+**DO:**
+- `git add src/specific_file.py` - Add individual files explicitly
+- `git add src/elelem/` - Add specific directories when needed
+- `git status` - Always review what will be committed BEFORE committing
+- `git diff --cached` - Review staged changes before committing
+
+**NEVER DO:**
+- `git add .` - Adds ALL files including temp files, test results, logs
+- `git add -A` - Same disaster as above
+- `git add *` - Shell glob expansion, unpredictable results
+- `git commit -am` - Bypasses explicit file selection
+
+## Safe Commit Workflow
+
+1. `git status` - See what's changed
+2. `git add src/elelem/specific_file.py` - Add only the files you modified
+3. `git status` - Verify only intended files are staged
+4. `git diff --cached` - Review the actual changes
+5. `git commit -m "descriptive message"`
+
+**When in doubt, add files one by one explicitly!**

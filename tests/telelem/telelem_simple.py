@@ -302,11 +302,11 @@ async def run_single_test(
         duration = time.time() - start_time
 
         # Extract response content (now consistent dict format)
-        choices = response.get("choices", [])
-        content = choices[0]["message"]["content"] if choices else ""
+        choices = getattr(response, "choices", [])
+        content = choices[0].message.content if choices else ""
 
         # Use Elelem's processed metrics for accurate token counts (includes reasoning tokens)
-        elelem_metrics = response.get("elelem_metrics", {})
+        elelem_metrics = getattr(response, "elelem_metrics", {})
         if elelem_metrics and "tokens" in elelem_metrics:
             tokens = elelem_metrics["tokens"]
             input_tokens = tokens.get("input", 0)
@@ -315,9 +315,13 @@ async def run_single_test(
             total_tokens = tokens.get("total", 0)
         else:
             # Fallback to raw usage if elelem_metrics not available
-            usage = response.get("usage", {})
-            input_tokens = usage.get("prompt_tokens", 0)
-            output_tokens = usage.get("completion_tokens", 0)
+            usage = getattr(response, "usage", None)
+            if usage:
+                input_tokens = getattr(usage, "prompt_tokens", 0)
+                output_tokens = getattr(usage, "completion_tokens", 0)
+            else:
+                input_tokens = 0
+                output_tokens = 0
             reasoning_tokens = 0
             total_tokens = input_tokens + output_tokens
 

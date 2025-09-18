@@ -76,7 +76,7 @@ class TestElelemWithFaker:
 
         # Should eventually succeed with valid JSON
         assert response
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
         json_data = json.loads(content)
         assert json_data["status"] == "success_after_temperature_reduction"
 
@@ -95,7 +95,7 @@ class TestElelemWithFaker:
         print(f"Temperature sequence: {temperatures}")
 
         # Check elelem_metrics structure
-        elelem_metrics = response["elelem_metrics"]
+        elelem_metrics = response.elelem_metrics
         print(f"Elelem metrics keys: {list(elelem_metrics.keys())}")
 
         # Should show decreasing temperatures
@@ -125,7 +125,7 @@ class TestElelemWithFaker:
 
         # Should eventually succeed
         assert response
-        assert "Success after" in response["choices"][0]["message"]["content"]
+        assert "Success after" in response.choices[0].message.content
 
         # Should have taken some time due to rate limit backoff
         assert elapsed_time > 1.0  # At least 1 second due to retries
@@ -152,7 +152,7 @@ class TestElelemWithFaker:
 
         # Should succeed
         assert response
-        assert "Parameter cleanup test" in response["choices"][0]["message"]["content"]
+        assert "Parameter cleanup test" in response.choices[0].message.content
 
         # Verify Elelem removed response_format parameter
         requests = faker.request_analyzer.get_captured_requests()
@@ -182,9 +182,9 @@ class TestElelemWithFaker:
         print(f"Response type: {type(response)}")
         print(f"Response content: {response}")
 
-        # Elelem returns dict format, not OpenAI object
-        assert "usage" in response
-        assert response["usage"]["total_tokens"] > 0
+        # Elelem returns OpenAI response object
+        assert hasattr(response, "usage")
+        assert response.usage.total_tokens > 0
 
         # Check that Elelem tracked costs
         stats = elelem.get_stats_by_tag("test_cost_tracking")
@@ -195,8 +195,8 @@ class TestElelemWithFaker:
         print(f"Overall stats: {overall_stats}")
 
         # The response itself contains cost information
-        assert response["elelem_metrics"]["costs_usd"]["total_cost_usd"] > 0
-        assert response["elelem_metrics"]["tokens"]["total"] > 0
+        assert response.elelem_metrics["costs_usd"]["total_cost_usd"] > 0
+        assert response.elelem_metrics["tokens"]["total"] > 0
 
     @pytest.mark.asyncio
     async def test_virtual_model_candidate_failover(self, elelem_with_faker_env):
@@ -215,9 +215,9 @@ class TestElelemWithFaker:
 
         # Should eventually succeed with the basic candidate
         assert response
-        assert "choices" in response
-        assert len(response["choices"]) > 0
-        assert response["choices"][0]["message"]["content"]
+        assert hasattr(response, "choices")
+        assert len(response.choices) > 0
+        assert response.choices[0].message.content
 
         # Verify we actually hit multiple candidates (check logs or internal state)
         # The response should come from the successful candidate
@@ -276,7 +276,7 @@ class TestElelemWithFaker:
 
         # Should succeed with valid JSON
         assert response
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
 
         # Verify it's valid JSON matching schema
         import json
@@ -297,7 +297,7 @@ class TestElelemWithFaker:
             )
 
             # If it succeeds, check that validation handled the invalid data
-            content = response["choices"][0]["message"]["content"]
+            content = response.choices[0].message.content
             parsed = json.loads(content)
             # Should either fix the invalid age or retry to get valid response
 
@@ -351,7 +351,7 @@ class TestElelemWithFaker:
         )
 
         assert response
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
 
         # Check what the faker actually sent vs what Elelem returned
         requests = faker.request_analyzer.get_captured_requests()
@@ -387,7 +387,7 @@ class TestElelemWithFaker:
 
         # Should succeed
         assert response
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
         assert "Temperature parameter was cleaned up" in content
 
         # Verify the request sent to faker doesn't contain temperature
@@ -421,7 +421,7 @@ class TestElelemWithFaker:
 
         # Should succeed
         assert response
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
         assert "System message was handled" in content
 
         # Verify the request transformation
@@ -473,13 +473,13 @@ class TestElelemWithFaker:
 
         # The response should be identical to non-streaming responses
         # Check response structure
-        if "choices" in response and len(response["choices"]) > 0:
-            choice = response["choices"][0]
+        if hasattr(response, "choices") and len(response.choices) > 0:
+            choice = response.choices[0]
             print(f"DEBUG: Choice structure: {choice}")
-            if "message" in choice:
-                content = choice["message"]["content"]
-            elif "delta" in choice:
-                content = choice["delta"].get("content", "")
+            if hasattr(choice, "message"):
+                content = choice.message.content
+            elif hasattr(choice, "delta"):
+                content = getattr(choice.delta, "content", "")
             else:
                 # If neither message nor delta, maybe it's in a different format
                 content = str(choice)
@@ -491,11 +491,11 @@ class TestElelemWithFaker:
         assert content == expected_content, f"Expected '{expected_content}' but got '{content}'"
 
         # Verify the response structure matches non-streaming responses
-        assert isinstance(response, dict), "Response should be a dict"
-        assert "choices" in response, "Response should have 'choices'"
-        assert len(response["choices"]) > 0, "Should have at least one choice"
-        assert "message" in response["choices"][0], "Choice should have 'message'"
-        assert "content" in response["choices"][0]["message"], "Message should have 'content'"
+        # Response should be an OpenAI ChatCompletion object
+        assert hasattr(response, "choices"), "Response should have 'choices'"
+        assert len(response.choices) > 0, "Should have at least one choice"
+        assert hasattr(response.choices[0], "message"), "Choice should have 'message'"
+        assert hasattr(response.choices[0].message, "content"), "Message should have 'content'"
 
         print(f"✓ Response structure is correct: {type(response)}")
         print(f"✓ Response has choices[0].message.content structure")
@@ -508,7 +508,7 @@ class TestElelemWithFaker:
         assert request_body.get('stream') == True, "Stream parameter should be enabled"
 
         # Verify tokens are tracked correctly
-        token_info = response.get('elelem_metrics', {}).get('tokens', {})
+        token_info = getattr(response, 'elelem_metrics', {}).get('tokens', {})
         assert token_info['input'] > 0
         assert token_info['output'] > 0
 

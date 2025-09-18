@@ -133,14 +133,14 @@ class TestRealProviders:
 
             # Validate response structure
             assert response is not None, f"No response from {model_name}"
-            assert 'choices' in response, f"No choices in response from {model_name}"
-            assert len(response['choices']) > 0, f"Empty choices from {model_name}"
+            assert hasattr(response, 'choices'), f"No choices in response from {model_name}"
+            assert len(response.choices) > 0, f"Empty choices from {model_name}"
 
-            choice = response['choices'][0]
-            assert 'message' in choice, f"No message in choice from {model_name}"
-            assert 'content' in choice['message'], f"No content in message from {model_name}"
+            choice = response.choices[0]
+            assert hasattr(choice, 'message'), f"No message in choice from {model_name}"
+            assert hasattr(choice.message, 'content'), f"No content in message from {model_name}"
 
-            content = choice['message']['content']
+            content = choice.message.content
             assert content is not None, f"Null content from {model_name}"
             assert isinstance(content, str), f"Non-string content from {model_name}"
             assert len(content.strip()) > 0, f"Empty content from {model_name}"
@@ -194,14 +194,14 @@ class TestRealProviders:
 
             # Validate response structure
             assert response is not None, f"No response from {model_name}"
-            assert 'choices' in response, f"No choices in response from {model_name}"
-            assert len(response['choices']) > 0, f"Empty choices from {model_name}"
+            assert hasattr(response, 'choices'), f"No choices in response from {model_name}"
+            assert len(response.choices) > 0, f"Empty choices from {model_name}"
 
-            choice = response['choices'][0]
-            assert 'message' in choice, f"No message in choice from {model_name}"
-            assert 'content' in choice['message'], f"No content in message from {model_name}"
+            choice = response.choices[0]
+            assert hasattr(choice, 'message'), f"No message in choice from {model_name}"
+            assert hasattr(choice.message, 'content'), f"No content in message from {model_name}"
 
-            content = choice['message']['content']
+            content = choice.message.content
             assert content is not None, f"Null content from {model_name}"
             assert isinstance(content, str), f"Non-string content from {model_name}"
             assert len(content.strip()) > 0, f"Empty content from {model_name}"
@@ -256,10 +256,10 @@ class TestRealProviders:
 
             # Validate response structure
             assert response is not None, f"No response from {model_name}"
-            assert 'choices' in response, f"No choices in response from {model_name}"
-            assert len(response['choices']) > 0, f"Empty choices from {model_name}"
+            assert hasattr(response, 'choices'), f"No choices in response from {model_name}"
+            assert len(response.choices) > 0, f"Empty choices from {model_name}"
 
-            content = response['choices'][0]['message']['content']
+            content = response.choices[0].message.content
             assert content is not None, f"Null content from {model_name}"
             assert isinstance(content, str), f"Non-string content from {model_name}"
 
@@ -315,13 +315,13 @@ class TestRealProviders:
                 )
 
                 # Check if response has usage information
-                if 'usage' in response and response['usage']:
-                    usage = response['usage']
+                if hasattr(response, 'usage') and response.usage:
+                    usage = response.usage
                     cost_info = {
                         'model': model_name,
-                        'prompt_tokens': usage.get('prompt_tokens', 0),
-                        'completion_tokens': usage.get('completion_tokens', 0),
-                        'total_tokens': usage.get('total_tokens', 0)
+                        'prompt_tokens': getattr(usage, 'prompt_tokens', 0),
+                        'completion_tokens': getattr(usage, 'completion_tokens', 0),
+                        'total_tokens': getattr(usage, 'total_tokens', 0)
                     }
 
                     # Validate usage data
@@ -420,9 +420,9 @@ class TestSpecificProviders:
             )
 
             assert response is not None
-            assert 'choices' in response
+            assert hasattr(response, 'choices')
             # OpenAI should provide usage data
-            assert 'usage' in response
+            assert hasattr(response, 'usage')
 
         except Exception as e:
             pytest.skip(f"OpenAI test skipped: {str(e)}")
@@ -432,7 +432,7 @@ class TestSpecificProviders:
         """Test Groq-specific features."""
         try:
             response = await elelem.create_chat_completion(
-                model="groq:openai/gpt-oss-120b",
+                model="groq:openai/gpt-oss-120b?reasoning=low",
                 messages=[
                     {"role": "user", "content": "What is 2+2?"}
                 ],
@@ -440,7 +440,7 @@ class TestSpecificProviders:
             )
 
             assert response is not None
-            assert 'choices' in response
+            assert hasattr(response, 'choices')
 
         except Exception as e:
             pytest.skip(f"Groq test skipped: {str(e)}")
@@ -459,7 +459,7 @@ class TestSpecificProviders:
             )
 
             assert response is not None
-            assert 'choices' in response
+            assert hasattr(response, 'choices')
 
             # The response should indicate which provider was actually used
             # This depends on Elelem's implementation details

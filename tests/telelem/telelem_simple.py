@@ -102,7 +102,7 @@ class TelelemClient:
 
             print(f"✅ Connected to Elelem server at {self.server_url}")
 
-    async def chat_completion(self, messages: List[Dict], model: str, **kwargs) -> Dict:
+    async def chat_completion(self, messages: List[Dict], model: str, **kwargs):
         """Create a chat completion - unified interface for both modes."""
 
         if self.mode == "direct":
@@ -125,24 +125,8 @@ class TelelemClient:
                 **api_kwargs
             )
 
-            # Convert OpenAI response object to dict for consistent interface
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "content": choice.message.content,
-                            "role": choice.message.role
-                        },
-                        "finish_reason": choice.finish_reason
-                    }
-                    for choice in response.choices
-                ],
-                "usage": {
-                    "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                    "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                    "total_tokens": response.usage.total_tokens if response.usage else 0
-                }
-            }
+            # Return response object directly to preserve elelem_metrics
+            return response
 
     def list_models(self) -> List[Dict]:
         """Get list of available models."""
@@ -301,7 +285,7 @@ async def run_single_test(
         )
         duration = time.time() - start_time
 
-        # Extract response content (now consistent dict format)
+        # Extract response content (consistent format for both modes)
         choices = getattr(response, "choices", [])
         content = choices[0].message.content if choices else ""
 
@@ -336,6 +320,20 @@ async def run_single_test(
             if duration > 0 and output_tokens > 0:
                 tokens_per_sec = output_tokens / duration
                 print(f"   Generation speed: {tokens_per_sec:.1f} tokens/s")
+
+            # Display cost information if available
+            if elelem_metrics and "costs_usd" in elelem_metrics:
+                costs = elelem_metrics["costs_usd"]
+                total_cost = costs.get("total_cost_usd", 0.0)
+                input_cost = costs.get("input_cost_usd", 0.0)
+                output_cost = costs.get("output_cost_usd", 0.0)
+                reasoning_cost = costs.get("reasoning_cost_usd", 0.0)
+
+                print(f"   Total cost: ${total_cost:.6f}")
+                if reasoning_cost > 0:
+                    print(f"   Input cost: ${input_cost:.6f}, Output cost: ${output_cost:.6f}, Reasoning cost: ${reasoning_cost:.6f}")
+                else:
+                    print(f"   Input cost: ${input_cost:.6f}, Output cost: ${output_cost:.6f}")
 
             # Validate JSON if needed
             if json_mode:

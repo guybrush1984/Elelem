@@ -5,34 +5,26 @@ Main Elelem class - Unified API wrapper for OpenAI, GROQ, and DeepInfra
 import asyncio
 import json
 import logging
-import os
-import re
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
-import yaml
 import openai
 from openai import (
     BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError,
     ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError,
-    LengthFinishReasonError, ContentFilterFinishReasonError
 )
 import pandas as pd
-from jsonschema import validate, ValidationError
 from .config import Config
 from .metrics import MetricsStore
-from .reasoning_tokens import extract_token_counts
-
-
-class InfrastructureError(Exception):
-    """Errors that should trigger candidate iteration."""
-    pass
-
-class ModelError(Exception):
-    """Errors that should not trigger candidate iteration."""
-    pass
+from ._reasoning_tokens import extract_token_counts
+from ._exceptions import InfrastructureError, ModelError
+from ._cost_calculation import calculate_costs, extract_runtime_costs
+from ._response_processing import collect_streaming_response, remove_think_tags, extract_json_from_markdown, process_response_content
+from ._json_validation import validate_json_schema, is_json_validation_api_error, add_json_instructions_to_messages, validate_json_response
+from ._provider_management import create_provider_client, initialize_providers, get_model_config
+from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
+from ._request_execution import prepare_api_kwargs
 
 
 class Elelem:
@@ -53,52 +45,11 @@ class Elelem:
     
     def _create_provider_client(self, api_key: str, base_url: str, timeout: int = 120, provider_name: str = None, default_headers: Dict = None):
         """Create an OpenAI-compatible client for any provider."""
-        client_kwargs = {
-            "api_key": api_key,
-            "base_url": base_url,
-            "timeout": 600,  # High timeout - we'll manage timeouts at application level
-            "max_retries": 0  # Disable OpenAI SDK retries - Elelem handles all retry logic
-        }
-        
-        # Add custom headers for specific providers
-        if default_headers:
-            client_kwargs["default_headers"] = default_headers
-            
-        return openai.AsyncOpenAI(**client_kwargs)
+        return create_provider_client(api_key, base_url, timeout, provider_name, default_headers)
         
     def _initialize_providers(self) -> Dict[str, Any]:
         """Initialize provider clients."""
-        providers = {}
-        
-        # Initialize all configured providers
-        for provider_name, provider_config in self.config.providers.items():
-            # Handle infrastructure providers (e.g., cerebras@openrouter)
-            base_provider = provider_config.get("base_provider")
-            if base_provider:
-                # Use base provider for API key: cerebras@openrouter -> OPENROUTER_API_KEY
-                env_var = f"{base_provider.upper()}_API_KEY"
-            else:
-                # Direct provider: openrouter -> OPENROUTER_API_KEY
-                env_var = f"{provider_name.upper()}_API_KEY"
-            
-            api_key = os.getenv(env_var)
-            
-            if api_key:
-                # Get custom headers from provider config
-                custom_headers = provider_config.get("headers")
-                
-                providers[provider_name] = self._create_provider_client(
-                    api_key=api_key,
-                    base_url=provider_config["endpoint"],
-                    timeout=self.config.timeout_seconds,
-                    provider_name=provider_name,
-                    default_headers=custom_headers
-                )
-                self.logger.debug(f"Initialized {provider_name} provider")
-            else:
-                self.logger.warning(f"No API key found for {provider_name} (env var: {env_var})")
-                
-        return providers
+        return initialize_providers(self.config.providers, self.config.timeout_seconds, self.logger)
         
     def _reset_stats(self):
         """Reset all statistics."""
@@ -106,295 +57,41 @@ class Elelem:
         
     def _get_model_config(self, model: str) -> tuple[str, str]:
         """Get provider and model_id from model configuration (opaque key lookup)."""
-        if model not in self._models:
-            raise ValueError(f"Unknown model: {model}")
-
-        model_config = self._models.get(model, {})
-        provider = model_config.get("provider")
-        model_id = model_config.get("model_id")
-
-        if not provider:
-            raise ValueError(f"Model '{model}' missing provider configuration")
-        if not model_id:
-            raise ValueError(f"Model '{model}' missing model_id configuration")
-
-        if provider not in self._providers:
-            available_providers = list(self._providers.keys())
-            raise ValueError(f"Provider '{provider}' not available. Available: {available_providers}")
-
-        return provider, model_id
+        return get_model_config(model, self._models, self._providers)
         
         
     async def _collect_streaming_response(self, stream):
         """Collect streaming chunks and reconstruct a normal response object."""
-        content_parts = []
-        reasoning_content_parts = []
-        final_chunk = None
-        finish_reason = None
-
-        async for chunk in stream:
-            if chunk.choices and len(chunk.choices) > 0:
-                choice = chunk.choices[0]
-                
-                # Extract content from delta
-                if hasattr(choice, 'delta') and choice.delta.content is not None:
-                    content_parts.append(choice.delta.content)
-                
-                # Extract reasoning_content if available
-                if hasattr(choice, 'delta') and hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content is not None:
-                    reasoning_content_parts.append(choice.delta.reasoning_content)
-                
-                # Capture finish_reason
-                if hasattr(choice, 'finish_reason') and choice.finish_reason:
-                    finish_reason = choice.finish_reason
-            
-            # Keep the last chunk for metadata (id, usage, etc.)
-            final_chunk = chunk
-        
-        if not final_chunk:
-            raise ValueError("No chunks received from stream")
-        
-        # Reconstruct the complete content
-        full_content = ''.join(content_parts) if content_parts else None
-        full_reasoning_content = ''.join(reasoning_content_parts) if reasoning_content_parts else None
-        
-        # Create a normal ChatCompletion response (not streaming)
-        from openai.types.chat.chat_completion_message import ChatCompletionMessage
-        from openai.types.chat.chat_completion import ChatCompletion, Choice
-
-        # Create the message object
-        message = ChatCompletionMessage(
-            role="assistant",
-            content=full_content,
-            reasoning_content=full_reasoning_content if full_reasoning_content else None
-        )
-
-        # Create the choice object
-        choice = Choice(
-            index=0,
-            message=message,
-            finish_reason=finish_reason
-        )
-
-        # Create a proper ChatCompletion object (not ChatCompletionChunk)
-        # Use the metadata from the final chunk but create a new ChatCompletion
-        completion = ChatCompletion(
-            id=final_chunk.id,
-            object="chat.completion",  # Not "chat.completion.chunk"
-            created=final_chunk.created,
-            model=final_chunk.model,
-            choices=[choice],
-            usage=final_chunk.usage if hasattr(final_chunk, 'usage') and final_chunk.usage else None,
-            system_fingerprint=final_chunk.system_fingerprint if hasattr(final_chunk, 'system_fingerprint') else None,
-            service_tier=final_chunk.service_tier if hasattr(final_chunk, 'service_tier') else None
-        )
-
-        return completion
+        return await collect_streaming_response(stream)
         
     def _remove_think_tags(self, content: str) -> str:
         """Remove <think>...</think> tags from content."""
-        if not content:
-            return ""
-        
-        # Pattern to match <think>...</think> including multiline content
-        pattern = r'<think>.*?</think>'
-        cleaned = re.sub(pattern, '', content, flags=re.DOTALL).strip()
-        
-        # Fallback: if content starts with thinking content and contains </think>,
-        # extract everything after </think>
-        if cleaned == content and '</think>' in content:
-            parts = content.split('</think>', 1)
-            if len(parts) > 1:
-                cleaned = parts[1].strip()
-                self.logger.debug(f"Removed thinking content using </think> split: kept {len(cleaned)} chars")
-        
-        return cleaned
+        return remove_think_tags(content, self.logger)
         
     def _extract_json_from_markdown(self, content: str) -> str:
         """Extract JSON from markdown code blocks."""
-        # Pattern to match ```json\n{...}\n``` or ```\n{...}\n```
-        patterns = [
-            r'```json\s*\n(.*?)\n```',
-            r'```\s*\n(\{.*?\})\n```',
-            r'```json\s*\n(.*?)```',
-            r'```\s*\n(\{.*?\})```'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, content, re.DOTALL)
-            if match:
-                extracted = match.group(1).strip()
-                self.logger.debug(f"Extracted JSON from markdown: {extracted}")
-                return extracted
-                
-        # If no markdown wrapper found, return original content
-        return content
+        return extract_json_from_markdown(content, self.logger)
         
     def _validate_json_schema(self, json_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Validate a JSON object against a JSON Schema.
-        
-        Args:
-            json_obj: The parsed JSON object to validate
-            schema: The JSON Schema to validate against
-            
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        try:
-            validate(instance=json_obj, schema=schema)
-            return True, None
-        except ValidationError as e:
-            # Build detailed error message
-            error_parts = [f"Schema validation failed: {e.message}"]
-            
-            if e.path:
-                path_str = ".".join(str(p) for p in e.path)
-                error_parts.append(f"at path: {path_str}")
-                
-            if e.schema_path:
-                schema_path_str = ".".join(str(p) for p in e.schema_path)
-                error_parts.append(f"schema path: {schema_path_str}")
-                
-            error_msg = " | ".join(error_parts)
-            return False, error_msg
+        """Validate a JSON object against a JSON Schema."""
+        return validate_json_schema(json_obj, schema)
         
     def _is_json_validation_api_error(self, error: Exception) -> bool:
         """Check if the error is a json_validate_failed API error."""
-        error_str = str(error).lower()
-        return "json_validate_failed" in error_str and "400" in error_str
+        return is_json_validation_api_error(error)
         
     def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict) -> List[Dict[str, str]]:
         """Add JSON formatting instructions to messages when response_format is JSON."""
         supports_system = capabilities.get("supports_system", True)
-        
-        modified_messages = messages.copy()
-        
-        # Add JSON instruction to system message or create one
-        json_instruction = (
-            "\n\nCRITICAL: You must respond with ONLY a clean JSON object - no markdown, no code blocks, no extra text. "
-            "Do not wrap the JSON in ```json``` blocks or any other formatting. "
-            "Return raw, valid JSON that can be parsed directly. "
-            "Start your response with { and end with }. "
-            "Any non-JSON content will cause a parsing error."
-        )
-        
-        if supports_system:
-            # Find system message and append instruction
-            system_found = False
-            for msg in modified_messages:
-                if msg.get("role") == "system":
-                    msg["content"] = msg["content"] + json_instruction
-                    system_found = True
-                    break
-                    
-            # If no system message found, add one
-            if not system_found:
-                modified_messages.insert(0, {
-                    "role": "system",
-                    "content": "You are a helpful assistant." + json_instruction
-                })
-        else:
-            # Model doesn't support system messages, add as user message
-            modified_messages.append({
-                "role": "user",
-                "content": json_instruction.strip()
-            })
-            
-        return modified_messages
+        return add_json_instructions_to_messages(messages, supports_system)
         
     def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None, candidate_cost_config: Dict = None) -> Dict[str, float]:
         """Calculate costs based on model pricing or runtime data from provider."""
-        cost_config = candidate_cost_config
-        
-        # Handle runtime cost calculation (e.g., from OpenRouter headers)
-        if runtime_costs:
-            return {
-                "input_cost_usd": runtime_costs.get("input_cost_usd", 0.0),
-                "output_cost_usd": runtime_costs.get("output_cost_usd", 0.0),
-                "reasoning_cost_usd": runtime_costs.get("reasoning_cost_usd", 0.0),
-                "total_cost_usd": runtime_costs.get("total_cost_usd", 0.0)
-            }
-        
-        # Handle runtime-priced models (cost: "runtime")
-        if cost_config == "runtime":
-            self.logger.warning(f"Runtime pricing model {model} used without runtime cost data - costs set to 0")
-            return {
-                "input_cost_usd": 0.0,
-                "output_cost_usd": 0.0,
-                "reasoning_cost_usd": 0.0,
-                "total_cost_usd": 0.0
-            }
-        
-        # Standard static pricing calculation
-        input_cost_per_1m = cost_config.get("input_cost_per_1m", 0.0)
-        output_cost_per_1m = cost_config.get("output_cost_per_1m", 0.0)
-        
-        input_cost = (input_tokens / 1_000_000) * input_cost_per_1m
-        # Reasoning tokens count as output cost
-        total_output_tokens = output_tokens + reasoning_tokens
-        output_cost = (total_output_tokens / 1_000_000) * output_cost_per_1m
-        
-        return {
-            "input_cost_usd": input_cost,
-            "output_cost_usd": output_cost,
-            "reasoning_cost_usd": (reasoning_tokens / 1_000_000) * output_cost_per_1m,
-            "total_cost_usd": input_cost + output_cost
-        }
+        return calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs, candidate_cost_config, self.logger)
     
     def _extract_runtime_costs(self, response, cost_config: str) -> Dict[str, Any]:
         """Extract runtime cost information from response when cost config is 'runtime'."""
-        if cost_config != "runtime":
-            return None
-
-        runtime_costs = None
-
-        try:
-            # Only extract costs if model is configured for runtime pricing
-            if hasattr(response, 'usage') and response.usage:
-                usage = response.usage
-
-                # Extract cost information from usage field (providers may return cost in USD)
-                if hasattr(usage, 'cost'):
-                    total_cost_usd = usage.cost
-
-                    # Distribute the cost proportionally between input/output based on token counts
-                    prompt_tokens = getattr(usage, 'prompt_tokens', 0)
-                    completion_tokens = getattr(usage, 'completion_tokens', 0)
-                    total_tokens = prompt_tokens + completion_tokens
-
-                    if total_tokens > 0:
-                        input_cost_usd = total_cost_usd * (prompt_tokens / total_tokens)
-                        output_cost_usd = total_cost_usd * (completion_tokens / total_tokens)
-                    else:
-                        input_cost_usd = total_cost_usd / 2
-                        output_cost_usd = total_cost_usd / 2
-
-                    # Extract provider information (which actual provider was used)
-                    actual_provider = None
-                    if hasattr(response, 'provider'):
-                        actual_provider = response.provider
-                    else:
-                        # Try model_dump fallback for provider info
-                        try:
-                            response_dict = response.model_dump()
-                            actual_provider = response_dict.get('provider')
-                        except Exception:
-                            pass
-
-                    runtime_costs = {
-                        "input_cost_usd": input_cost_usd,
-                        "output_cost_usd": output_cost_usd,
-                        "reasoning_cost_usd": 0.0,  # Most providers include reasoning in output cost
-                        "total_cost_usd": total_cost_usd,
-                        "actual_provider": actual_provider  # Which provider was actually used
-                    }
-
-                    self.logger.debug(f"Runtime costs extracted: ${total_cost_usd:.8f} USD")
-
-        except Exception as e:
-            self.logger.debug(f"Could not extract runtime costs: {e}")
-
-        return runtime_costs
+        return extract_runtime_costs(response, cost_config, self.logger)
         
     def _update_statistics(self, model: str, input_tokens: int, output_tokens: int,
                           reasoning_tokens: int, duration: float, tags: List[str], runtime_costs: Dict = None, candidate_cost_config: Dict = None, candidate_provider: str = None, requested_model: str = None):
@@ -426,19 +123,8 @@ class Elelem:
         )
     
     def _update_retry_analytics(self, retry_type: str, tags: List[str], count: int = 1):
-        """Update retry analytics.
-
-        Args:
-            retry_type: Type of retry ('json_parse_retries', 'json_schema_retries', etc.)
-            tags: List of tags to update
-            count: Number to increment by (default 1)
-        """
-        # Record in MetricsStore
-        self._metrics_store.record_retry(
-            retry_type=retry_type,
-            tags=tags,
-            count=count
-        )
+        """Update retry analytics."""
+        update_retry_analytics(retry_type, tags, self._metrics_store, count)
     
     def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, capabilities: Dict) -> List[Dict[str, str]]:
         """Preprocess messages for the request."""
@@ -485,102 +171,18 @@ class Elelem:
 
     def _process_response_content(self, response: Any, json_mode_requested: bool) -> str:
         """Process and clean response content."""
-        # Debug logging to understand response structure
-        if hasattr(response, 'model_dump_json'):
-            self.logger.debug(f"Full response JSON: {response.model_dump_json()[:500]}")
-        
-        if hasattr(response, 'choices') and response.choices:
-            first_choice = response.choices[0]
-            self.logger.debug(f"First choice type: {type(first_choice)}")
-            if hasattr(first_choice, 'message'):
-                self.logger.debug(f"Message type: {type(first_choice.message)}")
-                self.logger.debug(f"Message content: {first_choice.message.content}")
-                if hasattr(first_choice.message, 'model_dump_json'):
-                    self.logger.debug(f"Message JSON: {first_choice.message.model_dump_json()[:500]}")
-        
-        # Check finish_reason first - this should always be present
-        finish_reason = getattr(response.choices[0], 'finish_reason', None)
-        if finish_reason != 'stop':
-            if finish_reason == 'length':
-                raise ModelError(f"Response was truncated due to max_tokens limit (finish_reason: {finish_reason})")
-            elif finish_reason == 'content_filter':
-                raise ModelError(f"Response was filtered due to safety policies (finish_reason: {finish_reason})")
-            elif finish_reason in ['function_call', 'tool_calls']:
-                raise ModelError(f"Unexpected function/tool call in non-function context (finish_reason: {finish_reason})")
-            else:
-                raise ModelError(f"Unexpected finish_reason: {finish_reason}")
-        
-        content = response.choices[0].message.content
-        
-        # Handle None content (some providers may return None for empty responses)
-        if content is None:
-            self.logger.warning("Response content is None despite finish_reason being 'stop'")
-            content = ""
-        
-        # Remove think tags if present
-        content = self._remove_think_tags(content)
-        
-        # Extract JSON from markdown if JSON mode was requested
-        if json_mode_requested:
-            content = self._extract_json_from_markdown(content)
-            
-        return content
+        return process_response_content(response, json_mode_requested, self.logger)
     
     def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception) -> None:
         """Validate JSON response content and schema."""
-        if api_error:
-            # Force JSON validation to fail so it triggers retry logic
-            raise json.JSONDecodeError(f"API JSON validation failed: {str(api_error)}", "", 0)
-        else:
-            # First parse the JSON
-            parsed_json = json.loads(content)
-            
-            # Then validate against schema if provided
-            if json_schema:
-                is_valid, schema_error = self._validate_json_schema(parsed_json, json_schema)
-                if not is_valid:
-                    # Treat schema validation failure like JSON parse failure
-                    raise json.JSONDecodeError(f"JSON schema validation failed: {schema_error}", "", 0)
+        validate_json_response(content, json_schema, api_error)
     
-    def _handle_json_retry(self, e: json.JSONDecodeError, attempt: int, max_retries: int, 
+    def _handle_json_retry(self, e: json.JSONDecodeError, attempt: int, max_retries: int,
                           request_id: str, api_kwargs: Dict, original_temperature: float,
                           temperature_reductions: List[float], min_temp: float, tags: List[str]) -> tuple[bool, float]:
-        """Handle JSON validation retry logic.
-        
-        Returns:
-            Tuple of (should_continue, new_temperature)
-        """
-        if attempt < max_retries:
-            # Calculate new temperature for retry
-            if attempt < len(temperature_reductions):
-                new_temp = max(min_temp, original_temperature - temperature_reductions[attempt])
-            else:
-                new_temp = min_temp
-                
-            api_kwargs["temperature"] = new_temp
-            
-            # Track temperature reduction
-            self._update_retry_analytics("temperature_reductions", tags)
-            
-            # Log appropriate message based on error type and track retry type
-            if "JSON schema validation failed" in str(e):
-                self._update_retry_analytics("json_schema_retries", tags)
-                self.logger.warning(
-                    f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
-                    f"Retrying with temperature {new_temp}: {str(e)[:500]}..."
-                )
-            else:
-                # Could be API JSON validation or client-side parse failure
-                if "API JSON validation failed" in str(e):
-                    self._update_retry_analytics("api_json_validation_retries", tags)
-                else:
-                    self._update_retry_analytics("json_parse_retries", tags)
-                self.logger.warning(
-                    f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
-                    f"Retrying with temperature {new_temp}: {str(e)[:300]}..."
-                )
-            return True, new_temp
-        return False, 0.0
+        """Handle JSON validation retry logic."""
+        return handle_json_retry(e, attempt, max_retries, request_id, api_kwargs, original_temperature,
+                                temperature_reductions, min_temp, tags, self._metrics_store, self.logger)
     
     
     async def create_chat_completion(
@@ -712,44 +314,12 @@ class Elelem:
         
         self.logger.info(f"[{request_id}] 🎯 Candidate {candidate_idx}/{total_candidates}: {candidate_model_name} (timeout={timeout}s)")
         
-        # Prepare API parameters
-        api_kwargs = kwargs.copy()
-        api_kwargs['temperature'] = original_temperature
-        
         # Get provider configuration for defaults
         provider_config = self.config.get_provider_config(provider_name)
-        
-        # Add provider-specific default parameters
-        provider_defaults = provider_config.get("default_params", {})
-        for key, value in provider_defaults.items():
-            if key == "stream":
-                # Always apply provider stream default, ignore client input
-                api_kwargs[key] = value
-            elif key not in api_kwargs:
-                api_kwargs[key] = value
-        
-        # Add model-specific default parameters (overrides provider defaults)
-        model_defaults = candidate.get("default_params", {})
-        for key, value in model_defaults.items():
-            if key not in api_kwargs:
-                api_kwargs[key] = value
-        
-        # Add max_tokens default if provider specifies it and user didn't provide max_tokens
-        if "max_tokens" not in api_kwargs:
-            max_tokens_default = self.config.get_provider_max_tokens_default(provider_name)
-            if max_tokens_default is not None:
-                api_kwargs["max_tokens"] = max_tokens_default
 
-        # Add extra_body parameters with precedence: user > model > provider
-        provider_extra_body = provider_config.get("extra_body", {})
-        model_extra_body = self.config.get_model_extra_body(original_model)
-        user_extra_body = api_kwargs.get("extra_body", {})
-        
-        # Merge with proper precedence (rightmost wins)
-        merged_extra_body = {**provider_extra_body, **model_extra_body, **user_extra_body}
-        
-        if merged_extra_body:
-            api_kwargs["extra_body"] = merged_extra_body
+        # Prepare API parameters with proper precedence
+        api_kwargs = prepare_api_kwargs(kwargs, original_temperature, provider_config,
+                                      candidate, original_model, self.config, provider_name)
         
         # Clean up unsupported parameters for this candidate model
         self.logger.debug(f"[{request_id}] Full candidate dict: {candidate}")
@@ -968,17 +538,7 @@ class Elelem:
     
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""
-        error_str = str(error).lower()
-        
-        # Common infrastructure error patterns
-        infrastructure_patterns = [
-            "connection", "network", "timeout", "503", "502", "500",
-            "service unavailable", "bad gateway", "internal server error",
-            "401", "403", "unauthorized", "forbidden", "quota", "billing",
-            "429", "rate limit", "too many requests"
-        ]
-        
-        return any(pattern in error_str for pattern in infrastructure_patterns)
+        return is_infrastructure_error(error)
         
     def get_stats(self) -> Dict[str, Any]:
         """Get overall statistics."""

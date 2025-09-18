@@ -30,6 +30,22 @@ models:
       output_cost_per_1m:  {COST} Price per 1M output token (includes reasoning tokens)
       currency: USD
 
+# Code Structure
+
+Elelem's core logic has been refactored into focused modules for better maintainability:
+
+- `src/elelem/elelem.py` - Main orchestrator class with public API methods
+- `src/elelem/_exceptions.py` - Custom exceptions (InfrastructureError, ModelError)
+- `src/elelem/_cost_calculation.py` - Cost calculation and runtime cost extraction logic
+- `src/elelem/_response_processing.py` - Response content processing and streaming collection
+- `src/elelem/_json_validation.py` - JSON validation, schema validation, and instruction injection
+- `src/elelem/_provider_management.py` - Provider initialization and model configuration lookup
+- `src/elelem/_retry_logic.py` - Retry strategies, error classification, and analytics tracking
+- `src/elelem/_request_execution.py` - API parameter preparation for requests
+- `src/elelem/_reasoning_tokens.py` - Token extraction and normalization across providers
+
+All `_*.py` files are internal modules with flat function signatures (no nested attributes as parameters).
+
 # Testing
 - When making edits to the model definitions, launching tests/test_config_validation.py is recommended (uv run pytest tests/test_config_validation.py -v)
 - When making edits to the core code, launching tests/test_elemem_with_faker.py is recommended (uv run pytest tests/test_elemem_with_faker.py -v)

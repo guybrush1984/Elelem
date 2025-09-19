@@ -250,7 +250,7 @@ class Elelem:
             try:
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
-                    messages, model, model_config, request_id, 
+                    messages, model, model_config, request_id,
                     json_mode_requested, json_schema, original_temperature,
                     tags, start_time, **kwargs
                 )
@@ -258,37 +258,29 @@ class Elelem:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed: {e}")
                 self._update_retry_analytics("candidate_iterations", tags)
                 last_error = e
-                
+
                 if candidate_idx < len(candidates) - 1:
                     continue  # Try next candidate
                 else:
                     # All candidates exhausted - record failure
                     enhanced_tags = list(tags) if tags else []
                     enhanced_tags.append(f"model:{model}")
-                    provider = self._get_model_config(model)[0]
-                    enhanced_tags.append(f"provider:{provider}")
+                    enhanced_tags.append(f"provider:{candidate['provider']}")
                     enhanced_tags.append("error:AllCandidatesFailed")
                     self._update_retry_analytics("final_failures", enhanced_tags)
                     raise e
             except ModelError as e:
                 # Model/request errors don't trigger candidate iteration
-                # Record failure
+                # Record failure with the current candidate's provider
                 enhanced_tags = list(tags) if tags else []
                 enhanced_tags.append(f"model:{model}")
-                provider = self._get_model_config(model)[0]
-                enhanced_tags.append(f"provider:{provider}")
+                enhanced_tags.append(f"provider:{candidate['provider']}")
                 enhanced_tags.append("error:ModelError")
                 self._update_retry_analytics("final_failures", enhanced_tags)
                 raise e
 
-        # Should never reach here, but just in case
-        enhanced_tags = list(tags) if tags else []
-        enhanced_tags.append(f"model:{model}")
-        provider = self._get_model_config(model)[0]
-        enhanced_tags.append(f"provider:{provider}")
-        enhanced_tags.append("error:UnknownError")
-        self._update_retry_analytics("final_failures", enhanced_tags)
-        raise last_error or Exception(f"All {len(candidates)} candidates failed")
+        # This should never be reached - if it is, there's a logic error
+        raise RuntimeError(f"FATAL: Candidate loop completed without returning or raising - this is a bug in Elelem")
     
     
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,

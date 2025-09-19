@@ -746,4 +746,67 @@ class TestElelemWithFaker:
 
         print(f"✓ Virtual model stats validated - actual model used: {actual_model}")
 
+    @pytest.mark.asyncio
+    async def test_virtual_model_json_temperature_reduction(self, elelem_with_faker_env):
+        """Test that virtual models handle JSON temperature reduction within candidates."""
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with JSON temperature reduction scenario
+        faker.configure_scenario('elelem_json_temp_reduction')
+        faker.reset_state()
+
+        # Create virtual model with faker:json-temp-test as first candidate
+        virtual_model_config = {
+            "candidates": [
+                {"model": "faker:json-temp-test", "timeout": 60}
+            ]
+        }
+
+        # Make request with high temperature and JSON mode
+        response = await elelem.create_chat_completion(
+            model=f"dynamic:{virtual_model_config}",
+            messages=[{"role": "user", "content": "Return JSON data"}],
+            response_format={"type": "json_object"},
+            temperature=0.9,
+            tags=["virtual_json_test"]
+        )
+
+        # Should eventually succeed with valid JSON
+        assert response
+        content = response.choices[0].message.content
+        json_data = json.loads(content)
+        assert json_data["status"] == "success_after_temperature_reduction"
+
+        # Verify multiple requests were made with decreasing temperature
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) > 1, "Should have made multiple requests for temperature reduction"
+
+        # Check temperature reduction pattern
+        temperatures = []
+        for req in requests:
+            body = req.get('body', {})
+            temp = body.get('temperature')
+            if temp is not None:
+                temperatures.append(temp)
+
+        # Should have decreasing temperatures
+        assert len(temperatures) >= 2, "Should have multiple temperature values"
+        assert temperatures[0] > temperatures[-1], "Temperature should decrease"
+
+        # Check that all requests went to the same candidate (no failover to next candidate)
+        models_used = [req.get('url', '').split('/')[-1] for req in requests]
+        unique_models = set(models_used)
+        assert len(unique_models) == 1, "All requests should go to the same candidate model"
+
+        # Verify stats tracking
+        stats = elelem.get_stats_by_tag("virtual_json_test")
+        assert stats["total_calls"] == 1
+
+        # Verify temperature reductions occurred (not candidate iterations)
+        retry_analytics = stats["retry_analytics"]
+        assert retry_analytics["temperature_reductions"] >= 2, "Should have reduced temperature at least twice"
+        assert retry_analytics["candidate_iterations"] == 0, "Should not have tried other candidates for JSON failures"
+
+        print(f"✓ Virtual model JSON temperature reduction validated - {len(requests)} requests made")
+
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

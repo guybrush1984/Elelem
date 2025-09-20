@@ -384,23 +384,6 @@ class Elelem:
                 
                 # Extract tokens from response
                 if response:
-                    # DEBUG: Dump the ENTIRE response object to a file
-                    import json
-                    with open('raw_response.log', 'w') as f:
-                        f.write(f"=== Response for {candidate_model_name} ===\n")
-                        f.write(f"Type: {type(response)}\n\n")
-
-                        if hasattr(response, 'model_dump'):
-                            try:
-                                response_dict = response.model_dump()
-                                f.write("Response as dict:\n")
-                                f.write(json.dumps(response_dict, indent=2))
-                            except Exception as e:
-                                f.write(f"Error dumping response: {e}\n")
-                                f.write(f"Response str: {response}\n")
-                        else:
-                            f.write(f"Response str: {response}\n")
-
                     # Extract normalized token counts
                     input_tokens, output_tokens, reasoning_tokens, total_tokens = extract_token_counts(response, self.logger)
                     

@@ -40,25 +40,7 @@ async def collect_streaming_response(stream, logger=None, request_id=None):
             elapsed = current_time - first_chunk_time if first_chunk_time else 0
             request_prefix = f"[{request_id}] " if request_id else ""
 
-            # Get last 100 characters of all collected content
-            current_content = ''.join(content_parts)
-            current_reasoning = ''.join(reasoning_content_parts)
-
-            # Show whatever content we have
-            if current_reasoning and not current_content:
-                # Only reasoning content so far
-                content_preview = current_reasoning[-100:]
-                content_type = "reasoning"
-            elif current_content:
-                # Regular content available
-                content_preview = current_content[-100:]
-                content_type = "content"
-            else:
-                content_preview = "(no content yet)"
-                content_type = "none"
-
             logger.info(f"{request_prefix}📊 Streaming progress: {chunk_count} chunks received ({elapsed:.1f}s elapsed)")
-            logger.info(f"{request_prefix}   Last 100 chars ({content_type}): ...{content_preview}")
             last_trace_time = current_time
 
         if chunk.choices and len(chunk.choices) > 0:

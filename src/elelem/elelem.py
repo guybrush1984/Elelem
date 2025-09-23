@@ -17,7 +17,7 @@ from openai import (
 import pandas as pd
 from .config import Config
 from .metrics import MetricsStore
-from ._reasoning_tokens import extract_token_counts
+from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
 from ._exceptions import InfrastructureError, ModelError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
 from ._response_processing import collect_streaming_response, remove_think_tags, extract_json_from_markdown, process_response_content
@@ -60,9 +60,9 @@ class Elelem:
         return get_model_config(model, self._models, self._providers)
         
         
-    async def _collect_streaming_response(self, stream):
+    async def _collect_streaming_response(self, stream, request_id=None):
         """Collect streaming chunks and reconstruct a normal response object."""
-        return await collect_streaming_response(stream)
+        return await collect_streaming_response(stream, logger=self.logger, request_id=request_id)
         
     def _remove_think_tags(self, content: str) -> str:
         """Remove <think>...</think> tags from content."""
@@ -352,7 +352,7 @@ class Elelem:
                             ),
                             timeout=timeout
                         )
-                        response = await self._collect_streaming_response(stream)
+                        response = await self._collect_streaming_response(stream, request_id)
                     else:
                         # Handle non-streaming response
                         response = await asyncio.wait_for(
@@ -386,14 +386,18 @@ class Elelem:
                 if response:
                     # Extract normalized token counts
                     input_tokens, output_tokens, reasoning_tokens, total_tokens = extract_token_counts(response, self.logger)
-                    
+
+                    # Extract reasoning content
+                    reasoning_content = extract_reasoning_content(response, self.logger)
+
                     total_input_tokens += input_tokens
                     total_output_tokens += output_tokens
                     total_reasoning_tokens += reasoning_tokens
-                    
+
                     content = self._process_response_content(response, json_mode_requested)
                 else:
                     content = ""
+                    reasoning_content = None
                 
                 # JSON validation if requested
                 if json_mode_requested:
@@ -464,6 +468,10 @@ class Elelem:
                     "costs_usd": costs,
                     "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
                 }
+
+                # Add reasoning content if present
+                if reasoning_content:
+                    response.elelem_metrics["reasoning_content"] = reasoning_content
 
                 return response
                 

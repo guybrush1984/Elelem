@@ -297,6 +297,9 @@ async def run_single_test(
             output_tokens = tokens.get("output", 0)
             reasoning_tokens = tokens.get("reasoning", 0)
             total_tokens = tokens.get("total", 0)
+
+            # Extract reasoning content if available
+            reasoning_content = elelem_metrics.get("reasoning_content")
         else:
             # Fallback to raw usage if elelem_metrics not available
             usage = getattr(response, "usage", None)
@@ -308,6 +311,7 @@ async def run_single_test(
                 output_tokens = 0
             reasoning_tokens = 0
             total_tokens = input_tokens + output_tokens
+            reasoning_content = None
 
         if not quiet:
             print(f"✅ Request completed in {format_duration(duration)}")
@@ -343,6 +347,12 @@ async def run_single_test(
                 except json.JSONDecodeError as e:
                     print(f"   ❌ Invalid JSON: {e}")
 
+            # Show reasoning content if available
+            if reasoning_content:
+                print(f"\n🧠 Reasoning content:")
+                reasoning_preview = reasoning_content[:300] if reasoning_content else "(empty)"
+                print(f"   {reasoning_preview}{'...' if len(reasoning_content) > 300 else ''}")
+
             # Show preview
             print(f"\n📄 Response preview:")
             preview = content[:200] if content else "(empty)"
@@ -360,6 +370,7 @@ async def run_single_test(
                 },
                 "response": {
                     "content": content,
+                    "reasoning_content": reasoning_content,
                     "timestamp": datetime.now().isoformat()
                 },
                 "metrics": {

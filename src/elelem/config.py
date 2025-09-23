@@ -3,14 +3,87 @@ Configuration loading system for Elelem
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import yaml
 
 
+def expand_parameterized_models(models: Dict[str, Any]) -> Dict[str, Any]:
+    """Expand parameterized model definitions into individual models."""
+    expanded_models = {}
+
+    for model_key, model_config in models.items():
+        # Check for parameterization syntax: @[value1,value2,value3]
+        param_pattern = r'@\[([^\]]+)\]'
+        matches = list(re.finditer(param_pattern, model_key))
+
+        if not matches:
+            # No parameterization, keep as-is
+            expanded_models[model_key] = model_config
+            continue
+
+        # Extract parameter values and generate all combinations
+        param_values = []
+        param_names = []
+
+        for match in matches:
+            values_str = match.group(1)
+            values = [v.strip() for v in values_str.split(',')]
+            param_values.append(values)
+
+            # Extract parameter name from the pattern before @
+            start_pos = match.start()
+            # Look backwards to find parameter name (e.g., "reasoning=" before "@[low,high]")
+            param_part = model_key[:start_pos]
+
+            # Find the parameter name by looking for "key=" pattern
+            param_match = re.search(r'([^?&=]+)=@', model_key[max(0, start_pos-20):start_pos+2])
+            if param_match:
+                param_name = param_match.group(1)
+            else:
+                param_name = f"param{len(param_names)}"
+
+            param_names.append(param_name)
+
+        # Generate all combinations
+        from itertools import product
+
+        for combination in product(*param_values):
+            # Create new model key by substituting parameter values
+            new_model_key = model_key
+            new_model_config = model_config.copy()
+
+            for i, (match, param_name, param_value) in enumerate(zip(matches, param_names, combination)):
+                # Replace @[...] with actual value
+                new_model_key = new_model_key.replace(match.group(0), param_value, 1)
+
+                # Substitute $parameter_name in config values
+                new_model_config = substitute_parameters(new_model_config, {param_name: param_value})
+
+            expanded_models[new_model_key] = new_model_config
+
+    return expanded_models
+
+
+def substitute_parameters(config: Any, params: Dict[str, str]) -> Any:
+    """Recursively substitute $parameter references in config values."""
+    if isinstance(config, dict):
+        return {k: substitute_parameters(v, params) for k, v in config.items()}
+    elif isinstance(config, list):
+        return [substitute_parameters(item, params) for item in config]
+    elif isinstance(config, str):
+        # Replace $parameter_name with actual value
+        for param_name, param_value in params.items():
+            config = config.replace(f"${param_name}", param_value)
+        return config
+    else:
+        return config
+
+
 class Config:
     """Configuration loader for Elelem settings."""
-    
+
     def __init__(self, extra_provider_dirs: Optional[List[str]] = None):
         self._config = self._load_config()
         # Check for extra provider dirs from environment variable
@@ -112,7 +185,10 @@ class Config:
                                     model_config.setdefault('display_metadata', {})['model_configuration'] = model_configuration
 
                             merged_config['models'][model_key] = model_config
-            
+
+            # Expand parameterized models after all models are loaded
+            merged_config['models'] = expand_parameterized_models(merged_config['models'])
+
             return merged_config
         except (FileNotFoundError, yaml.YAMLError) as e:
             raise RuntimeError(f"Failed to load Elelem models configuration: {e}")

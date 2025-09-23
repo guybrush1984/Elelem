@@ -30,6 +30,13 @@ model_metadata:
     license: "MIT"
     reasoning: "no"
 
+  deepseek_v31-terminus: &deepseek-v31-terminus
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-v3.1-Terminus"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3.1-Terminus"
+    license: "MIT"
+    reasoning: "no"
+
   deepseek_r1: &deepseek-r1
     model_owner: "DeepSeek"
     model_nickname: "deepseek-r1"

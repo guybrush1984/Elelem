@@ -70,3 +70,39 @@ models:
       currency: USD
     default_params:
       reasoning_effort: $reasoning
+
+  "fireworks:qwen/qwen3-30b-a3b?reasoning=@[none,high]":
+    metadata:
+      model_reference: "alibaba_qwen3_30b_a3b"
+      model_configuration: "reasoning=$reasoning"
+    provider: fireworks
+    model_id: accounts/fireworks/models/qwen3-30b-a3b
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
+      currency: USD
+    default_params:
+      stream: true
+      reasoning_effort: $reasoning      
+
+  "fireworks:qwen/qwen3-235b-a22b?reasoning=@[none,high]":
+    metadata:
+      model_reference: "alibaba_qwen3_235b_a22b"
+      model_configuration: "reasoning=$reasoning"
+    provider: fireworks
+    model_id: accounts/fireworks/models/qwen3-235b-a22b
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.22
+      output_cost_per_1m: 0.88
+      currency: USD
+    default_params:
+      stream: true
+      reasoning_effort: $reasoning  

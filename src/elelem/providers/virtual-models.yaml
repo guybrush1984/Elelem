@@ -103,3 +103,25 @@ models:
         timeout: 120s
       - model: "cerebras@openrouter:openai/gpt-oss-120b?reasoning=$reasoning"     
         timeout: 120s        
+     
+  # Speed-optimized routing (fastest first) - shorter timeouts for speed
+  "virtual:qwen3-30b-a3b-cheap?reasoning":
+    metadata:
+      model_reference: "alibaba_qwen3_30b_a3b"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:qwen/qwen3-30b-a3b?reasoning=high"
+        timeout: 120s
+      - model: "fireworks:qwen/qwen3-30b-a3b?reasoning=high"  
+        timeout: 120s     
+
+  # Speed-optimized routing (fastest first) - shorter timeouts for speed
+  "virtual:qwen3-235b-a22b-cheap?reasoning":
+    metadata:
+      model_reference: "alibaba_qwen3_235b_a22b"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:qwen/qwen3-235b-a22b?reasoning=high"
+        timeout: 120s
+      - model: "fireworks:qwen/qwen3-235b-a22b?reasoning=high"
+        timeout: 120s

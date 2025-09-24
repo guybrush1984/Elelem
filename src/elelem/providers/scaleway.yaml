@@ -52,7 +52,7 @@ models:
 
   "scaleway:alibaba/qwen3-235b-a22b-instruct":
     metadata:
-      model_reference: "alibaba_qwen3_235b"
+      model_reference: "alibaba_qwen3_235b_a22b"
     provider: scaleway
     model_id: qwen3-235b-a22b-instruct-2507
     capabilities:

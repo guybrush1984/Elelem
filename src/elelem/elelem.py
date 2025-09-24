@@ -410,11 +410,12 @@ class Elelem:
                                 reduction_idx = min(attempt, len(temperature_reductions) - 1)
                                 reduction = temperature_reductions[reduction_idx]
                                 new_temp = max(current_temp - reduction, min_temp)
-                                
+
                                 if new_temp < current_temp:
                                     api_kwargs['temperature'] = new_temp
                                     self._update_retry_analytics("temperature_reductions", tags)
-                                    self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp}")
+                                    error_snippet = str(e)[:300]
+                                    self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp} (error: {error_snippet})")
                                     continue
                             
                             # Try removing response format

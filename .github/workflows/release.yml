@@ -33,6 +33,11 @@ jobs:
         echo "🔧 Running configuration validation tests..."
         uv run pytest tests/test_config_validation.py -v
 
+    - name: Run parameterized models tests
+      run: |
+        echo "📋 Running parameterized model system tests..."
+        uv run pytest tests/test_parameterized_models.py -v
+
     - name: Run faker tests
       run: |
         echo "🎭 Running faker tests (no real API calls)..."

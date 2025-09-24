@@ -9,14 +9,43 @@ from typing import Any
 from ._exceptions import ModelError
 
 
-async def collect_streaming_response(stream):
+async def collect_streaming_response(stream, logger=None, request_id=None):
     """Collect streaming chunks and reconstruct a normal response object."""
+    import time
+    import json
+
     content_parts = []
     reasoning_content_parts = []
     final_chunk = None
     finish_reason = None
 
+
+    # Trace variables
+    chunk_count = 0
+    first_chunk_time = None
+    last_trace_time = None
+    trace_interval = 30  # 30 seconds
+
     async for chunk in stream:
+        chunk_count += 1
+        current_time = time.time()
+
+
+        # Log first chunk received
+        if chunk_count == 1:
+            first_chunk_time = current_time
+            if logger:
+                request_prefix = f"[{request_id}] " if request_id else ""
+                logger.info(f"{request_prefix}🎬 First streaming chunk received")
+
+        # Log periodic traces every 30s
+        if logger and (last_trace_time is None or current_time - last_trace_time >= trace_interval):
+            elapsed = current_time - first_chunk_time if first_chunk_time else 0
+            request_prefix = f"[{request_id}] " if request_id else ""
+
+            logger.info(f"{request_prefix}📊 Streaming progress: {chunk_count} chunks received ({elapsed:.1f}s elapsed)")
+            last_trace_time = current_time
+
         if chunk.choices and len(chunk.choices) > 0:
             choice = chunk.choices[0]
 
@@ -24,8 +53,10 @@ async def collect_streaming_response(stream):
             if hasattr(choice, 'delta') and choice.delta.content is not None:
                 content_parts.append(choice.delta.content)
 
-            # Extract reasoning_content if available
-            if hasattr(choice, 'delta') and hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content is not None:
+            # Extract reasoning content if available (OpenRouter uses 'reasoning' field, not 'reasoning_content')
+            if hasattr(choice, 'delta') and hasattr(choice.delta, 'reasoning') and choice.delta.reasoning is not None:
+                reasoning_content_parts.append(choice.delta.reasoning)
+            elif hasattr(choice, 'delta') and hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content is not None:
                 reasoning_content_parts.append(choice.delta.reasoning_content)
 
             # Capture finish_reason
@@ -41,6 +72,7 @@ async def collect_streaming_response(stream):
     # Reconstruct the complete content
     full_content = ''.join(content_parts) if content_parts else None
     full_reasoning_content = ''.join(reasoning_content_parts) if reasoning_content_parts else None
+
 
     # Create a normal ChatCompletion response (not streaming)
     from openai.types.chat.chat_completion_message import ChatCompletionMessage
@@ -119,19 +151,6 @@ def extract_json_from_markdown(content: str, logger: logging.Logger) -> str:
 
 def process_response_content(response: Any, json_mode_requested: bool, logger: logging.Logger) -> str:
     """Process and clean response content."""
-    # Debug logging to understand response structure
-    if hasattr(response, 'model_dump_json'):
-        logger.debug(f"Full response JSON: {response.model_dump_json()[:500]}")
-
-    if hasattr(response, 'choices') and response.choices:
-        first_choice = response.choices[0]
-        logger.debug(f"First choice type: {type(first_choice)}")
-        if hasattr(first_choice, 'message'):
-            logger.debug(f"Message type: {type(first_choice.message)}")
-            logger.debug(f"Message content: {first_choice.message.content}")
-            if hasattr(first_choice.message, 'model_dump_json'):
-                logger.debug(f"Message JSON: {first_choice.message.model_dump_json()[:500]}")
-
     # Check finish_reason first - this should always be present
     finish_reason = getattr(response.choices[0], 'finish_reason', None)
     if finish_reason != 'stop':

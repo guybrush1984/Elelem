@@ -30,6 +30,13 @@ model_metadata:
     license: "MIT"
     reasoning: "no"
 
+  deepseek_v31-terminus: &deepseek-v31-terminus
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-v3.1-Terminus"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V3.1-Terminus"
+    license: "MIT"
+    reasoning: "no"
+
   deepseek_r1: &deepseek-r1
     model_owner: "DeepSeek"
     model_nickname: "deepseek-r1"
@@ -100,12 +107,19 @@ model_metadata:
     license: "Apache 2.0"
     reasoning: "no"
 
-  alibaba_qwen3_235b: &alibaba-qwen3-235b
+  alibaba_qwen3_235b_a22b: &alibaba-qwen3-235b-a22b
     model_owner: "Alibaba"
     model_nickname: "qwen3-235b-a22b"
     model_page: "https://huggingface.co/Qwen/Qwen3-235B-A22B-Instruct"
     license: "Qwen License"
     reasoning: "no"
+
+  alibaba_qwen3_30b_a3b: &alibaba-qwen3_30b_a3b
+    model_owner: "Alibaba"
+    model_nickname: "qwen3-30b-a3b"
+    model_page: "https://huggingface.co/Qwen/Qwen3-30B-A3B"
+    license: "Qwen License"
+    reasoning: "no"    
 
   anthropic_claude_sonnet_4: &anthropic-claude-sonnet-4
     model_owner: "Anthropic"

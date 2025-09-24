@@ -36,14 +36,14 @@ def calculate_costs(model: str, input_tokens: int, output_tokens: int, reasoning
     output_cost_per_1m = cost_config.get("output_cost_per_1m", 0.0)
 
     input_cost = (input_tokens / 1_000_000) * input_cost_per_1m
-    # Reasoning tokens count as output cost
-    total_output_tokens = output_tokens + reasoning_tokens
-    output_cost = (total_output_tokens / 1_000_000) * output_cost_per_1m
+    # output_tokens already includes reasoning tokens in our normalized structure
+    output_cost = (output_tokens / 1_000_000) * output_cost_per_1m
+    reasoning_cost = (reasoning_tokens / 1_000_000) * output_cost_per_1m
 
     return {
         "input_cost_usd": input_cost,
         "output_cost_usd": output_cost,
-        "reasoning_cost_usd": (reasoning_tokens / 1_000_000) * output_cost_per_1m,
+        "reasoning_cost_usd": reasoning_cost,
         "total_cost_usd": input_cost + output_cost
     }
 

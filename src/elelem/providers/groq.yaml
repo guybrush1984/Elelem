@@ -5,7 +5,7 @@ provider:
     service_tier: auto
 
 models:
-  "groq:openai/gpt-oss-120b?reasoning=low":
+  "groq:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
     provider: groq
     model_id: openai/gpt-oss-120b  # GROQ's model ID format
     capabilities:
@@ -17,29 +17,12 @@ models:
       output_cost_per_1m: 0.75
       currency: USD
     default_params:
-      reasoning_effort: low
+      reasoning_effort: $reasoning
     metadata:
       model_reference: "openai_gpt_oss_120b"
-      model_configuration: "reasoning=low"
+      model_configuration: "reasoning=$reasoning" 
 
-  "groq:openai/gpt-oss-120b?reasoning=high":
-    provider: groq
-    model_id: openai/gpt-oss-120b  # GROQ's model ID format
-    capabilities:
-      supports_json_mode: true
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.15
-      output_cost_per_1m: 0.75
-      currency: USD
-    default_params:
-      reasoning_effort: high
-    metadata:
-      model_reference: "openai_gpt_oss_120b"
-      model_configuration: "reasoning=high"    
-
-  "groq:openai/gpt-oss-20b?reasoning=low":
+  "groq:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
     provider: groq
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -51,27 +34,10 @@ models:
       output_cost_per_1m: 0.50
       currency: USD
     default_params:
-      reasoning_effort: low
+      reasoning_effort: $reasoning
     metadata:
       model_reference: "openai_gpt_oss_20b"
-      model_configuration: "reasoning=low"      
-
-  "groq:openai/gpt-oss-20b?reasoning=high":
-    provider: groq
-    model_id: openai/gpt-oss-20b
-    capabilities:
-      supports_json_mode: true
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.10
-      output_cost_per_1m: 0.50
-      currency: USD
-    default_params:
-      reasoning_effort: high
-    metadata:
-      model_reference: "openai_gpt_oss_20b"
-      model_configuration: "reasoning=high"     
+      model_configuration: "reasoning=$reasoning"       
 
   "groq:moonshotai/kimi-k2-instruct":
     provider: groq

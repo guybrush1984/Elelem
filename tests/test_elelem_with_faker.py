@@ -365,9 +365,105 @@ class TestElelemWithFaker:
         stats = elelem.get_stats()
         assert stats["reasoning_tokens"] > 0
 
+        # Verify reasoning content was extracted and added to response
+        assert hasattr(response, 'elelem_metrics'), "Response should have elelem_metrics"
+        assert "reasoning_content" in response.elelem_metrics, "Response should include reasoning_content in elelem_metrics"
+
+        reasoning_content = response.elelem_metrics["reasoning_content"]
+        assert reasoning_content is not None, "Reasoning content should not be None"
+        assert len(reasoning_content.strip()) > 0, "Reasoning content should not be empty"
+
+        # The reasoning content should contain the thinking content from <think> tags
+        # Based on the faker scenario, this should be the content between the tags
+        print(f"Extracted reasoning content: '{reasoning_content}'")
+
+        # Verify exact content matches what the faker scenario defines for temperature 0.6
+        expected_reasoning = "Let me analyze this step by step. First, I need to understand the problem. Then I can work through the solution methodically."
+        assert reasoning_content == expected_reasoning, f"Reasoning content mismatch.\nExpected: '{expected_reasoning}'\nActual: '{reasoning_content}'"
+
         print(f"Final reasoning tokens extracted: {stats['reasoning_tokens']}")
         print(f"Total tokens: {stats['total_tokens']}")
+        print(f"✅ Reasoning content successfully extracted: {len(reasoning_content)} chars")
         print(f"Calls made: {stats['total_calls']}")
+
+    @pytest.mark.asyncio
+    async def test_reasoning_content_extraction_formats(self, elelem_with_faker_env):
+        """Test reasoning content extraction with different provider formats."""
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with reasoning token scenario
+        faker.configure_scenario('elelem_reasoning_tokens')
+
+        # Test 1: OpenAI-style reasoning (temperature 1.0)
+        faker.reset_state()
+        response1 = await elelem.create_chat_completion(
+            model="faker:reasoning-test",
+            messages=[{"role": "user", "content": "Test OpenAI format"}],
+            temperature=1.0  # OpenAI format condition
+        )
+
+        assert response1
+        assert hasattr(response1, 'elelem_metrics')
+
+        # For OpenAI format, reasoning tokens come from explicit fields but no reasoning content
+        reasoning_tokens = response1.elelem_metrics["tokens"]["reasoning"]
+        assert reasoning_tokens > 0, "OpenAI format should have reasoning tokens"
+
+        # OpenAI format typically doesn't expose reasoning content, only tokens
+        assert "reasoning_content" not in response1.elelem_metrics or response1.elelem_metrics["reasoning_content"] is None, \
+            "OpenAI format should not have reasoning content"
+
+        # Test 2: GROQ-style reasoning (temperature 0.8)
+        faker.reset_state()
+        response2 = await elelem.create_chat_completion(
+            model="faker:reasoning-test",
+            messages=[{"role": "user", "content": "Test GROQ format"}],
+            temperature=0.8  # GROQ format condition
+        )
+
+        assert response2
+        reasoning_tokens2 = response2.elelem_metrics["tokens"]["reasoning"]
+        assert reasoning_tokens2 > 0, "GROQ format should have reasoning tokens"
+
+        # GROQ format also typically doesn't expose reasoning content, only tokens
+        assert "reasoning_content" not in response2.elelem_metrics or response2.elelem_metrics["reasoning_content"] is None, \
+            "GROQ format should not have reasoning content"
+
+        # Test 3: <think> tags format (temperature 0.6) - already tested above
+        faker.reset_state()
+        response3 = await elelem.create_chat_completion(
+            model="faker:reasoning-test",
+            messages=[{"role": "user", "content": "Test think tags"}],
+            temperature=0.6  # Think tags condition
+        )
+
+        assert response3
+        assert "reasoning_content" in response3.elelem_metrics
+        reasoning_content3 = response3.elelem_metrics["reasoning_content"]
+        assert reasoning_content3 is not None
+        assert len(reasoning_content3.strip()) > 0
+
+        # Verify exact content matches the faker scenario for temperature 0.6
+        expected_reasoning3 = "Let me analyze this step by step. First, I need to understand the problem. Then I can work through the solution methodically."
+        assert reasoning_content3 == expected_reasoning3, f"Think tags reasoning content mismatch.\nExpected: '{expected_reasoning3}'\nActual: '{reasoning_content3}'"
+
+        # Test 4: Structured reasoning format (temperature 0.4)
+        faker.reset_state()
+        response4 = await elelem.create_chat_completion(
+            model="faker:reasoning-test",
+            messages=[{"role": "user", "content": "Test structured format"}],
+            temperature=0.4  # Structured reasoning condition
+        )
+
+        assert response4
+        reasoning_tokens4 = response4.elelem_metrics["tokens"]["reasoning"]
+        assert reasoning_tokens4 > 0, "Structured format should have reasoning tokens"
+
+        print(f"✅ All reasoning formats tested successfully:")
+        print(f"  OpenAI format: {reasoning_tokens} tokens")
+        print(f"  GROQ format: {reasoning_tokens2} tokens")
+        print(f"  Think tags: {response3.elelem_metrics['tokens']['reasoning']} tokens, content: {len(reasoning_content3)} chars")
+        print(f"  Structured: {reasoning_tokens4} tokens")
 
     @pytest.mark.asyncio
     async def test_temperature_parameter_cleanup(self, elelem_with_faker_env):
@@ -808,5 +904,53 @@ class TestElelemWithFaker:
         assert retry_analytics["candidate_iterations"] == 0, "Should not have tried other candidates for JSON failures"
 
         print(f"✓ Virtual model JSON temperature reduction validated - {len(requests)} requests made")
+
+    @pytest.mark.asyncio
+    async def test_parameterized_models_integration(self, elelem_with_faker_env):
+        """Test that parameterized model system works with faker and doesn't break existing functionality."""
+        elelem, faker = elelem_with_faker_env
+
+        # Get all models to verify expansion worked
+        all_models = elelem._models
+
+        # Should contain multiple faker models
+        faker_models = {k: v for k, v in all_models.items() if k.startswith('faker:')}
+
+        assert len(faker_models) > 0, "Should have faker models available"
+
+        # Test that existing faker functionality still works after parameterized model expansion
+        faker.configure_scenario('happy_path')
+        faker.reset_state()
+
+        response = await elelem.create_chat_completion(
+            model="faker:basic",
+            messages=[{"role": "user", "content": "Test parameterized model integration"}]
+        )
+
+        assert response is not None
+        assert response.choices[0].message.content is not None
+
+        # Test reasoning models still work (these may be parameterized in the future)
+        faker.configure_scenario('elelem_reasoning_tokens')
+        faker.reset_state()
+
+        reasoning_response = await elelem.create_chat_completion(
+            model="faker:reasoning-test",
+            messages=[{"role": "user", "content": "Think about this"}],
+            temperature=0.6  # Think tags condition
+        )
+
+        assert reasoning_response is not None
+        assert hasattr(reasoning_response, 'elelem_metrics')
+
+        # Verify reasoning content extraction still works
+        if "reasoning_content" in reasoning_response.elelem_metrics:
+            reasoning_content = reasoning_response.elelem_metrics["reasoning_content"]
+            assert reasoning_content is not None
+            assert len(reasoning_content.strip()) > 0
+
+        print(f"✅ Found {len(faker_models)} faker models")
+        print("✅ Parameterized model system compatible with faker")
+        print("✅ Existing functionality preserved after parameterized model expansion")
 
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

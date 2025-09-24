@@ -1,0 +1,39 @@
+# DeepInfra provider configuration and models
+# CRITICAL: ALL supports_json_mode = false
+provider:
+  endpoint: https://api.deepseek.com/v1
+  default_params: {}
+
+models:
+  "deepseek:deepseek/deepseek-chat":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+    provider: deepseek
+    model_id: deepseek-chat
+    capabilities:
+      supports_json_mode: true  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+    default_params:
+      stream: true
+
+  "deepseek:deepseek/deepseek-reasoner":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+      model_configuration: "reasoning=yes"      
+    provider: deepseek
+    model_id: deepseek-reasoner
+    capabilities:
+      supports_json_mode: true  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+    default_params:
+      stream: true

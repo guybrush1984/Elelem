@@ -3,14 +3,109 @@ Configuration loading system for Elelem
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import yaml
 
 
+def expand_parameterized_models(models: Dict[str, Any]) -> Dict[str, Any]:
+    """Expand parameterized model definitions into individual models."""
+    expanded_models = {}
+
+    for model_key, model_config in models.items():
+        # Check for parameterization syntax: @[value1,value2,value3] or @b[true,false] for booleans
+        param_pattern = r'@(b)?\[([^\]]+)\]'
+        matches = list(re.finditer(param_pattern, model_key))
+
+        if not matches:
+            # No parameterization, keep as-is
+            expanded_models[model_key] = model_config
+            continue
+
+        # Extract parameter values and generate all combinations
+        param_values = []
+        param_names = []
+
+        for match in matches:
+            is_boolean = match.group(1) == 'b'  # Check if @b syntax was used
+            values_str = match.group(2)  # Now group 2 contains the values
+            values = [v.strip() for v in values_str.split(',')]
+
+            # Convert boolean strings to actual booleans if @b syntax was used
+            if is_boolean:
+                boolean_values = []
+                for v in values:
+                    if v.lower() == 'true':
+                        boolean_values.append(True)
+                    elif v.lower() == 'false':
+                        boolean_values.append(False)
+                    else:
+                        raise ValueError(f"Invalid boolean value '{v}' in @b[...] syntax. Use 'true' or 'false'.")
+                param_values.append(boolean_values)
+            else:
+                param_values.append(values)
+
+            # Extract parameter name from the pattern before @
+            start_pos = match.start()
+            # Look backwards to find parameter name (e.g., "reasoning=" before "@[low,high]")
+            param_part = model_key[:start_pos]
+
+            # Find the parameter name by looking for "key=" pattern (accounting for @b syntax)
+            param_match = re.search(r'([^?&=]+)=@b?\[', model_key[max(0, start_pos-20):start_pos+10])
+            if param_match:
+                param_name = param_match.group(1)
+            else:
+                param_name = f"param{len(param_names)}"
+
+            param_names.append(param_name)
+
+        # Generate all combinations
+        from itertools import product
+
+        for combination in product(*param_values):
+            # Create new model key by substituting parameter values
+            new_model_key = model_key
+            new_model_config = model_config.copy()
+
+            for i, (match, param_name, param_value) in enumerate(zip(matches, param_names, combination)):
+                # Replace @[...] or @b[...] with actual value (convert booleans to lowercase strings for model key)
+                key_value = str(param_value).lower() if isinstance(param_value, bool) else str(param_value)
+                new_model_key = new_model_key.replace(match.group(0), key_value, 1)
+
+                # Substitute $parameter_name in config values (param_value can now be boolean or string)
+                new_model_config = substitute_parameters(new_model_config, {param_name: param_value})
+
+            expanded_models[new_model_key] = new_model_config
+
+    return expanded_models
+
+
+def substitute_parameters(config: Any, params: Dict[str, Any]) -> Any:
+    """Recursively substitute $parameter references in config values."""
+    if isinstance(config, dict):
+        return {k: substitute_parameters(v, params) for k, v in config.items()}
+    elif isinstance(config, list):
+        return [substitute_parameters(item, params) for item in config]
+    elif isinstance(config, str):
+        # Replace $parameter_name with actual value
+        for param_name, param_value in params.items():
+            placeholder = f"${param_name}"
+            if placeholder in config:
+                # If the entire string is just the placeholder, return the actual value (preserving type)
+                if config == placeholder:
+                    return param_value
+                else:
+                    # For partial replacements, convert to string
+                    config = config.replace(placeholder, str(param_value))
+        return config
+    else:
+        return config
+
+
 class Config:
     """Configuration loader for Elelem settings."""
-    
+
     def __init__(self, extra_provider_dirs: Optional[List[str]] = None):
         self._config = self._load_config()
         # Check for extra provider dirs from environment variable
@@ -112,7 +207,10 @@ class Config:
                                     model_config.setdefault('display_metadata', {})['model_configuration'] = model_configuration
 
                             merged_config['models'][model_key] = model_config
-            
+
+            # Expand parameterized models after all models are loaded
+            merged_config['models'] = expand_parameterized_models(merged_config['models'])
+
             return merged_config
         except (FileNotFoundError, yaml.YAMLError) as e:
             raise RuntimeError(f"Failed to load Elelem models configuration: {e}")

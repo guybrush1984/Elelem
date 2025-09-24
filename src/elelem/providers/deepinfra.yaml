@@ -5,10 +5,10 @@ provider:
   default_params: {}
 
 models:
-  "deepinfra:openai/gpt-oss-120b?reasoning=low":
+  "deepinfra:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_120b"
-      model_configuration: "reasoning=low"
+      model_configuration: "reasoning=$reasoning"
     provider: deepinfra
     model_id: openai/gpt-oss-120b
     capabilities:
@@ -20,29 +20,12 @@ models:
       output_cost_per_1m: 0.45
       currency: USD
     default_params:
-      reasoning_effort: low
+      reasoning_effort: $reasoning
 
-  "deepinfra:openai/gpt-oss-120b?reasoning=high":
-    metadata:
-      model_reference: "openai_gpt_oss_120b"
-      model_configuration: "reasoning=high"
-    provider: deepinfra
-    model_id: openai/gpt-oss-120b
-    capabilities:
-      supports_json_mode: false  # DeepInfra doesn't support response_format
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.09
-      output_cost_per_1m: 0.45
-      currency: USD
-    default_params:
-      reasoning_effort: low
-
-  "deepinfra:openai/gpt-oss-20b?reasoning=low":
+  "deepinfra:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_20b"
-      model_configuration: "reasoning=low"
+      model_configuration: "reasoning=$reasoning"
     provider: deepinfra
     model_id: openai/gpt-oss-20b
     capabilities:
@@ -53,23 +36,7 @@ models:
       output_cost_per_1m: 0.16
       currency: USD
     default_params:
-      reasoning_effort: low      
-
-  "deepinfra:openai/gpt-oss-20b?reasoning=high":
-    metadata:
-      model_reference: "openai_gpt_oss_20b"
-      model_configuration: "reasoning=high"
-    provider: deepinfra
-    model_id: openai/gpt-oss-20b
-    capabilities:
-      supports_json_mode: false
-      supports_temperature: true
-    cost:
-      input_cost_per_1m: 0.04
-      output_cost_per_1m: 0.16
-      currency: USD
-    default_params:
-      reasoning_effort: high        
+      reasoning_effort: $reasoning  
 
   "deepinfra:meta-llama/llama-4-maverick-17b":
     metadata:
@@ -110,19 +77,6 @@ models:
       output_cost_per_1m: 2.00
       currency: USD
 
-  "deepinfra:deepseek/deepseek-r1-0528":
-    metadata:
-      model_reference: "deepseek_r1_0528"
-    provider: deepinfra
-    model_id: deepseek-ai/DeepSeek-R1-0528
-    capabilities:
-      supports_json_mode: false
-      supports_temperature: true
-    cost:
-      input_cost_per_1m: 0.50
-      output_cost_per_1m: 2.15
-      currency: USD
-
   "deepinfra:deepseek/deepseek-3.1":
     metadata:
       model_reference: "deepseek_v31"
@@ -136,28 +90,58 @@ models:
       output_cost_per_1m: 1.00
       currency: USD
 
-  "deepinfra:deepseek/deepseek-r1-distill-llama-70b":
+  "deepinfra:deepseek/deepseek-3.1?reasoning=@[low,medium,high]":
     metadata:
-      model_reference: "deepseek_r1_distill_llama_70b"
+      model_reference: "deepseek_v31"
+      model_configuration: "reasoning=$reasoning"
     provider: deepinfra
-    model_id: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+    model_id: deepseek-ai/DeepSeek-V3.1
+    timeout: 300
     capabilities:
       supports_json_mode: false
       supports_temperature: true
     cost:
-      input_cost_per_1m: 0.10
-      output_cost_per_1m: 0.40
-      currency: USD
+      input_cost_per_1m: 0.30
+      output_cost_per_1m: 1.00
+      currency: USD      
+    default_params:
+      stream: true    
+      reasoning_effort: $reasoning
 
-  "deepinfra:deepseek/deepseek-r1-distill-qwen-32b":
+  "deepinfra:qwen/qwen3-30b-a3b?reasoning=@[none,high]":
     metadata:
-      model_reference: "deepseek_r1_distill_qwen_32b"
+      model_reference: "alibaba_qwen3_30b_a3b"
+      model_configuration: "reasoning=$reasoning"
     provider: deepinfra
-    model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+    model_id: Qwen/Qwen3-30B-A3B
     capabilities:
-      supports_json_mode: false
+      supports_json_mode: false  
       supports_temperature: true
+      supports_system: true
     cost:
-      input_cost_per_1m: 0.075
-      output_cost_per_1m: 0.15
+      input_cost_per_1m: 0.08
+      output_cost_per_1m: 0.29
       currency: USD
+    default_params:
+      stream: true
+      reasoning_effort: $reasoning      
+
+  "deepinfra:qwen/qwen3-235b-a22b?reasoning=@[none,high]":
+    metadata:
+      model_reference: "alibaba_qwen3_235b_a22b"
+      model_configuration: "reasoning=$reasoning"
+    provider: deepinfra
+    model_id: Qwen/Qwen3-235B-A22B
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.18
+      output_cost_per_1m: 0.54
+      currency: USD
+    default_params:
+      stream: true
+      reasoning_effort: $reasoning  
+
+

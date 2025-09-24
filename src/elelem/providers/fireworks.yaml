@@ -20,11 +20,27 @@ models:
       output_cost_per_1m: 1.68
       currency: USD
 
+  "fireworks:deepseek/deepseek-3.1?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "deepseek_v31"
+      model_configuration: "reasoning=$reasoning"      
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v3p1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
 
-  "fireworks:openai/gpt-oss-120b?reasoning=low":
+  "fireworks:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_120b"
-      model_configuration: "reasoning=low"
+      model_configuration: "reasoning=$reasoning"
     provider: fireworks
     model_id: accounts/fireworks/models/gpt-oss-120b
     capabilities:
@@ -36,16 +52,33 @@ models:
       output_cost_per_1m: 0.60
       currency: USD
     default_params:
-      reasoning_effort: low
+      reasoning_effort: $reasoning
 
-  "fireworks:openai/gpt-oss-120b?reasoning=high":
+  "fireworks:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
     metadata:
-      model_reference: "openai_gpt_oss_120b"
-      model_configuration: "reasoning=high"
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=$reasoning"
     provider: fireworks
-    model_id: accounts/fireworks/models/gpt-oss-120b
+    model_id: accounts/fireworks/models/gpt-oss-20b
     capabilities:
       supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.07
+      output_cost_per_1m: 0.30
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+
+  "fireworks:qwen/qwen3-30b-a3b?reasoning=@[none,high]":
+    metadata:
+      model_reference: "alibaba_qwen3_30b_a3b"
+      model_configuration: "reasoning=$reasoning"
+    provider: fireworks
+    model_id: accounts/fireworks/models/qwen3-30b-a3b
+    capabilities:
+      supports_json_mode: false  
       supports_temperature: true
       supports_system: true
     cost:
@@ -53,40 +86,23 @@ models:
       output_cost_per_1m: 0.60
       currency: USD
     default_params:
-      reasoning_effort: high      
+      stream: true
+      reasoning_effort: $reasoning      
 
-
-  "fireworks:openai/gpt-oss-20b?reasoning=low":
+  "fireworks:qwen/qwen3-235b-a22b?reasoning=@[none,high]":
     metadata:
-      model_reference: "openai_gpt_oss_20b"
-      model_configuration: "reasoning=low"
+      model_reference: "alibaba_qwen3_235b_a22b"
+      model_configuration: "reasoning=$reasoning"
     provider: fireworks
-    model_id: accounts/fireworks/models/gpt-oss-20b
+    model_id: accounts/fireworks/models/qwen3-235b-a22b
     capabilities:
-      supports_json_mode: false
+      supports_json_mode: false  
       supports_temperature: true
       supports_system: true
     cost:
-      input_cost_per_1m: 0.07
-      output_cost_per_1m: 0.30
+      input_cost_per_1m: 0.22
+      output_cost_per_1m: 0.88
       currency: USD
     default_params:
-      reasoning_effort: low      
-
-
-  "fireworks:openai/gpt-oss-20b?reasoning=high":
-    metadata:
-      model_reference: "openai_gpt_oss_20b"
-      model_configuration: "reasoning=high"
-    provider: fireworks
-    model_id: accounts/fireworks/models/gpt-oss-20b
-    capabilities:
-      supports_json_mode: false
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.07
-      output_cost_per_1m: 0.30
-      currency: USD
-    default_params:
-      reasoning_effort: high      
+      stream: true
+      reasoning_effort: $reasoning  

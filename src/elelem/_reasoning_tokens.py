@@ -95,7 +95,7 @@ def extract_reasoning_tokens(response: Any, logger: Optional[logging.Logger] = N
         return explicit_reasoning
 
     # Priority 2: Content analysis (<think> tags, reasoning fields)
-    content_reasoning = extract_reasoning_from_content(response, logger)
+    content_reasoning, _ = extract_reasoning_from_content(response, logger)
     if content_reasoning > 0:
         return content_reasoning
 
@@ -160,9 +160,11 @@ def recursive_search_reasoning_tokens(obj: Any, target_field: str = "reasoning_t
     return 0
 
 
-def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logger] = None) -> int:
+def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logger] = None) -> Tuple[int, Optional[str]]:
     """
-    Extract reasoning tokens from content analysis (for models with <think> tags or reasoning fields).
+    Extract reasoning tokens and content from content analysis (for models with <think> tags or reasoning fields).
+
+    Returns tuple of (reasoning_tokens, reasoning_content).
 
     Handles multiple edge cases:
     - Complete <think>content</think> tags
@@ -171,7 +173,7 @@ def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logge
     - Character-based token estimation using ratios
     """
     if not response or not hasattr(response, 'usage'):
-        return 0
+        return 0, None
 
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -211,7 +213,7 @@ def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logge
 
                         logger.debug(f"Extracted reasoning from <think> tags: {estimated_reasoning_tokens} tokens "
                                    f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
-                        return estimated_reasoning_tokens
+                        return estimated_reasoning_tokens, reasoning_content
 
             # Fallback for content that starts with thinking but no opening <think> tag
             elif '</think>' in content:
@@ -234,7 +236,7 @@ def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logge
 
                         logger.debug(f"Extracted reasoning via fallback: {estimated_reasoning_tokens} tokens "
                                    f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
-                        return estimated_reasoning_tokens
+                        return estimated_reasoning_tokens, reasoning_content
 
     # Fallback: estimate from reasoning content fields (any provider)
     if response and hasattr(response, 'choices') and response.choices:
@@ -266,9 +268,20 @@ def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logge
 
                     logger.debug(f"Estimated reasoning tokens via char ratio: {estimated_reasoning_tokens} "
                                f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
-                    return estimated_reasoning_tokens
+                    return estimated_reasoning_tokens, reasoning_content
 
-    return 0
+    return 0, None
+
+
+def extract_reasoning_content(response: Any, logger: Optional[logging.Logger] = None) -> Optional[str]:
+    """
+    Extract just the reasoning content text from response.
+
+    Returns the reasoning content string if found, None otherwise.
+    Uses the same logic as extract_reasoning_from_content but only returns the content.
+    """
+    _, content = extract_reasoning_from_content(response, logger)
+    return content
 
 
 def is_gemini_style_response(response: Any) -> bool:

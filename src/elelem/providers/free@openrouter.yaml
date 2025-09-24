@@ -1,0 +1,151 @@
+# Cost-optimized infrastructure provider via OpenRouter
+provider:
+  base_provider: openrouter
+  endpoint: https://openrouter.ai/api/v1
+  headers:
+    HTTP-Referer: https://github.com/guybrush1984/Elelem
+    X-Title: Elelem
+  default_params: {}
+  extra_body:
+    usage:
+      include: true
+
+models:
+  "free@openrouter:deepseek/deepseek-3.1":
+    metadata:
+      model_reference: "deepseek_v31"
+    provider: free@openrouter
+    model_id: deepseek/deepseek-chat-v3.1:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+
+  "free@openrouter:deepseek/deepseek-3.1?reasoning":
+    metadata:
+      model_reference: "deepseek_v31"
+    provider: free@openrouter
+    model_id: deepseek/deepseek-chat-v3.1:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: true
+
+  "free@openrouter:openai/gpt-oss-20b":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+    provider: free@openrouter
+    model_id: openai/gpt-oss-20b:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+
+  "free@openrouter:openai/gpt-oss-120b":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+    provider: free@openrouter
+    model_id: openai/gpt-oss-120b:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+
+  "free@openrouter:meta-llama/llama-4-scout-17b":
+    metadata:
+      model_reference: "meta_llama4_scout"
+    provider: free@openrouter
+    model_id: meta-llama/llama-4-scout:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+
+  "free@openrouter:meta-llama/llama-4-maverick-17b":
+    metadata:
+      model_reference: "meta_llama4_maverick"
+    provider: free@openrouter
+    model_id: meta-llama/llama-4-maverick:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+
+  "free@openrouter:qwen/qwen3-30b-a3b?reasoning=@b[false,true]":
+    metadata:
+      model_reference: "alibaba_qwen3_30b_a3b"
+      model_configuration: "reasoning=$reasoning"
+    provider: free@openrouter
+    model_id: qwen/qwen3-30b-a3b:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: false
+
+  "free@openrouter:qwen/qwen3-235b-a22b?reasoning=@b[false,true]":
+    metadata:
+      model_reference: "alibaba_qwen3_235b_a22b"
+      model_configuration: "reasoning=$reasoning"
+    provider: free@openrouter
+    model_id: qwen/qwen3-235b-a22b:free
+    capabilities:
+      supports_json_mode: false  
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.0
+      output_cost_per_1m: 0.0
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: $reasoning

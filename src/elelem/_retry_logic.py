@@ -28,7 +28,7 @@ def update_retry_analytics(retry_type: str, tags: List[str], metrics_store: Metr
 def handle_json_retry(error: json.JSONDecodeError, attempt: int, max_retries: int,
                      request_id: str, api_kwargs: Dict, original_temperature: float,
                      temperature_reductions: List[float], min_temp: float, tags: List[str],
-                     metrics_store: MetricsStore, logger: logging.Logger) -> Tuple[bool, float]:
+                     request_tracker, logger: logging.Logger) -> Tuple[bool, float]:
     """Handle JSON validation retry logic.
 
     Returns:
@@ -44,11 +44,11 @@ def handle_json_retry(error: json.JSONDecodeError, attempt: int, max_retries: in
         api_kwargs["temperature"] = new_temp
 
         # Track temperature reduction
-        update_retry_analytics("temperature_reductions", tags, metrics_store)
+        request_tracker.record_retry("temperature_reductions")
 
         # Log appropriate message based on error type and track retry type
         if "JSON schema validation failed" in str(error):
-            update_retry_analytics("json_schema_retries", tags, metrics_store)
+            request_tracker.record_retry("json_schema_retries")
             logger.warning(
                 f"[{request_id}] JSON schema validation failed (attempt {attempt + 1}/{max_retries + 1}). "
                 f"Retrying with temperature {new_temp}: {str(error)[:500]}..."
@@ -56,9 +56,9 @@ def handle_json_retry(error: json.JSONDecodeError, attempt: int, max_retries: in
         else:
             # Could be API JSON validation or client-side parse failure
             if "API JSON validation failed" in str(error):
-                update_retry_analytics("api_json_validation_retries", tags, metrics_store)
+                request_tracker.record_retry("api_json_validation_retries")
             else:
-                update_retry_analytics("json_parse_retries", tags, metrics_store)
+                request_tracker.record_retry("json_parse_retries")
             logger.warning(
                 f"[{request_id}] JSON parse failed (attempt {attempt + 1}/{max_retries + 1}). "
                 f"Retrying with temperature {new_temp}: {str(error)[:300]}..."

@@ -36,8 +36,8 @@ class Elelem:
         self._models = self._load_models()
         self._providers = self._initialize_providers()
 
-        # Initialize metrics system
-        self._metrics_store = MetricsStore(persist_file=metrics_persist_file)
+        # Initialize metrics system (unified SQLAlchemy backend)
+        self._metrics_store = MetricsStore()
     
     def _load_models(self) -> Dict[str, Any]:
         """Load model definitions using the Config system."""
@@ -93,38 +93,7 @@ class Elelem:
         """Extract runtime cost information from response when cost config is 'runtime'."""
         return extract_runtime_costs(response, cost_config, self.logger)
         
-    def _update_statistics(self, model: str, input_tokens: int, output_tokens: int,
-                          reasoning_tokens: int, duration: float, tags: List[str], runtime_costs: Dict = None, candidate_cost_config: Dict = None, candidate_provider: str = None, requested_model: str = None):
-        """Update statistics tracking."""
-        costs = self._calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs, candidate_cost_config)
-
-        # Track actual provider used (for OpenRouter)
-        actual_provider = runtime_costs.get("actual_provider") if runtime_costs else None
-
-        # Use candidate provider directly
-        provider = candidate_provider
-
-        # Add model and provider as automatic tags
-        enhanced_tags = list(tags) if tags else []
-        enhanced_tags.append(f"model:{model}")
-        enhanced_tags.append(f"provider:{provider}")
-
-        self._metrics_store.record_call(
-            model=model,
-            provider=provider,
-            tags=enhanced_tags,
-            duration_seconds=duration,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            reasoning_tokens=reasoning_tokens,
-            costs=costs,
-            actual_provider=actual_provider,
-            requested_model=requested_model
-        )
     
-    def _update_retry_analytics(self, retry_type: str, tags: List[str], count: int = 1):
-        """Update retry analytics."""
-        update_retry_analytics(retry_type, tags, self._metrics_store, count)
     
     def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, capabilities: Dict) -> List[Dict[str, str]]:
         """Preprocess messages for the request."""
@@ -177,12 +146,6 @@ class Elelem:
         """Validate JSON response content and schema."""
         validate_json_response(content, json_schema, api_error)
     
-    def _handle_json_retry(self, e: json.JSONDecodeError, attempt: int, max_retries: int,
-                          request_id: str, api_kwargs: Dict, original_temperature: float,
-                          temperature_reductions: List[float], min_temp: float, tags: List[str]) -> tuple[bool, float]:
-        """Handle JSON validation retry logic."""
-        return handle_json_retry(e, attempt, max_retries, request_id, api_kwargs, original_temperature,
-                                temperature_reductions, min_temp, tags, self._metrics_store, self.logger)
     
     
     async def create_chat_completion(
@@ -208,12 +171,22 @@ class Elelem:
         # Generate unique request ID for tracking
         request_id = str(uuid.uuid4())[:8]
         start_time = time.time()
-        
+
         # Normalize tags
         if isinstance(tags, str):
             tags = [tags]
         elif not tags:
             tags = []
+
+        # Create RequestTracker for unified metrics
+        request_tracker = self._metrics_store.start_request(
+            request_id=request_id,
+            requested_model=model,
+            tags=tags,
+            temperature=kwargs.get("temperature"),
+            max_tokens=kwargs.get("max_tokens"),
+            stream=kwargs.get("stream", False)
+        )
         
         # Get model configuration and candidates
         try:
@@ -221,10 +194,7 @@ class Elelem:
             candidates = model_config['candidates']
         except ValueError as e:
             # Record failure for invalid model
-            enhanced_tags = list(tags) if tags else []
-            enhanced_tags.append(f"model:{model}")
-            enhanced_tags.append("error:ModelNotFound")
-            self._update_retry_analytics("final_failures", enhanced_tags)
+            request_tracker.finalize_failure(self._metrics_store, "ModelNotFound", str(e))
             raise ValueError(f"Model configuration error: {e}")
         
         # Extract common parameters
@@ -252,31 +222,22 @@ class Elelem:
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
                     json_mode_requested, json_schema, original_temperature,
-                    tags, start_time, **kwargs
+                    tags, start_time, request_tracker, **kwargs
                 )
             except InfrastructureError as e:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed: {e}")
-                self._update_retry_analytics("candidate_iterations", tags)
+                request_tracker.record_retry("candidate_iterations")
                 last_error = e
 
                 if candidate_idx < len(candidates) - 1:
                     continue  # Try next candidate
                 else:
                     # All candidates exhausted - record failure
-                    enhanced_tags = list(tags) if tags else []
-                    enhanced_tags.append(f"model:{model}")
-                    enhanced_tags.append(f"provider:{candidate['provider']}")
-                    enhanced_tags.append("error:AllCandidatesFailed")
-                    self._update_retry_analytics("final_failures", enhanced_tags)
+                    request_tracker.finalize_failure(self._metrics_store, "AllCandidatesFailed", str(e))
                     raise e
             except ModelError as e:
                 # Model/request errors don't trigger candidate iteration
-                # Record failure with the current candidate's provider
-                enhanced_tags = list(tags) if tags else []
-                enhanced_tags.append(f"model:{model}")
-                enhanced_tags.append(f"provider:{candidate['provider']}")
-                enhanced_tags.append("error:ModelError")
-                self._update_retry_analytics("final_failures", enhanced_tags)
+                request_tracker.finalize_failure(self._metrics_store, "ModelError", str(e))
                 raise e
 
         # This should never be reached - if it is, there's a logic error
@@ -284,9 +245,9 @@ class Elelem:
     
     
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
-                                messages, original_model, model_config, request_id, 
+                                messages, original_model, model_config, request_id,
                                 json_mode_requested, json_schema, original_temperature,
-                                tags, start_time, **kwargs):
+                                tags, start_time, request_tracker, **kwargs):
         """Attempt to complete request with a specific candidate."""
         
         # Get timeout for this candidate
@@ -413,7 +374,7 @@ class Elelem:
 
                                 if new_temp < current_temp:
                                     api_kwargs['temperature'] = new_temp
-                                    self._update_retry_analytics("temperature_reductions", tags)
+                                    request_tracker.record_retry("temperature_reductions")
                                     error_snippet = str(e)[:300]
                                     self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp} (error: {error_snippet})")
                                     continue
@@ -422,12 +383,12 @@ class Elelem:
                             if 'response_format' in api_kwargs:
                                 api_kwargs.pop('response_format', None)
                                 api_kwargs['temperature'] = original_temperature
-                                self._update_retry_analytics("response_format_removals", tags)
+                                request_tracker.record_retry("response_format_removals")
                                 self.logger.warning(f"[{request_id}] Removing response_format and retrying")
                                 continue
                         
                         # All JSON retries exhausted - this is a model error, don't iterate candidates
-                        self._update_retry_analytics("final_failures", tags)
+                        request_tracker.finalize_failure(self._metrics_store, "JSONValidationFailed", str(e))
                         raise ModelError(f"JSON validation failed after all retries: {e}")
                 
                 # Success! Calculate duration and return
@@ -448,9 +409,18 @@ class Elelem:
                 costs = self._calculate_costs(stats_model_name, total_input_tokens, total_output_tokens,
                                             total_reasoning_tokens, runtime_costs, candidate_cost_config)
 
-                # Update statistics
-                self._update_statistics(stats_model_name, total_input_tokens, total_output_tokens,
-                                      total_reasoning_tokens, duration, tags, runtime_costs, candidate_cost_config, provider_name, original_model)
+                # Finalize request tracking with candidate details and store
+                request_tracker.finalize_with_candidate(
+                    self._metrics_store,
+                    selected_candidate=f"{provider_name}:{candidate_model_name}",
+                    actual_model=stats_model_name,
+                    actual_provider=runtime_costs.get("actual_provider") if runtime_costs else provider_name,
+                    status="success",
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    reasoning_tokens=total_reasoning_tokens,
+                    total_cost_usd=costs.get('total_cost_usd', 0.0)
+                )
 
                 # Update response content
                 response.choices[0].message.content = content
@@ -484,7 +454,7 @@ class Elelem:
                 if attempt < max_rate_limit_retries:
                     backoff_times = self.config.retry_settings["rate_limit_backoff"]
                     wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
-                    self._update_retry_analytics("rate_limit_retries", tags)
+                    request_tracker.record_retry("rate_limit_retries")
                     self.logger.warning(f"[{request_id}] Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_rate_limit_retries + 1})")
                     await asyncio.sleep(wait_time)
                     continue
@@ -507,7 +477,7 @@ class Elelem:
                     if attempt < max_rate_limit_retries:
                         backoff_times = self.config.retry_settings["rate_limit_backoff"]
                         wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
-                        self._update_retry_analytics("rate_limit_retries", tags)
+                        request_tracker.record_retry("rate_limit_retries")
                         self.logger.warning(f"[{request_id}] Rate limit (fallback), waiting {wait_time}s")
                         await asyncio.sleep(wait_time)
                         continue
@@ -526,11 +496,11 @@ class Elelem:
         
     def get_stats(self) -> Dict[str, Any]:
         """Get overall statistics."""
-        return self._metrics_store.get_overall_stats()
+        return self._metrics_store.get_stats()
 
     def get_stats_by_tag(self, tag: str) -> Dict[str, Any]:
         """Get statistics for a specific tag."""
-        return self._metrics_store.get_stats_by_tag(tag)
+        return self._metrics_store.get_stats(tags=[tag])
 
     def get_summary(self,
                     start_time: Optional[datetime] = None,
@@ -546,7 +516,7 @@ class Elelem:
         Returns:
             Dict with aggregated metrics for tokens, costs, duration, and retry analytics
         """
-        return self._metrics_store.get_summary(start_time, end_time, tags)
+        return self._metrics_store.get_stats(start_time, end_time, tags)
 
     def get_metrics_dataframe(self,
                               start_time: Optional[datetime] = None,
@@ -653,3 +623,20 @@ class Elelem:
             "object": "list",
             "data": sorted(models_list, key=lambda x: x["id"])
         }
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """Get health status of Elelem and its subsystems.
+
+        Returns:
+            Dictionary with health status including metrics backends
+        """
+        return self._metrics_store.get_health_status()
+
+
+    def close(self):
+        """Clean up resources and close connections."""
+        if hasattr(self._metrics_store, 'postgres_engine') and self._metrics_store.postgres_engine:
+            try:
+                self._metrics_store.postgres_engine.dispose()
+            except Exception as e:
+                self.logger.error(f"Error closing PostgreSQL connections: {e}")

@@ -10,6 +10,7 @@ Usage:
 
 import logging
 import traceback
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -20,7 +21,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from elelem.elelem import Elelem
+from elelem import Elelem
 from elelem import __version__
 from elelem.server.models import (
     ChatCompletionRequest,
@@ -41,8 +42,46 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Initialize Elelem instance
-elelem = Elelem()
+# Global variables
+elelem = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Elelem on server startup."""
+    global elelem
+    logger.info("🚀 Starting Elelem server...")
+
+    # Initialize Elelem instance (auto-creates PostgreSQL tables if configured)
+    elelem = Elelem()
+
+    # Log startup status using proper encapsulation
+    if os.getenv('ELELEM_DATABASE_URL'):
+        health = elelem.get_health_status()
+        if health["postgresql"]["connected"]:
+            logger.info("✅ PostgreSQL metrics backend ready")
+        else:
+            logger.warning(f"⚠️ PostgreSQL connection issue: {health['postgresql']['error']}")
+    else:
+        logger.info("📊 Running with SQLite metrics backend")
+
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up on server shutdown."""
+    global elelem
+    logger.info("🛑 Shutting down Elelem server...")
+
+    # Clean up using proper encapsulation
+    if elelem:
+        try:
+            elelem.close()
+            logger.info("✅ Elelem resources cleaned up")
+        except Exception as e:
+            logger.error(f"❌ Error during cleanup: {e}")
+
+    logger.info("👋 Shutdown complete")
 
 
 @app.exception_handler(Exception)
@@ -65,9 +104,23 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health")
-async def health_check() -> HealthResponse:
-    """Health check endpoint."""
-    return HealthResponse(status="healthy", version=__version__)
+async def health_check():
+    """Health check endpoint with detailed status."""
+    if not elelem:
+        return {"status": "error", "message": "Elelem not initialized"}
+
+    health = elelem.get_health_status()
+
+    # Determine overall status
+    overall_status = "healthy"
+    if health["postgresql"]["enabled"] and not health["postgresql"]["connected"]:
+        overall_status = "degraded"
+
+    return {
+        "status": overall_status,
+        "version": __version__,
+        "metrics": health
+    }
 
 
 @app.get("/v1/models")
@@ -194,19 +247,17 @@ async def get_metrics_data(
     tags: Optional[str] = Query(None, description="Comma-separated list of tags to filter by"),
     format: str = Query("json", description="Output format (currently only 'json' supported)")
 ):
-    """Get raw metrics data as JSON array.
+    """Get raw unified metrics data as JSON array.
 
-    Returns array of call records with all fields:
-    - timestamp, model, provider, tags
-    - Token counts, costs, duration
-    - call_id for correlation
+    Returns array of request records from unified metrics structure.
+    Works with both PostgreSQL and local pandas.
     """
     try:
         if format != "json":
             raise HTTPException(status_code=400, detail="Only 'json' format is currently supported")
 
         tag_list = tags.split(',') if tags else None
-        df = elelem.get_metrics_dataframe(start_time, end_time, tag_list)
+        df = elelem.get_dataframe(start_time, end_time, tag_list)
 
         # Convert DataFrame to JSON records
         # Handle datetime serialization

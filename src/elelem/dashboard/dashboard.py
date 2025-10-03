@@ -50,44 +50,94 @@ def get_database_connection():
         st.error(f"❌ Database connection failed: {e}")
         st.stop()
 
-def load_data(engine, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, limit: int = 1000) -> pd.DataFrame:
-    """Load data from database with optional time filtering."""
+def load_data(engine, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None, limit: int = 1000) -> pd.DataFrame:
+    """Load data from database with optional time and tag filtering."""
     try:
-        # Build query
-        query = "SELECT * FROM request_metrics"
         params = {}
-        conditions = []
 
-        if start_time:
-            conditions.append("timestamp >= :start_time")
-            params['start_time'] = start_time
+        # Build base query - conditionally join with tags if filtering by tags
+        if tags:
+            # When filtering by tags with AND logic (must have ALL tags)
+            # Use GROUP BY and HAVING COUNT to ensure all tags are present
+            if len(tags) == 1:
+                tag_filter = f"rt.tag = '{tags[0]}'"
+            else:
+                tag_filter = f"rt.tag IN {tuple(tags)}"
 
-        if end_time:
-            conditions.append("timestamp <= :end_time")
-            params['end_time'] = end_time
+            # Build time filter conditions
+            time_conditions = []
+            if start_time:
+                time_conditions.append("rm.timestamp >= :start_time")
+                params['start_time'] = start_time
+            if end_time:
+                time_conditions.append("rm.timestamp <= :end_time")
+                params['end_time'] = end_time
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+            time_filter = " AND " + " AND ".join(time_conditions) if time_conditions else ""
 
-        query += " ORDER BY timestamp DESC"
+            query = f"""
+            SELECT rm.*
+            FROM request_metrics rm
+            WHERE rm.request_id IN (
+                SELECT rt.request_id
+                FROM request_tags rt
+                WHERE {tag_filter}
+                GROUP BY rt.request_id
+                HAVING COUNT(DISTINCT rt.tag) = {len(tags)}
+            ){time_filter}
+            ORDER BY rm.timestamp DESC
+            """
+        else:
+            # When not filtering by tags, just get all metrics
+            query = "SELECT * FROM request_metrics rm"
+            conditions = []
+
+            if start_time:
+                conditions.append("rm.timestamp >= :start_time")
+                params['start_time'] = start_time
+
+            if end_time:
+                conditions.append("rm.timestamp <= :end_time")
+                params['end_time'] = end_time
+
+            # Add WHERE clause only if we have conditions
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY rm.timestamp DESC"
 
         if limit:
             query += f" LIMIT {limit}"
 
-        # Load data using SQLAlchemy text() for proper parameter binding
+        # Load main dataframe
         df = pd.read_sql(text(query), engine, params=params)
 
-        # Parse JSON tags
-        if 'tags' in df.columns and not df.empty:
-            df['tags'] = df['tags'].apply(
-                lambda x: json.loads(x) if isinstance(x, str) and x.strip() else []
-            )
+        # ALWAYS append tags column (fetch tags for all requests in result)
+        if not df.empty:
+            request_ids = df['request_id'].tolist()
+            if request_ids:
+                # Build query to get tags for these requests
+                if len(request_ids) == 1:
+                    tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id = '{request_ids[0]}'"
+                else:
+                    tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id IN {tuple(request_ids)}"
+
+                tags_df = pd.read_sql(text(tags_query), engine)
+
+                # Group tags by request_id into lists
+                if not tags_df.empty:
+                    tags_by_request = tags_df.groupby('request_id')['tag'].apply(list).to_dict()
+                    df['tags'] = df['request_id'].map(lambda rid: tags_by_request.get(rid, []))
+                else:
+                    df['tags'] = [[] for _ in range(len(df))]
+            else:
+                df['tags'] = [[] for _ in range(len(df))]
 
         return df
 
     except Exception as e:
         st.error(f"❌ Error loading data: {e}")
-        return pd.DataFrame()
+        raise
 
 def calculate_stats(df: pd.DataFrame) -> dict:
     """Calculate summary statistics from DataFrame."""
@@ -151,6 +201,51 @@ def main():
 
     start_time, end_time = time_options[selected_range]
 
+    # Load tag prefixes (keys) for autocomplete suggestions
+    try:
+        tags_query = "SELECT DISTINCT tag FROM request_tags ORDER BY tag"
+        available_tags_df = pd.read_sql(text(tags_query), engine)
+        all_tags = available_tags_df['tag'].tolist() if not available_tags_df.empty else []
+
+        # Extract unique tag prefixes (e.g., "phase", "generation_id" from "phase:blurb")
+        tag_prefixes = set()
+        for tag in all_tags:
+            if ':' in tag:
+                prefix = tag.split(':', 1)[0]
+                tag_prefixes.add(prefix)
+        tag_prefixes = sorted(tag_prefixes)
+    except:
+        all_tags = []
+        tag_prefixes = []
+
+    # Tag filter with text input
+    st.sidebar.markdown("### 🏷️ Filter by Tags")
+    st.sidebar.caption("Enter tags as comma-separated (e.g., `phase:blurb, generation_id:abc123`)")
+
+    # Show common tag prefixes as hints
+    if tag_prefixes:
+        st.sidebar.caption(f"Available tag types: {', '.join(tag_prefixes)}")
+
+    tag_input = st.sidebar.text_input(
+        "Tags (comma-separated):",
+        value="",
+        placeholder="phase:blurb, generation_id:abc123",
+        help="Enter one or more tags separated by commas (AND logic - must have ALL tags)"
+    )
+
+    # Parse tag input
+    selected_tags = []
+    if tag_input.strip():
+        selected_tags = [tag.strip() for tag in tag_input.split(',') if tag.strip()]
+
+    # Group by selector
+    group_by = st.sidebar.selectbox(
+        "📊 Group by:",
+        options=["None", "Model", "Provider", "Status", "Tags"],
+        index=0,
+        help="Group data for aggregated view"
+    )
+
     # Limit selector
     max_rows = st.sidebar.number_input(
         "Max rows to display:",
@@ -176,16 +271,20 @@ def main():
 
         st.sidebar.write(f"Last refresh: {datetime.now().strftime('%H:%M:%S')}")
 
-    # Load data
+    # Load data with tag filtering
     with st.spinner("Loading data..."):
-        df = load_data(engine, start_time, end_time, max_rows)
+        df = load_data(engine, start_time, end_time, selected_tags if selected_tags else None, max_rows)
 
     if df.empty:
-        st.warning("📭 No data available for the selected time range")
+        st.warning("📭 No data available for the selected filters")
         return
 
     # Calculate statistics
     stats = calculate_stats(df)
+
+    # Display filter info if tags are selected
+    if selected_tags:
+        st.info(f"🏷️ Filtered by tags: {', '.join(selected_tags)} ({len(df)} requests)")
 
     # Display summary metrics
     st.subheader("📊 Summary Metrics")
@@ -209,6 +308,70 @@ def main():
 
     with col6:
         st.metric("📝 Output Tokens", f"{stats['total_output_tokens']:,}")
+
+    # Grouped/Pivot view if group_by is selected
+    if group_by != "None" and len(df) > 0:
+        st.subheader(f"📊 Aggregated View - Grouped by {group_by}")
+
+        successful = df[df['status'] == 'success']
+
+        if group_by == "Model":
+            grouped = successful.groupby('actual_model').agg({
+                'request_id': 'count',
+                'total_cost_usd': ['sum', 'mean'],
+                'total_duration_seconds': 'mean',
+                'input_tokens': 'sum',
+                'output_tokens': 'sum',
+                'reasoning_tokens': 'sum'
+            }).round(6)
+            grouped.columns = ['Requests', 'Total Cost', 'Avg Cost', 'Avg Duration (s)', 'Input Tokens', 'Output Tokens', 'Reasoning Tokens']
+
+        elif group_by == "Provider":
+            grouped = successful.groupby('actual_provider').agg({
+                'request_id': 'count',
+                'total_cost_usd': ['sum', 'mean'],
+                'total_duration_seconds': 'mean',
+                'input_tokens': 'sum',
+                'output_tokens': 'sum'
+            }).round(6)
+            grouped.columns = ['Requests', 'Total Cost', 'Avg Cost', 'Avg Duration (s)', 'Input Tokens', 'Output Tokens']
+
+        elif group_by == "Status":
+            grouped = df.groupby('status').agg({
+                'request_id': 'count',
+                'total_cost_usd': 'sum',
+                'total_duration_seconds': 'mean'
+            }).round(6)
+            grouped.columns = ['Requests', 'Total Cost', 'Avg Duration (s)']
+
+        elif group_by == "Tags":
+            # Explode tags into individual rows for grouping
+            df_exploded = df.explode('tags')
+            df_exploded = df_exploded[df_exploded['status'] == 'success']
+            if not df_exploded.empty and 'tags' in df_exploded.columns:
+                grouped = df_exploded.groupby('tags').agg({
+                    'request_id': 'count',
+                    'total_cost_usd': ['sum', 'mean'],
+                    'total_duration_seconds': 'mean'
+                }).round(6)
+                grouped.columns = ['Requests', 'Total Cost', 'Avg Cost', 'Avg Duration (s)']
+            else:
+                st.warning("No tags available for grouping")
+                grouped = pd.DataFrame()
+
+        if not grouped.empty:
+            st.dataframe(grouped, use_container_width=True)
+
+            # Add a chart for the grouped view
+            if 'Total Cost' in grouped.columns:
+                fig_grouped = px.bar(
+                    grouped.reset_index(),
+                    x=grouped.index.name,
+                    y='Total Cost',
+                    title=f"Total Cost by {group_by}"
+                )
+                fig_grouped.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_grouped, use_container_width=True)
 
     # Charts section
     if len(df) > 1:

@@ -24,10 +24,13 @@ services:
     build:
       context: ../
       dockerfile: src/elelem/server/Dockerfile
+    env_file:
+      - ../.env  # Load .env from project root for local development
     environment:
+      # These override .env file values (shell env has highest priority)
       - ELELEM_DATABASE_URL=postgresql://elelem:test_password@postgres:5432/elelem_test
       - PORT=8000
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # OPENROUTER_API_KEY is loaded from .env file (local) or shell (CI)
     ports:
       - "8000:8000"
     depends_on:

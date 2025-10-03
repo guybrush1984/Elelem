@@ -189,27 +189,38 @@ jobs:
         echo "🧪 Testing dashboard image startup..."
 
         # Note: Dashboard requires DATABASE_URL, so we just test if it starts without crashing
-        timeout 30 docker run --name test-dashboard ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }} || true
+        echo "📦 Running dashboard container with 30s timeout..."
+        timeout 30 docker run --name test-dashboard ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }} || echo "⏰ Timeout or container exited (expected)"
 
         # Wait a moment for container to settle
+        echo "⏳ Waiting 2 seconds..."
         sleep 2
 
         # Check if container exists
+        echo "🔍 Checking if container exists..."
+        docker ps -a | grep test-dashboard || true
+
         if ! docker ps -a | grep -q test-dashboard; then
-          echo "❌ Container never started"
+          echo "❌ Container never started - listing all containers:"
+          docker ps -a
           exit 1
         fi
 
+        # Get and display logs
+        echo "📋 Container logs:"
+        docker logs test-dashboard 2>&1 || echo "⚠️  Failed to get logs"
+
         # Check if it started (even if it failed due to missing DATABASE_URL)
+        echo "🔍 Checking for Streamlit in logs..."
         if docker logs test-dashboard 2>&1 | grep -qi "streamlit"; then
-          echo "✅ Dashboard image started successfully"
+          echo "✅ Dashboard image started successfully (found Streamlit)"
         else
-          echo "❌ Dashboard image failed to start"
-          docker logs test-dashboard
+          echo "❌ Dashboard image failed to start (no Streamlit found)"
           exit 1
         fi
 
         # Cleanup
+        echo "🧹 Cleaning up..."
         docker rm test-dashboard
 
     - name: Print image details

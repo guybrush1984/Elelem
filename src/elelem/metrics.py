@@ -44,7 +44,7 @@ class RequestTracker:
     def __init__(self, request_id: Optional[str] = None):
         self.request_id = request_id or str(uuid.uuid4())
         self.start_time = time.time()
-        self.timestamp = datetime.now()
+        self.timestamp = datetime.utcnow()  # Use UTC to avoid timezone issues across servers
 
         # Request details
         self.requested_model: Optional[str] = None
@@ -279,7 +279,20 @@ class MetricsStore:
             # Default to SQLite file storage for local development
             database_url = "sqlite:///elelem_metrics.db"
 
-        self.engine = create_engine(database_url)
+        # Configure connection pooling with health checks and recycling for cloud databases
+        # These settings prevent "SSL connection closed" and stale connection errors
+        pool_config = {
+            "pool_pre_ping": True,      # Test connection health before use (prevents SSL errors)
+            "pool_recycle": 300,        # Recycle connections after 5 min (matches Neon timeout)
+            "pool_size": 2,             # Keep 2 connections open (low for serverless)
+            "max_overflow": 3,          # Allow up to 3 extra temp connections (total max: 5)
+        }
+
+        # SQLite doesn't support advanced pooling
+        if database_url.startswith("sqlite"):
+            pool_config = {"pool_pre_ping": True}
+
+        self.engine = create_engine(database_url, **pool_config)
         self.active_requests: Dict[str, RequestTracker] = {}
 
         # Ensure database schema exists
@@ -394,62 +407,100 @@ class MetricsStore:
         Args:
             tracker: The RequestTracker to finalize and store
         """
+        import threading
+
         # Convert tracker to record
         record = tracker.to_record()
 
         # Remove from active requests
         self.active_requests.pop(tracker.request_id, None)
 
-        # Save to unified database backend (SQLite or PostgreSQL)
-        self._save_record(record)
+        # Save to database in background thread to avoid blocking API response
+        # If save fails, it's logged but doesn't block the user
+        thread = threading.Thread(target=self._save_record, args=(record,), daemon=True)
+        thread.start()
 
     def _save_record(self, record: Dict[str, Any]):
-        """Save a single request record to the unified database backend."""
-        try:
-            # Extract tags before copying (they'll be stored in separate table)
-            tags = record.get('tags', [])
-            record_copy = record.copy()
-            record_copy.pop('tags', None)  # Remove tags from main record
+        """Save a single request record with retry logic for transient failures."""
+        import time
+        from sqlalchemy.exc import OperationalError, IntegrityError
 
-            # Insert into request_metrics (without tags column)
-            insert_metrics_sql = """
-            INSERT INTO request_metrics (
-                request_id, timestamp, requested_model, selected_candidate, actual_model, actual_provider,
-                temperature, initial_temperature, max_tokens, stream, status, total_duration_seconds,
-                input_tokens, output_tokens, reasoning_tokens, total_cost_usd, final_error_type, final_error_message,
-                total_tokens_per_second, cost_per_token, json_parse_retries, json_schema_retries,
-                api_json_validation_retries, rate_limit_retries, temperature_reductions, response_format_removals,
-                candidate_iterations, final_failures, total_retry_attempts
-            ) VALUES (
-                :request_id, :timestamp, :requested_model, :selected_candidate, :actual_model, :actual_provider,
-                :temperature, :initial_temperature, :max_tokens, :stream, :status, :total_duration_seconds,
-                :input_tokens, :output_tokens, :reasoning_tokens, :total_cost_usd, :final_error_type, :final_error_message,
-                :total_tokens_per_second, :cost_per_token, :json_parse_retries, :json_schema_retries,
-                :api_json_validation_retries, :rate_limit_retries, :temperature_reductions, :response_format_removals,
-                :candidate_iterations, :final_failures, :total_retry_attempts
-            )
-            """
+        # Extract tags before copying
+        tags = record.get('tags', [])
+        record_copy = record.copy()
+        record_copy.pop('tags', None)
 
-            with self.engine.connect() as conn:
-                # Insert main record
-                conn.execute(text(insert_metrics_sql), record_copy)
+        # SQL statements
+        insert_metrics_sql = """
+        INSERT INTO request_metrics (
+            request_id, timestamp, requested_model, selected_candidate, actual_model, actual_provider,
+            temperature, initial_temperature, max_tokens, stream, status, total_duration_seconds,
+            input_tokens, output_tokens, reasoning_tokens, total_cost_usd, final_error_type, final_error_message,
+            total_tokens_per_second, cost_per_token, json_parse_retries, json_schema_retries,
+            api_json_validation_retries, rate_limit_retries, temperature_reductions, response_format_removals,
+            candidate_iterations, final_failures, total_retry_attempts
+        ) VALUES (
+            :request_id, :timestamp, :requested_model, :selected_candidate, :actual_model, :actual_provider,
+            :temperature, :initial_temperature, :max_tokens, :stream, :status, :total_duration_seconds,
+            :input_tokens, :output_tokens, :reasoning_tokens, :total_cost_usd, :final_error_type, :final_error_message,
+            :total_tokens_per_second, :cost_per_token, :json_parse_retries, :json_schema_retries,
+            :api_json_validation_retries, :rate_limit_retries, :temperature_reductions, :response_format_removals,
+            :candidate_iterations, :final_failures, :total_retry_attempts
+        )
+        """
 
-                # Insert tags into separate table
-                if tags:
-                    insert_tags_sql = """
-                    INSERT INTO request_tags (request_id, tag)
-                    VALUES (:request_id, :tag)
-                    """
-                    for tag in tags:
-                        conn.execute(text(insert_tags_sql), {
-                            'request_id': record['request_id'],
-                            'tag': tag
-                        })
+        insert_tags_sql = """
+        INSERT INTO request_tags (request_id, tag)
+        VALUES (:request_id, :tag)
+        """
 
-                conn.commit()
+        # Retry with exponential backoff for transient connection errors
+        max_retries = 3
+        retry_delay = 0.5
 
-        except Exception as e:
-            self.logger.error(f"Failed to save request to database: {e}")
+        for attempt in range(max_retries):
+            try:
+                with self.engine.connect() as conn:
+                    with conn.begin():
+                        # Insert metrics
+                        conn.execute(text(insert_metrics_sql), record_copy)
+
+                        # Insert tags
+                        if tags:
+                            for tag in tags:
+                                conn.execute(text(insert_tags_sql), {
+                                    'request_id': record['request_id'],
+                                    'tag': tag
+                                })
+                # Success
+                return
+
+            except IntegrityError as e:
+                # Duplicate - don't retry
+                self.logger.warning(f"Duplicate metrics record (request_id={record.get('request_id')}): {e}")
+                return
+
+            except OperationalError as e:
+                # Connection/SSL errors - retry
+                if attempt < max_retries - 1:
+                    self.logger.warning(
+                        f"DB connection error (attempt {attempt + 1}/{max_retries}, "
+                        f"request_id={record.get('request_id')}): {e}. Retrying..."
+                    )
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                else:
+                    self.logger.error(
+                        f"Failed to save metrics after {max_retries} attempts "
+                        f"(request_id={record.get('request_id')}): {e}"
+                    )
+
+            except Exception as e:
+                # Unexpected error
+                self.logger.error(
+                    f"Unexpected error saving metrics (request_id={record.get('request_id')}): {type(e).__name__}: {e}"
+                )
+                return
 
     def get_stats(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
         """Get comprehensive statistics using pandas for readable analytics.

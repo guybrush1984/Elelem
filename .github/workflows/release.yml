@@ -43,6 +43,16 @@ jobs:
         echo "🎭 Running faker tests (no real API calls)..."
         uv run pytest tests/test_elelem_with_faker.py -v
 
+    - name: Run server mode tests
+      run: |
+        echo "🌐 Running server mode tests (HTTP API)..."
+        uv run python tests/test_elelem_server_mode.py
+
+    - name: Run Docker Compose integration tests
+      run: |
+        echo "🐳 Running Docker Compose integration tests..."
+        uv run pytest -v -m integration
+
   build-python:
     name: Build Python Package
     needs: test  # Only run if tests pass

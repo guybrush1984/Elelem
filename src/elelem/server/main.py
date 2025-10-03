@@ -11,6 +11,7 @@ Usage:
 import logging
 import traceback
 import os
+import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -257,12 +258,14 @@ async def get_metrics_data(
             raise HTTPException(status_code=400, detail="Only 'json' format is currently supported")
 
         tag_list = tags.split(',') if tags else None
-        df = elelem.get_dataframe(start_time, end_time, tag_list)
+        df = elelem.get_metrics_dataframe(start_time, end_time, tag_list)
 
         # Convert DataFrame to JSON records
         # Handle datetime serialization
         df_copy = df.copy()
-        if 'timestamp' in df_copy.columns:
+        if 'timestamp' in df_copy.columns and not df_copy.empty:
+            # Convert to datetime if not already
+            df_copy['timestamp'] = pd.to_datetime(df_copy['timestamp'])
             df_copy['timestamp'] = df_copy['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
         return df_copy.to_dict(orient="records")

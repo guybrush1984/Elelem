@@ -540,7 +540,7 @@ class Elelem:
         Returns:
             Sorted list of unique tags including automatic tags like model:* and provider:*
         """
-        return self._metrics_store.get_unique_tags()
+        return self._metrics_store.get_available_tags()
 
     def list_models(self) -> Dict[str, Any]:
         """List all available models in OpenAI-compatible format.

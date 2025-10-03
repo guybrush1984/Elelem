@@ -38,11 +38,10 @@ class TestElelemAPIIntegration:
     def test_chat_completion_basic(self, api_client):
         """Test basic chat completion through OpenAI client."""
         response = api_client.chat.completions.create(
-            model="groq:openai/gpt-oss-120b",
+            model="free@openrouter:deepseek/deepseek-3.1",
             messages=[
                 {"role": "user", "content": "Say 'test successful' and nothing else"}
-            ],
-            max_tokens=10
+            ]
         )
 
         assert response.choices[0].message.content is not None
@@ -58,9 +57,8 @@ class TestElelemAPIIntegration:
 
         # Make an API call
         api_client.chat.completions.create(
-            model="groq:openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": "test"}],
-            max_tokens=5
+            model="free@openrouter:meta-llama/llama-4-scout-17b",
+            messages=[{"role": "user", "content": "test"}]
         )
 
         # Wait a moment for metrics to be recorded
@@ -113,10 +111,8 @@ class TestElelemAPIIntegration:
 
         def make_request(i):
             response = api_client.chat.completions.create(
-                model="groq:openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": f"Say the number {i}"}],
-                max_tokens=5
-            )
+                model="free@openrouter:openai/gpt-oss-20b",
+                messages=[{"role": "user", "content": f"Say the number {i}"}]            )
             return response.choices[0].message.content is not None
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:

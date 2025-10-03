@@ -519,6 +519,19 @@ class MetricsStore:
             self.logger.error(f"Failed to load data from database: {e}")
             return pd.DataFrame()
 
+    def get_dataframe(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> pd.DataFrame:
+        """Public method to get filtered metrics data as DataFrame.
+
+        Args:
+            start_time: Filter calls after this time (inclusive). None = no lower bound
+            end_time: Filter calls before this time (inclusive). None = no upper bound
+            tags: Filter by specific tags. None = all tags
+
+        Returns:
+            Filtered pandas DataFrame with all metrics data
+        """
+        return self._load_dataframe(start_time, end_time, tags)
+
     def _empty_stats(self) -> Dict[str, Any]:
         """Return empty stats structure."""
         return {

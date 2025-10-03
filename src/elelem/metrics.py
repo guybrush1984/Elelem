@@ -286,10 +286,10 @@ class MetricsStore:
         self._ensure_schema()
 
     def _ensure_schema(self):
-        """Create metrics table if it doesn't exist (works for both SQLite and PostgreSQL)."""
+        """Create metrics tables if they don't exist (works for both SQLite and PostgreSQL)."""
         try:
-            # Create table with schema compatible with both SQLite and PostgreSQL
-            create_table_sql = """
+            # Create main request_metrics table (removed tags column)
+            create_metrics_table_sql = """
             CREATE TABLE IF NOT EXISTS request_metrics (
                 request_id TEXT PRIMARY KEY,
                 timestamp TIMESTAMP NOT NULL,
@@ -301,7 +301,6 @@ class MetricsStore:
                 initial_temperature REAL,
                 max_tokens INTEGER,
                 stream BOOLEAN DEFAULT false,
-                tags TEXT DEFAULT '[]',  -- JSON as TEXT for SQLite compatibility
                 status TEXT NOT NULL,
                 total_duration_seconds REAL NOT NULL,
                 input_tokens INTEGER DEFAULT 0,
@@ -324,11 +323,33 @@ class MetricsStore:
             )
             """
 
+            # Create separate tags table for efficient key-value filtering
+            create_tags_table_sql = """
+            CREATE TABLE IF NOT EXISTS request_tags (
+                request_id TEXT NOT NULL,
+                tag TEXT NOT NULL,
+                PRIMARY KEY (request_id, tag),
+                FOREIGN KEY (request_id) REFERENCES request_metrics(request_id) ON DELETE CASCADE
+            )
+            """
+
+            # Create indexes for efficient tag queries
+            create_tag_index_sql = """
+            CREATE INDEX IF NOT EXISTS idx_request_tags_tag ON request_tags(tag)
+            """
+
+            create_tag_request_index_sql = """
+            CREATE INDEX IF NOT EXISTS idx_request_tags_request_id ON request_tags(request_id)
+            """
+
             with self.engine.connect() as conn:
-                conn.execute(text(create_table_sql))
+                conn.execute(text(create_metrics_table_sql))
+                conn.execute(text(create_tags_table_sql))
+                conn.execute(text(create_tag_index_sql))
+                conn.execute(text(create_tag_request_index_sql))
                 conn.commit()
 
-            self.logger.info("Metrics database schema initialized")
+            self.logger.info("Metrics database schema initialized (2-table design with separate tags)")
         except Exception as e:
             self.logger.error(f"Failed to create database schema: {e}")
             raise
@@ -385,23 +406,23 @@ class MetricsStore:
     def _save_record(self, record: Dict[str, Any]):
         """Save a single request record to the unified database backend."""
         try:
-            # Convert tags list to JSON string for database storage
+            # Extract tags before copying (they'll be stored in separate table)
+            tags = record.get('tags', [])
             record_copy = record.copy()
-            if 'tags' in record_copy:
-                record_copy['tags'] = json.dumps(record_copy['tags']) if record_copy['tags'] else '[]'
+            record_copy.pop('tags', None)  # Remove tags from main record
 
-            # Direct SQLAlchemy insert - works for both SQLite and PostgreSQL
-            insert_sql = """
+            # Insert into request_metrics (without tags column)
+            insert_metrics_sql = """
             INSERT INTO request_metrics (
                 request_id, timestamp, requested_model, selected_candidate, actual_model, actual_provider,
-                temperature, initial_temperature, max_tokens, stream, tags, status, total_duration_seconds,
+                temperature, initial_temperature, max_tokens, stream, status, total_duration_seconds,
                 input_tokens, output_tokens, reasoning_tokens, total_cost_usd, final_error_type, final_error_message,
                 total_tokens_per_second, cost_per_token, json_parse_retries, json_schema_retries,
                 api_json_validation_retries, rate_limit_retries, temperature_reductions, response_format_removals,
                 candidate_iterations, final_failures, total_retry_attempts
             ) VALUES (
                 :request_id, :timestamp, :requested_model, :selected_candidate, :actual_model, :actual_provider,
-                :temperature, :initial_temperature, :max_tokens, :stream, :tags, :status, :total_duration_seconds,
+                :temperature, :initial_temperature, :max_tokens, :stream, :status, :total_duration_seconds,
                 :input_tokens, :output_tokens, :reasoning_tokens, :total_cost_usd, :final_error_type, :final_error_message,
                 :total_tokens_per_second, :cost_per_token, :json_parse_retries, :json_schema_retries,
                 :api_json_validation_retries, :rate_limit_retries, :temperature_reductions, :response_format_removals,
@@ -410,7 +431,21 @@ class MetricsStore:
             """
 
             with self.engine.connect() as conn:
-                conn.execute(text(insert_sql), record_copy)
+                # Insert main record
+                conn.execute(text(insert_metrics_sql), record_copy)
+
+                # Insert tags into separate table
+                if tags:
+                    insert_tags_sql = """
+                    INSERT INTO request_tags (request_id, tag)
+                    VALUES (:request_id, :tag)
+                    """
+                    for tag in tags:
+                        conn.execute(text(insert_tags_sql), {
+                            'request_id': record['request_id'],
+                            'tag': tag
+                        })
+
                 conn.commit()
 
         except Exception as e:
@@ -472,52 +507,92 @@ class MetricsStore:
         }
 
     def _load_dataframe(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> pd.DataFrame:
-        """Load filtered data from database using pandas."""
+        """Load filtered data from database using pandas with JOIN for tags."""
         try:
-            # Build query with proper conditional WHERE clause
-            query = "SELECT * FROM request_metrics"
-            conditions = []
             params = {}
 
-            if start_time:
-                conditions.append("timestamp >= :start_time")
-                params['start_time'] = start_time
-
-            if end_time:
-                conditions.append("timestamp <= :end_time")
-                params['end_time'] = end_time
-
+            # Build base query - conditionally join with tags if filtering by tags
             if tags:
-                # Filter by tags - works for JSON stored as TEXT
+                # When filtering by tags with AND logic (must have ALL tags)
+                # Use GROUP BY and HAVING COUNT to ensure all tags are present
                 tag_conditions = []
-                for i, tag in enumerate(tags):
-                    tag_key = f'tag_{i}'
-                    tag_conditions.append(f"tags LIKE :{tag_key}")
-                    params[tag_key] = f'%"{tag}"%'
+                if len(tags) == 1:
+                    tag_filter = f"rt.tag = '{tags[0]}'"
+                else:
+                    tag_filter = f"rt.tag IN {tuple(tags)}"
 
-                if tag_conditions:
-                    conditions.append(f"({' OR '.join(tag_conditions)})")
+                # Build time filter conditions
+                time_conditions = []
+                if start_time:
+                    time_conditions.append("rm.timestamp >= :start_time")
+                    params['start_time'] = start_time
+                if end_time:
+                    time_conditions.append("rm.timestamp <= :end_time")
+                    params['end_time'] = end_time
 
-            # Add WHERE clause only if we have conditions
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
+                time_filter = " AND " + " AND ".join(time_conditions) if time_conditions else ""
 
-            query += " ORDER BY timestamp DESC"
+                query = f"""
+                SELECT rm.*
+                FROM request_metrics rm
+                WHERE rm.request_id IN (
+                    SELECT rt.request_id
+                    FROM request_tags rt
+                    WHERE {tag_filter}
+                    GROUP BY rt.request_id
+                    HAVING COUNT(DISTINCT rt.tag) = {len(tags)}
+                ){time_filter}
+                ORDER BY rm.timestamp DESC
+                """
+            else:
+                # When not filtering by tags, just get all metrics
+                query = "SELECT * FROM request_metrics rm"
+                conditions = []
 
-            # Load with pandas
+                if start_time:
+                    conditions.append("rm.timestamp >= :start_time")
+                    params['start_time'] = start_time
+
+                if end_time:
+                    conditions.append("rm.timestamp <= :end_time")
+                    params['end_time'] = end_time
+
+                # Add WHERE clause only if we have conditions
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+                query += " ORDER BY rm.timestamp DESC"
+
+            # Load main dataframe
             df = pd.read_sql(query, self.engine, params=params)
 
-            # Convert JSON strings back to lists for tags
-            if 'tags' in df.columns and not df.empty:
-                df['tags'] = df['tags'].apply(
-                    lambda x: json.loads(x) if isinstance(x, str) else (x if isinstance(x, list) else [])
-                )
+            # ALWAYS append tags column (fetch tags for all requests in result)
+            if not df.empty:
+                request_ids = df['request_id'].tolist()
+                if request_ids:
+                    # Build query to get tags for these requests
+                    # Handle single-item list to avoid trailing comma issue in SQL
+                    if len(request_ids) == 1:
+                        tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id = '{request_ids[0]}'"
+                    else:
+                        tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id IN {tuple(request_ids)}"
+
+                    tags_df = pd.read_sql(tags_query, self.engine)
+
+                    # Group tags by request_id
+                    if not tags_df.empty:
+                        tags_by_request = tags_df.groupby('request_id')['tag'].apply(list).to_dict()
+                        df['tags'] = df['request_id'].map(lambda rid: tags_by_request.get(rid, []))
+                    else:
+                        df['tags'] = [[] for _ in range(len(df))]
+                else:
+                    df['tags'] = [[] for _ in range(len(df))]
 
             return df
 
         except Exception as e:
             self.logger.error(f"Failed to load data from database: {e}")
-            return pd.DataFrame()
+            raise  # Re-raise the exception instead of silently returning empty DataFrame
 
     def get_dataframe(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> pd.DataFrame:
         """Public method to get filtered metrics data as DataFrame.
@@ -551,16 +626,11 @@ class MetricsStore:
     def get_available_tags(self) -> List[str]:
         """Get all unique tags from the database."""
         try:
-            query = "SELECT DISTINCT tags FROM request_metrics WHERE tags IS NOT NULL AND tags != '[]'"
+            # Query the separate tags table for all unique tags
+            query = "SELECT DISTINCT tag FROM request_tags ORDER BY tag"
             df = pd.read_sql(query, self.engine)
 
-            all_tags = set()
-            for tags_json in df['tags']:
-                if isinstance(tags_json, str):
-                    tags_list = json.loads(tags_json)
-                    all_tags.update(tags_list)
-
-            return sorted(list(all_tags))
+            return df['tag'].tolist() if not df.empty else []
         except Exception as e:
             self.logger.error(f"Failed to get available tags: {e}")
             return []

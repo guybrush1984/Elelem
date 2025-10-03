@@ -443,6 +443,7 @@ class Elelem:
                 # Add reasoning content if present
                 if reasoning_content:
                     response.elelem_metrics["reasoning_content"] = reasoning_content
+                    response.choices[0].message.reasoning = reasoning_content
 
                 return response
                 

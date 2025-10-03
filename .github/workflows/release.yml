@@ -53,6 +53,7 @@ jobs:
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_FREE_API_KEY }}
       run: |
         echo "🐳 Running Docker Compose integration tests..."
+        echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" > .env
         uv run pytest -v -m integration
 
   build-python:

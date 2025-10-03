@@ -192,7 +192,7 @@ jobs:
         timeout 30 docker run --name test-dashboard ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }} || true
 
         # Check if it started (even if it failed due to missing DATABASE_URL)
-        if docker logs test-dashboard 2>&1 | grep -q "streamlit"; then
+        if docker logs test-dashboard 2>&1 | grep -qi "streamlit"; then
           echo "✅ Dashboard image started successfully"
         else
           echo "❌ Dashboard image failed to start"

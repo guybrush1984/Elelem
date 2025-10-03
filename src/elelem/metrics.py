@@ -415,22 +415,21 @@ class MetricsStore:
         # Remove from active requests
         self.active_requests.pop(tracker.request_id, None)
 
-        # Save to database in background thread to avoid blocking API response
-        # If save fails, it's logged but doesn't block the user
-        thread = threading.Thread(target=self._save_record, args=(record,), daemon=True)
-        thread.start()
+        # Try synchronous write first (fast path - pool_pre_ping makes this quick)
+        # If it fails, retry in background to avoid blocking API response
+        success = self._save_record_once(record)
 
-    def _save_record(self, record: Dict[str, Any]):
-        """Save a single request record with retry logic for transient failures."""
-        import time
-        from sqlalchemy.exc import OperationalError, IntegrityError
+        if not success:
+            # First attempt failed - retry in background with backoff
+            thread = threading.Thread(
+                target=self._save_record_with_retry,
+                args=(record,),
+                daemon=True
+            )
+            thread.start()
 
-        # Extract tags before copying
-        tags = record.get('tags', [])
-        record_copy = record.copy()
-        record_copy.pop('tags', None)
-
-        # SQL statements
+    def _do_save(self, record_copy: Dict, tags: List[str]):
+        """Perform the actual database insert (factored logic)."""
         insert_metrics_sql = """
         INSERT INTO request_metrics (
             request_id, timestamp, requested_model, selected_candidate, actual_model, actual_provider,
@@ -454,52 +453,62 @@ class MetricsStore:
         VALUES (:request_id, :tag)
         """
 
-        # Retry with exponential backoff for transient connection errors
+        with self.engine.connect() as conn:
+            with conn.begin():
+                conn.execute(text(insert_metrics_sql), record_copy)
+                if tags:
+                    for tag in tags:
+                        conn.execute(text(insert_tags_sql), {
+                            'request_id': record_copy['request_id'],
+                            'tag': tag
+                        })
+
+    def _save_record_once(self, record: Dict[str, Any]) -> bool:
+        """Try to save record once synchronously. Returns True if successful."""
+        from sqlalchemy.exc import IntegrityError
+
+        tags = record.get('tags', [])
+        record_copy = record.copy()
+        record_copy.pop('tags', None)
+
+        try:
+            self._do_save(record_copy, tags)
+            return True
+        except IntegrityError:
+            self.logger.warning(f"Duplicate metrics (request_id={record.get('request_id')})")
+            return True  # Already saved
+        except Exception as e:
+            self.logger.debug(f"First save failed (request_id={record.get('request_id')}): {e}")
+            return False
+
+    def _save_record_with_retry(self, record: Dict[str, Any]):
+        """Retry saving with exponential backoff (runs in background thread)."""
+        import time
+        from sqlalchemy.exc import OperationalError, IntegrityError
+
+        tags = record.get('tags', [])
+        record_copy = record.copy()
+        record_copy.pop('tags', None)
+
         max_retries = 3
         retry_delay = 0.5
 
         for attempt in range(max_retries):
             try:
-                with self.engine.connect() as conn:
-                    with conn.begin():
-                        # Insert metrics
-                        conn.execute(text(insert_metrics_sql), record_copy)
-
-                        # Insert tags
-                        if tags:
-                            for tag in tags:
-                                conn.execute(text(insert_tags_sql), {
-                                    'request_id': record['request_id'],
-                                    'tag': tag
-                                })
-                # Success
+                self._do_save(record_copy, tags)
+                self.logger.info(f"Metrics saved on retry {attempt + 1} (request_id={record.get('request_id')})")
                 return
-
-            except IntegrityError as e:
-                # Duplicate - don't retry
-                self.logger.warning(f"Duplicate metrics record (request_id={record.get('request_id')}): {e}")
+            except IntegrityError:
+                self.logger.debug(f"Duplicate on retry (request_id={record.get('request_id')})")
                 return
-
             except OperationalError as e:
-                # Connection/SSL errors - retry
                 if attempt < max_retries - 1:
-                    self.logger.warning(
-                        f"DB connection error (attempt {attempt + 1}/{max_retries}, "
-                        f"request_id={record.get('request_id')}): {e}. Retrying..."
-                    )
+                    self.logger.warning(f"DB error (retry {attempt + 1}/{max_retries}, request_id={record.get('request_id')}): {e}")
                     time.sleep(retry_delay * (attempt + 1))
-                    continue
                 else:
-                    self.logger.error(
-                        f"Failed to save metrics after {max_retries} attempts "
-                        f"(request_id={record.get('request_id')}): {e}"
-                    )
-
+                    self.logger.error(f"Failed after {max_retries} retries (request_id={record.get('request_id')}): {e}")
             except Exception as e:
-                # Unexpected error
-                self.logger.error(
-                    f"Unexpected error saving metrics (request_id={record.get('request_id')}): {type(e).__name__}: {e}"
-                )
+                self.logger.error(f"Unexpected error on retry (request_id={record.get('request_id')}): {e}")
                 return
 
     def get_stats(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:

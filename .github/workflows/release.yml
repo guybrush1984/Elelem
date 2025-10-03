@@ -49,6 +49,8 @@ jobs:
         uv run python tests/test_elelem_server_mode.py
 
     - name: Run Docker Compose integration tests
+      env:
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_FREE_API_KEY }}
       run: |
         echo "🐳 Running Docker Compose integration tests..."
         uv run pytest -v -m integration

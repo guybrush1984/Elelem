@@ -27,6 +27,7 @@ services:
     environment:
       - ELELEM_DATABASE_URL=postgresql://elelem:test_password@postgres:5432/elelem_test
       - PORT=8000
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

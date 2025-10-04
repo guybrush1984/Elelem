@@ -20,6 +20,7 @@ services:
       # Use tmpfs for faster tests (data doesn't need to persist)
       - /var/lib/postgresql/data
 
+  # Elelem server for integration tests
   elelem-server:
     build:
       context: ../
@@ -30,6 +31,9 @@ services:
       # These override .env file values (shell env has highest priority)
       - ELELEM_DATABASE_URL=postgresql://elelem:test_password@postgres:5432/elelem_test
       - PORT=8000
+      - ELELEM_CACHE_ENABLED=true
+      - ELELEM_CACHE_TTL=120  # Short TTL for testing
+      - ELELEM_CACHE_CLEANUP_INTERVAL=30  # Cleanup every 30s for testing
       # OPENROUTER_API_KEY is loaded from .env file (local) or shell (CI)
     ports:
       - "8000:8000"

@@ -138,6 +138,55 @@ def test_database_connectivity(elelem_server_url):
     assert postgres_info.get("connected") is True
 
 
+@pytest.mark.integration
+@pytest.mark.server
+def test_cache_hit_and_miss(api_client, elelem_server_url):
+    """Test cache hit/miss behavior with PostgreSQL backend."""
+    import time
+
+    # Make first request - should be cache MISS
+    response1 = api_client.chat.completions.create(
+        model="free@openrouter:deepseek/deepseek-3.1",
+        messages=[
+            {"role": "user", "content": "Say exactly: 'cache test response'"}
+        ],
+        temperature=0  # Deterministic for caching
+    )
+
+    # Check cache status in health endpoint
+    health = requests.get(f"{elelem_server_url}/health").json()
+    assert health.get("cache", {}).get("enabled") is True
+
+    # Make identical request - should be cache HIT
+    response2 = api_client.chat.completions.create(
+        model="free@openrouter:deepseek/deepseek-3.1",
+        messages=[
+            {"role": "user", "content": "Say exactly: 'cache test response'"}
+        ],
+        temperature=0
+    )
+
+    # Both responses should have same content
+    assert response1.choices[0].message.content == response2.choices[0].message.content
+
+    # Check elelem_metrics for cache indication
+    # Note: OpenAI client may not expose elelem_metrics, so we verify via behavior
+    # Cache hit should be much faster than cache miss (no actual API call)
+
+    # Make request with different temperature - should be cache MISS (different cache key)
+    response3 = api_client.chat.completions.create(
+        model="free@openrouter:deepseek/deepseek-3.1",
+        messages=[
+            {"role": "user", "content": "Say exactly: 'cache test response'"}
+        ],
+        temperature=0.5  # Different temperature = different cache key
+    )
+
+    # Content may differ due to different temperature
+    # Just verify it completes successfully
+    assert response3.choices[0].message.content is not None
+
+
 if __name__ == "__main__":
     # Run integration tests
     pytest.main([__file__, "-v", "-m", "integration"])

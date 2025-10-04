@@ -300,67 +300,85 @@ class MetricsStore:
 
     def _ensure_schema(self):
         """Create metrics tables if they don't exist (works for both SQLite and PostgreSQL)."""
+        # Advisory lock ID for schema creation (different from cache cleanup lock)
+        SCHEMA_LOCK_ID = 123456789
+
         try:
-            # Create main request_metrics table (removed tags column)
-            create_metrics_table_sql = """
-            CREATE TABLE IF NOT EXISTS request_metrics (
-                request_id TEXT PRIMARY KEY,
-                timestamp TIMESTAMP NOT NULL,
-                requested_model TEXT,
-                selected_candidate TEXT,
-                actual_model TEXT,
-                actual_provider TEXT,
-                temperature REAL,
-                initial_temperature REAL,
-                max_tokens INTEGER,
-                stream BOOLEAN DEFAULT false,
-                status TEXT NOT NULL,
-                total_duration_seconds REAL NOT NULL,
-                input_tokens INTEGER DEFAULT 0,
-                output_tokens INTEGER DEFAULT 0,
-                reasoning_tokens INTEGER DEFAULT 0,
-                total_cost_usd REAL DEFAULT 0.0,
-                final_error_type TEXT,
-                final_error_message TEXT,
-                total_tokens_per_second REAL,
-                cost_per_token REAL,
-                json_parse_retries INTEGER DEFAULT 0,
-                json_schema_retries INTEGER DEFAULT 0,
-                api_json_validation_retries INTEGER DEFAULT 0,
-                rate_limit_retries INTEGER DEFAULT 0,
-                temperature_reductions INTEGER DEFAULT 0,
-                response_format_removals INTEGER DEFAULT 0,
-                candidate_iterations INTEGER DEFAULT 0,
-                final_failures INTEGER DEFAULT 0,
-                total_retry_attempts INTEGER DEFAULT 0
-            )
-            """
-
-            # Create separate tags table for efficient key-value filtering
-            create_tags_table_sql = """
-            CREATE TABLE IF NOT EXISTS request_tags (
-                request_id TEXT NOT NULL,
-                tag TEXT NOT NULL,
-                PRIMARY KEY (request_id, tag),
-                FOREIGN KEY (request_id) REFERENCES request_metrics(request_id) ON DELETE CASCADE
-            )
-            """
-
-            # Create indexes for efficient tag queries
-            create_tag_index_sql = """
-            CREATE INDEX IF NOT EXISTS idx_request_tags_tag ON request_tags(tag)
-            """
-
-            create_tag_request_index_sql = """
-            CREATE INDEX IF NOT EXISTS idx_request_tags_request_id ON request_tags(request_id)
-            """
+            # Check if we're using PostgreSQL
+            is_postgresql = self.engine.dialect.name == 'postgresql'
 
             with self.engine.connect() as conn:
-                conn.execute(text(create_metrics_table_sql))
-                conn.execute(text(create_tags_table_sql))
-                conn.execute(text(create_tag_index_sql))
-                conn.execute(text(create_tag_request_index_sql))
-                conn.commit()
+                # For PostgreSQL, acquire advisory lock to prevent race conditions
+                if is_postgresql:
+                    conn.execute(text(f"SELECT pg_advisory_lock({SCHEMA_LOCK_ID})"))
+
+                try:
+                    # Create main request_metrics table (removed tags column)
+                    create_metrics_table_sql = """
+                    CREATE TABLE IF NOT EXISTS request_metrics (
+                        request_id TEXT PRIMARY KEY,
+                        timestamp TIMESTAMP NOT NULL,
+                        requested_model TEXT,
+                        selected_candidate TEXT,
+                        actual_model TEXT,
+                        actual_provider TEXT,
+                        temperature REAL,
+                        initial_temperature REAL,
+                        max_tokens INTEGER,
+                        stream BOOLEAN DEFAULT false,
+                        status TEXT NOT NULL,
+                        total_duration_seconds REAL NOT NULL,
+                        input_tokens INTEGER DEFAULT 0,
+                        output_tokens INTEGER DEFAULT 0,
+                        reasoning_tokens INTEGER DEFAULT 0,
+                        total_cost_usd REAL DEFAULT 0.0,
+                        final_error_type TEXT,
+                        final_error_message TEXT,
+                        total_tokens_per_second REAL,
+                        cost_per_token REAL,
+                        json_parse_retries INTEGER DEFAULT 0,
+                        json_schema_retries INTEGER DEFAULT 0,
+                        api_json_validation_retries INTEGER DEFAULT 0,
+                        rate_limit_retries INTEGER DEFAULT 0,
+                        temperature_reductions INTEGER DEFAULT 0,
+                        response_format_removals INTEGER DEFAULT 0,
+                        candidate_iterations INTEGER DEFAULT 0,
+                        final_failures INTEGER DEFAULT 0,
+                        total_retry_attempts INTEGER DEFAULT 0,
+                        cache_hit BOOLEAN DEFAULT false,
+                        cache_age_seconds REAL
+                    )
+                    """
+
+                    # Create separate tags table for efficient key-value filtering
+                    create_tags_table_sql = """
+                    CREATE TABLE IF NOT EXISTS request_tags (
+                        request_id TEXT NOT NULL,
+                        tag TEXT NOT NULL,
+                        PRIMARY KEY (request_id, tag),
+                        FOREIGN KEY (request_id) REFERENCES request_metrics(request_id) ON DELETE CASCADE
+                    )
+                    """
+
+                    # Create indexes for efficient tag queries
+                    create_tag_index_sql = """
+                    CREATE INDEX IF NOT EXISTS idx_request_tags_tag ON request_tags(tag)
+                    """
+
+                    create_tag_request_index_sql = """
+                    CREATE INDEX IF NOT EXISTS idx_request_tags_request_id ON request_tags(request_id)
+                    """
+
+                    conn.execute(text(create_metrics_table_sql))
+                    conn.execute(text(create_tags_table_sql))
+                    conn.execute(text(create_tag_index_sql))
+                    conn.execute(text(create_tag_request_index_sql))
+                    conn.commit()
+
+                finally:
+                    # Release advisory lock if using PostgreSQL
+                    if is_postgresql:
+                        conn.execute(text(f"SELECT pg_advisory_unlock({SCHEMA_LOCK_ID})"))
 
             self.logger.info("Metrics database schema initialized (2-table design with separate tags)")
         except Exception as e:

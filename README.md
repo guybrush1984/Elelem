@@ -292,6 +292,78 @@ model="groq:deepseek/deepseek-r1-distill-qwen-32b?reasoning=medium"
 model="fireworks:deepseek/deepseek-3.1?reasoning=low"
 ```
 
+### 5. Response Caching
+
+Elelem includes a built-in PostgreSQL-based response cache that reduces costs and latency by reusing identical responses.
+
+**Why PostgreSQL instead of alternatives?**
+
+- **Not in-memory (memcached/local dict):** Serverless containers are ephemeral - cache would be lost on every deployment/scale-down
+- **Not Redis:** Adds infrastructure complexity and cost. For LLM caching (large payloads, infrequent writes, simple TTL), PostgreSQL is sufficient
+- **Not pg_cache extension:** Requires PostgreSQL superuser privileges, not available in managed databases (RDS, Cloud SQL, Supabase)
+- **PostgreSQL native:** Reuses existing metrics database, no extra infrastructure. Advisory locks handle multi-worker coordination without Redis/etcd
+
+**Configuration (Server Mode):**
+
+```bash
+# Enable cache
+export ELELEM_CACHE_ENABLED=true
+export ELELEM_CACHE_TTL=300              # TTL in seconds (default: 5 min)
+export ELELEM_CACHE_MAX_SIZE=50000       # Max response size in bytes
+export ELELEM_CACHE_CLEANUP_INTERVAL=600 # Cleanup every N seconds
+```
+
+**Configuration (Library Mode):**
+
+```python
+elelem = Elelem(
+    cache_enabled=True,
+    cache_ttl=300,        # 5 minutes
+    cache_max_size=50000  # 50KB max response
+)
+```
+
+**Cache behavior:**
+- **Cache key includes:** model, messages, temperature, max_tokens, response_format, json_schema
+- **Cache key excludes:** tags (metadata), stream (format), user (identifier)
+- **TTL is fixed:** Based on entry creation time, not last access (simple time-based expiration)
+- **Temperature matters:** Different temperatures create different cache keys (temp=0 and temp=0.5 are separate)
+- **Bypass cache:** Use `cache=False` parameter to skip caching for specific requests
+
+**Example:**
+
+```python
+# First request - cache MISS, hits API
+response1 = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Hello"}],
+    temperature=0,
+    tags=["test:cache"]
+)
+# response1.elelem_metrics['cached'] = False
+# response1.elelem_metrics['cost_usd'] > 0
+
+# Second identical request - cache HIT, free!
+response2 = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Hello"}],
+    temperature=0,
+    tags=["different:tags"]  # Tags don't affect cache key
+)
+# response2.elelem_metrics['cached'] = True
+# response2.elelem_metrics['cost_usd'] = 0.0
+# response2.elelem_metrics['cache_age_seconds'] = 2.5
+
+# Bypass cache
+response3 = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Hello"}],
+    temperature=0,
+    cache=False  # Explicitly bypass cache
+)
+# response3.elelem_metrics['cached'] = False
+```
+
 ## Installation
 
 ```bash

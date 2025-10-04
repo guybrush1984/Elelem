@@ -53,8 +53,17 @@ async def startup_event():
     global elelem
     logger.info("🚀 Starting Elelem server...")
 
+    # Read cache configuration from environment
+    cache_enabled = os.getenv('ELELEM_CACHE_ENABLED', 'false').lower() == 'true'
+    cache_ttl = int(os.getenv('ELELEM_CACHE_TTL', '300'))
+    cache_max_size = int(os.getenv('ELELEM_CACHE_MAX_SIZE', '50000'))
+
     # Initialize Elelem instance (auto-creates PostgreSQL tables if configured)
-    elelem = Elelem()
+    elelem = Elelem(
+        cache_enabled=cache_enabled,
+        cache_ttl=cache_ttl,
+        cache_max_size=cache_max_size
+    )
 
     # Log startup status using proper encapsulation
     if os.getenv('ELELEM_DATABASE_URL'):
@@ -65,6 +74,44 @@ async def startup_event():
             logger.warning(f"⚠️ PostgreSQL connection issue: {health['postgresql']['error']}")
     else:
         logger.info("📊 Running with SQLite metrics backend")
+
+    # Log cache status
+    if cache_enabled:
+        logger.info(f"✅ Response cache enabled (TTL: {cache_ttl}s, max size: {cache_max_size} bytes)")
+
+        # Start background cleanup task (checks every 10s, cleans when needed)
+        import asyncio
+        asyncio.create_task(cache_cleanup_task())
+    else:
+        logger.info("📦 Response cache disabled")
+
+
+async def cache_cleanup_task():
+    """Background task to cleanup expired cache entries.
+
+    Each worker tries cleanup at the specified interval.
+    PostgreSQL advisory lock ensures only one worker cleans at a time.
+    """
+    import asyncio
+
+    # Get cleanup interval from environment (default 600s = 10 min)
+    cleanup_interval = int(os.getenv('ELELEM_CACHE_CLEANUP_INTERVAL', '600'))
+
+    logger.info(f"Cache cleanup task started (interval: {cleanup_interval}s)")
+
+    while True:
+        try:
+            await asyncio.sleep(cleanup_interval)
+
+            if elelem and elelem.cache:
+                # Try to cleanup (acquires lock, only one worker succeeds)
+                deleted = elelem.cache.cleanup_expired()
+
+                if deleted == 0:
+                    logger.debug("Cache cleanup: no expired entries or another worker is cleaning")
+
+        except Exception as e:
+            logger.error(f"Cache cleanup task error: {e}")
 
 
 
@@ -112,6 +159,9 @@ async def health_check():
 
     health = elelem.get_health_status()
 
+    # Simple cache status
+    cache_info = {"enabled": elelem.cache is not None}
+
     # Determine overall status
     overall_status = "healthy"
     if health["postgresql"]["enabled"] and not health["postgresql"]["connected"]:
@@ -120,7 +170,8 @@ async def health_check():
     return {
         "status": overall_status,
         "version": __version__,
-        "metrics": health
+        "metrics": health,
+        "cache": cache_info
     }
 
 

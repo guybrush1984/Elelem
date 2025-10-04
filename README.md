@@ -1,590 +1,448 @@
 # Elelem - Multi-Provider LLM Gateway
 
-> *Managing 47 models across 8 providers with automatic failover and JSON reliability*
+Elelem is a Python library and OpenAI-compatible server that routes LLM requests across multiple providers with automatic failover. It solves the practical problem of provider reliability: when one provider has an outage or rate limit, Elelem automatically tries the next one.
 
-## Why Elelem Exists
+**Key capabilities:**
+- **Automatic failover** across 8 providers (OpenAI, Groq, Fireworks, DeepInfra, Parasail, Scaleway, OpenRouter, DeepSeek)
+- **JSON reliability** with automatic retries, schema validation, and error correction
+- **Cost tracking** with per-request metrics, reasoning token extraction, and tag-based analytics
+- **Two deployment modes:** Python library or Docker server with OpenAI-compatible API
 
-Elelem started from a simple need: reliable JSON responses from LLMs. Different providers handle JSON mode differently:
+## Quick Start
 
-- OpenAI uses `response_format: {type: "json_object"}`
-- Groq supports it but with varying reliability
-- DeepInfra has limited JSON mode support
-- Fireworks has specific streaming requirements
-- And reasoning tokens are handled differently everywhere
-
-Elelem was built to solve this through **infrastructure redundancy**, not model selection. When Provider A fails, you automatically failover to Provider B, C, or D.
-
-Think of it as:
-- 🎯 A lightweight [LiteLLM](https://github.com/BerriAI/litellm) focused on JSON reliability
-- 🌐 Your own local [OpenRouter](https://openrouter.ai/) (OpenRouter is also an Elelem provider)
-- 🔄 A failover system that prioritizes reliability
-
-This project is actively evolving - new providers and models are added regularly as the LLM landscape changes.
-
-## Key Features
-
-### 🎭 Virtual Models - Automatic Failover
-
-Define virtual models that iterate through different providers until one works:
-
-```yaml
-# In your virtual-models.yaml
-models:
-  "virtual:gpt-oss-120b-reliable":
-    candidates:
-      - model: "groq:openai/gpt-oss-120b"      # Try Groq first (fast!)
-        timeout: 10s
-      - model: "fireworks:openai/gpt-oss-120b" # Fall back to Fireworks
-        timeout: 15s
-      - model: "deepinfra:openai/gpt-oss-120b" # Last resort
-        timeout: 30s
-```
-
-```python
-# Just use it like any other model
-response = await elelem.create_chat_completion(
-    model="virtual:gpt-oss-120b-reliable",
-    messages=[{"role": "user", "content": "Your request"}]
-)
-# Elelem handles the provider failover automatically
-```
-
-### 🚀 Dynamic Models - Create Virtual Models on the Fly
-
-```python
-# Define failover models at runtime
-response = await elelem.create_chat_completion(
-    model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout: 30s}",
-    messages=[{"role": "user", "content": "Your request"}]
-)
-```
-
-### 🎯 Reliable JSON Mode
-
-Elelem provides robust JSON handling by:
-1. Try the native JSON mode if supported
-2. Strip markdown code blocks if the model gets creative
-3. Fix common JSON errors (trailing commas, single quotes)
-4. Retry with lower temperature if all else fails
-5. Validate against your schema (if provided)
-
-```python
-# Returns valid JSON with automatic error handling and retries
-response = await elelem.create_chat_completion(
-    model="any-model-really",
-    messages=[{"role": "user", "content": "Return a JSON with name and age"}],
-    response_format={"type": "json_object"},  # Elelem handles provider differences
-    json_schema={  # Optional validation
-        "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "integer"}
-        }
-    }
-)
-```
-
-### 🔌 Use as Library or OpenAI-Compatible Server
-
-**As a Library:**
-```python
-from elelem import Elelem
-
-elelem = Elelem()
-response = await elelem.create_chat_completion(
-    model="groq:openai/gpt-oss-120b",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-```
-
-**As an OpenAI-Compatible Server:**
-```bash
-# Start the server
-docker-compose -f src/elelem/server/docker-compose.yml up -d
-
-# Use with OpenAI SDK
-from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="anything")
-response = client.chat.completions.create(
-    model="groq:openai/gpt-oss-120b",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-```
-
-### 📊 Built-in Pandas Metrics Store
-
-Every call is tracked, tagged, and ready for analysis:
-
-```python
-# Tag your calls for later analysis
-response = await elelem.create_chat_completion(
-    model="openai:gpt-4.1",
-    messages=[{"role": "user", "content": "Analyze this"}],
-    tags=["experiment-42", "production"]
-)
-
-# Later, get your metrics
-df = elelem.get_metrics_dataframe(tags=["experiment-42"])
-# Ready for S3, BigQuery, or your favorite data warehouse
-```
-
-### 🎮 OpenRouter as a Provider (Meta!)
-
-Yes, OpenRouter can be an Elelem provider. It's providers all the way down:
-
-```python
-# Use OpenRouter's infrastructure through Elelem
-response = await elelem.create_chat_completion(
-    model="openrouter:anthropic/claude-sonnet-4",  # OpenRouter's Claude
-    messages=[{"role": "user", "content": "Inception!"}]
-)
-
-# Or their optimized routing
-response = await elelem.create_chat_completion(
-    model="cost@openrouter:openai/gpt-oss-120b",  # Cost-optimized routing
-    messages=[{"role": "user", "content": "Cheap and cheerful!"}]
-)
-```
-
-### 🥊 The OpenAI SDK Override Championship
-
-Elelem completely takes over retry logic from the OpenAI SDK. Why? Because:
-- OpenAI SDK: "Let me retry 3 times with the same provider that's down"
-- Elelem: "Let me try 3 different providers that actually work"
-
-Built on OpenAI SDK, but with trust issues and commitment to redundancy.
-
-### 🎨 Response Harmonization
-
-Every provider returns data differently. Elelem makes them all look like OpenAI:
-- Reasoning tokens? ✓ (even when hidden in weird places)
-- Usage stats? ✓ (standardized across all providers)
-- Cost calculation? ✓ (because money matters)
-- Model metadata? ✓ (who made this model anyway?)
-
-**Token Structure Standardization**: All responses include consistent token reporting:
-- `input`: Prompt tokens (what you send)
-- `output`: Completion tokens (what you get back, including reasoning)
-- `reasoning`: Reasoning tokens (portion of output that's internal reasoning)
-- `total`: Input + output tokens (standard total across all providers)
-
-This means `reasoning` is always a breakdown of what portion of `output` was reasoning, ensuring consistent semantics regardless of how each provider structures their token reporting internally.
-
-## What Elelem Is NOT
-
-- ❌ Not a model picker (that's your job)
-- ❌ Not trying to be LangChain (too many abstractions)
-- ❌ Not competing with OpenRouter (we're friends!)
-- ❌ Not complete (new providers break things weekly)
-- ❌ Not using Pydantic yet (yes, I know, I'm sorry!)
-
-## Installation
-
-> **Note:** Elelem is not available on PyPI. Install directly from GitHub.
-
-### From Git Repository
-```bash
-# Using pip
-pip install git+https://github.com/guybrush1984/Elelem.git
-
-# Or clone and install locally
-git clone https://github.com/guybrush1984/Elelem.git
-cd Elelem
-pip install -e .
-
-# Using uv (recommended)
-git clone https://github.com/guybrush1984/Elelem.git
-cd Elelem
-uv pip install -e .
-```
-
-## Quick Start - The 60-Second Tour
+### Library Mode
 
 ```python
 import asyncio
 from elelem import Elelem
 
 async def main():
-    # Initialize Elelem (it loads 47 models and hopes for the best)
     elelem = Elelem()
 
-    # Method 1: The "I have a favorite provider" approach
+    # Basic request
     response = await elelem.create_chat_completion(
-        model="groq:openai/gpt-oss-120b",  # Fast and furious
-        messages=[{"role": "user", "content": "Say hello in JSON"}],
-        response_format={"type": "json_object"}  # Will work even if model doesn't support it
+        model="groq:openai/gpt-oss-120b",
+        messages=[{"role": "user", "content": "What is 2+2?"}],
+        tags=["experiment:v1", "category:math"]  # Tags are key:value pairs
     )
 
-    # Method 2: The "I don't care who answers" approach (recommended!)
-    response = await elelem.create_chat_completion(
-        model="virtual:gpt-oss-120b-quick",  # Tries multiple providers
-        messages=[{"role": "user", "content": "What's 2+2? In JSON please."}],
-        response_format={"type": "json_object"}
-    )
+    print(response.choices[0].message.content)
+    # "2+2 equals 4."
 
-    # Method 3: The "I'm feeling lucky" dynamic approach
-    response = await elelem.create_chat_completion(
-        model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1]}",
-        messages=[{"role": "user", "content": "Make me a sandwich... in JSON"}],
-        tags=["lunch", "experimental"]  # Track your experiments
-    )
+    # Get metrics
+    stats = elelem.get_stats_by_tag("category:math")
+    print(f"Cost: ${stats['costs']['total']:.6f}")
+    print(f"Tokens: {stats['tokens']['total']['total']}")
 
-    # It's all OpenAI-compatible (because standards are nice)
-    print(response.choices[0].message.content)  # Your JSON
-    print(f"Cost: ${response.usage.cost_usd:.4f}")  # Your bill
+asyncio.run(main())
+```
 
-    # Check the damage
-    stats = elelem.get_stats_by_tag("lunch")
-    print(f"Lunch experiments cost: ${stats['total_cost_usd']:.4f}")
-    print(f"Retries: {stats['total_retries']}")  # How many providers failed you
+### Server Mode
 
-if __name__ == "__main__":
-    asyncio.run(main())
+```bash
+# Set your API keys (same for library and server mode)
+export GROQ_API_KEY="your-key"
+export OPENAI_API_KEY="your-key"
+
+# Start server
+docker-compose -f src/elelem/server/docker-compose.yml up -d
+```
+
+Use with OpenAI SDK:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="anything"  # Not validated in local mode
+)
+
+response = client.chat.completions.create(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Hello!"}],
+    extra_body={
+        "tags": ["category:test", "user:123"],  # Tags are key:value pairs
+        "json_schema": {...}  # Optional: Elelem-specific validation
+    }
+)
+
+print(response.choices[0].message.content)
+```
+
+**Server endpoints:**
+- `POST /v1/chat/completions` - Chat completions (OpenAI-compatible)
+- `GET /v1/models` - List available models
+- `GET /v1/metrics/summary` - Aggregated metrics (optional tags filter)
+- `GET /v1/metrics/data` - Raw metrics data
+- `GET /v1/metrics/tags` - Available tags
+- `GET /health` - Health check
+
+## Response Structure
+
+### Standard OpenAI Fields
+
+```python
+response.choices[0].message.content  # Response text
+response.choices[0].message.reasoning  # Reasoning content (for o3, DeepSeek, etc.)
+response.usage.prompt_tokens          # Input tokens
+response.usage.completion_tokens      # Output tokens (including reasoning)
+response.usage.total_tokens           # Total tokens
+```
+
+### Elelem Extensions
+
+The `response.elelem_metrics` dict contains additional tracking:
+
+```python
+{
+    "cost_usd": 0.000123,              # Total cost in USD
+    "reasoning_tokens": 45,             # Reasoning tokens (subset of completion_tokens)
+    "reasoning_content": "thinking...", # Reasoning text (if available)
+    "total_duration_seconds": 1.23,     # Request duration
+    "actual_provider": "groq",          # Provider that served the request
+    "actual_model": "openai/gpt-oss-120b",
+    "candidate_iterations": 0,          # Number of provider failovers
+    "temperature_reductions": 0,        # JSON retry attempts
+    "rate_limit_retries": 0,           # Rate limit backoff count
+    "total_retry_attempts": 0          # All retry attempts
+}
+```
+
+## Core Features
+
+### 1. Candidates & Automatic Failover
+
+Elelem supports three model types:
+
+**Direct models:** `provider:model-name`
+```python
+model="groq:openai/gpt-oss-120b"
+model="openai:gpt-4.1"
+```
+
+**Virtual models:** Pre-configured failover chains in `virtual-models.yaml`
+```yaml
+# virtual-models.yaml
+models:
+  "virtual:gpt-oss-120b-reliable":
+    candidates:
+      - model: "groq:openai/gpt-oss-120b"
+        timeout: 10
+      - model: "fireworks:openai/gpt-oss-120b"
+        timeout: 15
+      - model: "deepinfra:openai/gpt-oss-120b"
+        timeout: 30
+```
+
+```python
+# Automatically tries Groq → Fireworks → DeepInfra
+model="virtual:gpt-oss-120b-reliable"
+```
+
+**Dynamic models:** Runtime failover definition
+```python
+model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout: 30}"
+```
+
+**What triggers candidate iteration (tries next provider):**
+- Timeouts
+- Connection errors (SSL, network)
+- HTTP 500, 502, 503 (server errors)
+- HTTP 400 (bad request - might work with another provider)
+- HTTP 401, 403 (auth/permission - your key might work elsewhere)
+- HTTP 404 (model not found - might exist on another provider)
+- HTTP 429 (rate limit, after exhausting retries)
+
+**What causes immediate failure (no iteration):**
+- HTTP 409, 422 (conflict/unprocessable - request validation errors)
+- JSON validation failures (after all temperature reduction attempts)
+- Content filtering/safety violations (finish_reason: content_filter)
+- Response truncation due to max_tokens (finish_reason: length)
+- All candidates exhausted
+
+### 2. JSON Mode & Schema Validation
+
+Elelem provides robust JSON handling with automatic retry strategies:
+
+```python
+response = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Generate user data"}],
+    response_format={"type": "json_object"},
+    json_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"}
+        },
+        "required": ["name", "age"]
+    },
+    temperature=1.0
+)
+```
+
+**Retry strategy on JSON errors:**
+1. **Parse error:** Reduce temperature by 0.2, retry (up to 3 times)
+2. **Still failing:** Remove `response_format`, retry
+3. **Still failing:** Try next candidate
+
+**JSON processing:**
+- Strips markdown code blocks (```json ... ```)
+- Fixes common errors (trailing commas, single quotes)
+- Validates against schema if provided
+- Works even with models that don't support native JSON mode
+
+### 3. Metrics & Cost Tracking
+
+Every request is stored in SQLite (local) or PostgreSQL (production) with comprehensive metrics:
+
+```python
+# Tag your requests with key:value pairs
+response = await elelem.create_chat_completion(
+    model="openai:gpt-4.1",
+    messages=[{"role": "user", "content": "Analyze data"}],
+    tags=["env:production", "user:123", "feature:analysis"]
+)
+
+# Get aggregated stats by tag
+stats = elelem.get_stats_by_tag("env:production")
+print(stats)
+```
+
+**Stats structure:**
+```python
+{
+    "requests": {"total": 150, "successful": 148, "failed": 2, "success_rate": 0.987},
+    "tokens": {
+        "input": {"total": 45000, "avg": 300, "min": 50, "max": 1000},
+        "output": {"total": 30000, "avg": 200, "min": 20, "max": 800},
+        "reasoning": {"total": 5000, "avg": 33.3, "min": 0, "max": 200}
+    },
+    "costs": {"total": 0.245, "avg": 0.00163, "min": 0.0001, "max": 0.01},
+    "duration": {"total": 180.5, "avg": 1.2, "min": 0.3, "max": 5.2},
+    "providers": {"groq": 0.05, "openai": 0.195},
+    "models": {"groq:openai/gpt-oss-120b": 0.05, "openai:gpt-4.1": 0.195},
+    "retries": {
+        "json_parse_retries": 5,
+        "rate_limit_retries": 2,
+        "candidate_iterations": 3,
+        "total_retry_attempts": 10
+    }
+}
+```
+
+**Access raw data as pandas DataFrame:**
+```python
+df = elelem.get_metrics_dataframe(tags=["env:production"])
+# Returns pandas DataFrame with all request details
+
+# Filter by time and tags
+from datetime import datetime, timedelta
+start = datetime.now() - timedelta(hours=24)
+df = elelem.get_metrics_dataframe(start_time=start, tags=["user:123"])
+```
+
+**Server mode metrics:**
+```bash
+# Get summary stats
+curl "http://localhost:8000/v1/metrics/summary"
+
+# Filter by tags (AND logic - must have ALL tags)
+curl "http://localhost:8000/v1/metrics/summary?tags=env:production,user:123"
+
+# Get raw data
+curl "http://localhost:8000/v1/metrics/data?tags=env:production"
+
+# List available tags
+curl "http://localhost:8000/v1/metrics/tags"
+```
+
+### 4. Reasoning Token Extraction
+
+Elelem automatically extracts reasoning tokens from different provider formats:
+
+**OpenAI o3/o3-mini:**
+```python
+response = await elelem.create_chat_completion(
+    model="openai:o3-mini",
+    messages=[{"role": "user", "content": "What is 2+2?"}]
+)
+
+print(response.choices[0].message.reasoning)  # Reasoning text
+print(response.usage.completion_tokens)        # Includes reasoning tokens
+print(response.elelem_metrics["reasoning_tokens"])  # Reasoning token count
+```
+
+**Groq/Fireworks DeepSeek:**
+- Extracts reasoning tokens from `usage.completion_tokens_details`
+- Removes `<think>...</think>` tags from response content
+- Estimates reasoning tokens from character count when not provided
+
+**DeepSeek reasoning modes:**
+```python
+# Standard mode
+model="parasail:deepseek-3.1"
+
+# Thinking mode (automatic <think> tag removal)
+model="parasail:deepseek-3.1-think"
+
+# Parameterized reasoning
+model="groq:deepseek/deepseek-r1-distill-qwen-32b?reasoning=medium"
+model="fireworks:deepseek/deepseek-3.1?reasoning=low"
+```
+
+## Installation
+
+```bash
+# Clone repository
+git clone https://github.com/guybrush1984/Elelem.git
+cd Elelem
+
+# Install with pip
+pip install -e .
+
+# Or with uv (recommended)
+uv pip install -e .
+```
+
+### Environment Variables
+
+Set API keys for the providers you want to use:
+
+```bash
+export OPENAI_API_KEY="your-key"
+export GROQ_API_KEY="your-key"
+export FIREWORKS_API_KEY="your-key"
+export DEEPINFRA_API_KEY="your-key"
+export PARASAIL_API_KEY="your-key"
+export SCALEWAY_ACCESS_KEY="your-access-key"
+export SCALEWAY_SECRET_KEY="your-secret-key"
+export OPENROUTER_API_KEY="your-key"
+export DEEPSEEK_API_KEY="your-key"
+```
+
+### Docker Deployment
+
+For production, use PostgreSQL for metrics:
+
+```yaml
+# docker-compose.yml
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: elelem
+      POSTGRES_USER: elelem
+      POSTGRES_PASSWORD: your-password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  elelem:
+    image: your-registry/elelem:latest
+    environment:
+      - ELELEM_DATABASE_URL=postgresql://elelem:your-password@postgres:5432/elelem
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
 ```
 
 ## Configuration
 
-Set up your API keys as environment variables:
+### Provider Configuration
 
-```bash
-export OPENAI_API_KEY="your-openai-key"
-export GROQ_API_KEY="your-groq-key" 
-export DEEPINFRA_API_KEY="your-deepinfra-key"
-export SCALEWAY_ACCESS_KEY="your-scaleway-access-key"
-export SCALEWAY_SECRET_KEY="your-scaleway-secret-key"
-export FIREWORKS_API_KEY="your-fireworks-key"
-export OPENROUTER_API_KEY="your-openrouter-key"
-export PARASAIL_API_KEY="your-parasail-key"
+Providers and models are defined in YAML files under `src/elelem/providers/`:
+
+```yaml
+# src/elelem/providers/groq.yaml
+provider:
+  endpoint: https://api.groq.com/openai/v1
+
+models:
+  "groq:openai/gpt-oss-120b":
+    metadata_ref: "gpt-oss-120b"  # References src/elelem/providers/_metadata.yaml
+    provider: groq
+    model_id: "openai/gpt-oss-120b"
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.15
+      currency: USD
 ```
 
-## Virtual Models & Candidate System
+### Virtual Models
 
-Elelem now supports virtual models that automatically fall back across multiple providers:
+Define failover chains in `virtual-models.yaml` (project root):
+
+```yaml
+models:
+  "virtual:fast-and-reliable":
+    candidates:
+      - model: "groq:openai/gpt-oss-120b"
+        timeout: 10
+      - model: "openai:gpt-4.1-mini"
+        timeout: 20
+```
+
+### Dynamic Models
+
+Create failover chains at runtime:
 
 ```python
-# Virtual model with automatic provider fallback
-response = await elelem.create_chat_completion(
-    messages=[{"role": "user", "content": "Hello!"}],
-    model="virtual:gpt-oss-120b",  # Tries multiple providers automatically
-    tags=["fallback-test"]
-)
+# Simple list
+model="dynamic:[groq:openai/gpt-oss-120b, openai:gpt-4.1]"
+
+# With timeout
+model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout: 30}"
+
+# With individual candidate timeouts
+model="dynamic:{candidates: [{model: groq:openai/gpt-oss-120b, timeout: 10}, {model: openai:gpt-4.1, timeout: 20}]}"
 ```
 
-Virtual models try candidates in order with configurable timeouts:
-1. Primary provider (e.g., GROQ) - 120s timeout
-2. Fallback provider (e.g., Scaleway) - 240s timeout  
-3. Additional providers as configured
+## Supported Providers & Models
 
-## Reasoning Token Analytics
+| Provider | Models | Notes |
+|----------|--------|-------|
+| **OpenAI** | gpt-4.1, gpt-4.1-mini, o3, o3-mini | Native reasoning support |
+| **Groq** | gpt-oss-120b, gpt-oss-20b, llama-4, kimi-k2, deepseek-r1 | Fast inference |
+| **Fireworks** | deepseek-3.1, qwen-coder, llama-3.3 | Reasoning parameters |
+| **DeepInfra** | gpt-oss-120b, deepseek-3.1, llama-3.1 | Cost-effective |
+| **Parasail** | deepseek-3.1, deepseek-3.1-think, gpt-oss-120b | Thinking mode |
+| **Scaleway** | gpt-oss-120b, gemma-3, mistral-small | EU-based |
+| **OpenRouter** | All OpenRouter models | Meta-provider |
+| **DeepSeek** | deepseek-chat, deepseek-reasoner | Direct access |
 
-Elelem provides detailed analytics for reasoning models like o3, DeepSeek-R1, and thinking mode:
-
-```python
-# Use reasoning model
-response = await elelem.create_chat_completion(
-    messages=[{"role": "user", "content": "What's 2+2? Think step by step."}],
-    model="openai:o3-mini",  # or "parasail:deepseek-3.1-think"
-    tags=["reasoning"]
-)
-
-# Get reasoning analytics
-stats = elelem.get_stats_by_tag("reasoning")
-print(f"Reasoning tokens: {stats['reasoning_tokens']}")
-print(f"Output tokens: {stats['total_output_tokens']}")
-print(f"Reasoning cost: ${stats['reasoning_cost_usd']:.4f}")
-print(f"Output speed: {stats['total_output_tokens'] / stats['total_duration']:.1f} tokens/s")
-```
-
-**Key Features:**
-- **Dual Token Rates**: Total generation speed vs actual output speed
-- **Cost per Actual Token**: More accurate cost analysis for reasoning models
-- **Thinking Mode Support**: Automatic `<think>` tag extraction for DeepSeek
-- **Provider Compatibility**: Works across OpenAI, GROQ, DeepInfra, Parasail
-
-## Request Flow (Candidate-Based Architecture)
-
-```mermaid
-graph TD
-    A[create_chat_completion] --> B[Get Model Config]
-    B --> C[Parse Candidates]
-    C --> D[Candidate Loop Start<br/>candidate=1/N]
-    
-    D --> E[Setup Candidate]
-    E --> F[Get Timeout for Candidate]
-    F --> G[Setup Provider Client]
-    G --> H[Add Provider/Model Defaults]
-    H --> I[Cleanup Unsupported Params]
-    
-    I --> J[Retry Loop Start<br/>attempt=1/4]
-    J --> K[Make API Call with Timeout]
-    
-    K --> L{API Result}
-    
-    L -->|Timeout| M[Infrastructure Error<br/>Try Next Candidate]
-    L -->|503/502/401| M
-    L -->|429 Rate Limit| N[Rate Limit Retry<br/>Exponential Backoff]
-    L -->|JSON Validation Error| O[Handle JSON Error]
-    L -->|Other API Error| P[Model Error<br/>Don't Iterate]
-    L -->|200 Success| Q[Extract Usage Stats]
-    
-    M --> R{More Candidates?}
-    R -->|Yes| S[Next Candidate<br/>+candidate_iterations]
-    R -->|No| T[All Candidates Failed]
-    S --> D
-    
-    N --> U{Max Rate Retries?}
-    U -->|No| V[Wait & Retry]
-    U -->|Yes| M
-    V --> J
-    
-    O --> W[Reduce Temperature<br/>+temperature_reductions]
-    W --> X{Max JSON Retries?}
-    X -->|No| J
-    X -->|Yes| Y[Remove response_format<br/>+response_format_removals]
-    Y --> J
-    
-    Q --> Z[Extract Reasoning Tokens]
-    Z --> AA[Process Response Content]
-    AA --> BB[Remove Think Tags]
-    BB --> CC[Extract from Markdown]
-    CC --> DD{JSON Mode?}
-    
-    DD -->|No| SUCCESS[Return Response<br/>Update Statistics]
-    DD -->|Yes| EE[Parse & Validate JSON]
-    
-    EE --> FF{Valid JSON & Schema?}
-    FF -->|Yes| SUCCESS
-    FF -->|No| O
-    
-    P --> T
-    T --> GG[Throw Final Error]
-    
-    style SUCCESS fill:#90EE90
-    style GG fill:#FFB6C1
-    style M fill:#FFE4B5
-    style O fill:#FFE4B5
-    style S fill:#E0E0E0
-    
-```
-
-**Key Improvements:**
-- **🔄 Candidate Iteration**: Automatic fallback across providers for infrastructure failures
-- **⏱️ Timeout Hierarchy**: Per-candidate, per-model, and global timeout settings
-- **🧠 Reasoning Token Extraction**: Handles OpenAI, GROQ, and Parasail formats
-- **🏷️ Think Tag Processing**: Automatic removal with proper content extraction
-- **📊 Enhanced Analytics**: Tracks candidate iterations and infrastructure failures
-
-## Telelem Batch Testing
-
-Comprehensive benchmarking tool for testing multiple models with rich metadata:
-
-```bash
-# Run batch test with multiple models
-uv run python telelem.py --batch tests/telelem/batch.json --output results.json
-
-# Single model test
-uv run python telelem.py --model parasail:deepseek-3.1-think --prompt tests/telelem/small.yaml --output test.json
-```
-
-**Features:**
-- **Self-Contained Results**: JSON output includes complete model metadata
-- **Dashboard Ready**: Zero external dependencies for frontend consumption
-- **Reasoning Analytics**: Dual token rates and cost per actual output token
-- **Rich Metadata**: Display names, owners, reasoning capabilities, licenses
-- **Provider Coverage**: Tests across all 8 providers and 47+ models
-
-## JSON Schema Validation
-
-Elelem supports automatic JSON schema validation with intelligent retry strategies:
-
-```python
-response = await elelem.create_chat_completion(
-    messages=[{"role": "user", "content": "Generate user data"}],
-    model="groq:openai/gpt-oss-120b",
-    response_format={"type": "json_object"},
-    json_schema=your_schema_dict,  # Your JSON Schema definition
-    temperature=1.5
-)
-```
-
-**Benefits:**
-- **Guaranteed Structure**: Response will match your schema or fail gracefully
-- **Automatic Retries**: Temperature reduction → response_format removal → candidate iteration
-- **Detailed Error Logging**: Shows exactly what failed validation
-- **Production Ready**: Handles edge cases like malformed JSON and API rejections
-
-## Supported Models
-
-### OpenAI Models
-- `openai:gpt-4.1` - Latest GPT-4.1 model  
-- `openai:gpt-4.1-mini` - Cost-effective GPT-4.1 variant
-- `openai:o3` - Reasoning model (no temperature support)
-- `openai:o3-mini` - Cost-effective reasoning model
-
-### GROQ Models  
-- `groq:openai/gpt-oss-120b` - Large open-source GPT model
-- `groq:openai/gpt-oss-20b` - Medium open-source GPT model
-- `groq:meta-llama/llama-4-maverick-17b-128e-instruct` - Llama 4 Maverick
-- `groq:moonshotai/kimi-k2-instruct` - Kimi K2 instruction model
-
-### Scaleway Models
-- `scaleway:gpt-oss-120b` - Large open-source GPT (€0.15/€0.60 per 1M tokens)
-- `scaleway:gemma-3-27b-it` - Google Gemma 3 27B (€0.25/€0.50 per 1M tokens)
-- `scaleway:mistral-small-3.2-24b-instruct-2506` - Mistral Small (€0.15/€0.35 per 1M tokens)
-
-### Parasail Models
-- `parasail:deepseek-3.1` - DeepSeek 3.1 standard mode
-- `parasail:deepseek-3.1-think` - DeepSeek 3.1 with thinking mode enabled
-- `parasail:gpt-oss-120b` - GPT OSS 120B via Parasail
-
-### Fireworks Models
-- `fireworks:deepseek-v3p1` - DeepSeek V3.1 via Fireworks  
-- `fireworks:qwen2.5-coder-32b-instruct` - Qwen 2.5 Coder 32B
-- `fireworks:llama-v3p3-70b-instruct` - Llama 3.3 70B
-
-### Virtual Models (Multi-Provider Fallback)
-- `virtual:gpt-oss-120b` - Tries GROQ → Scaleway → DeepInfra
-- `virtual:deepseek-v3p1` - Tries Fireworks → DeepInfra with different timeout strategies
-
-**Provider Coverage**: 8 providers, 47+ models with full metadata and cost tracking
-
-## Retry Analytics
-
-Elelem tracks detailed metrics on retry events and failure patterns:
-
-```python
-stats = elelem.get_stats_by_tag("your_tag")
-retry_analytics = stats["retry_analytics"]
-
-# Available metrics:
-retry_analytics["json_parse_retries"]           # Malformed JSON syntax
-retry_analytics["json_schema_retries"]          # Valid JSON, wrong structure  
-retry_analytics["api_json_validation_retries"]  # Provider rejected request
-retry_analytics["rate_limit_retries"]           # Rate limit backoff events
-retry_analytics["temperature_reductions"]       # Temperature adjustment events
-retry_analytics["response_format_removals"]     # Fallback strategy usage
-retry_analytics["candidate_iterations"]         # Provider fallback events
-retry_analytics["final_failures"]              # Requests that never succeeded
-retry_analytics["total_retries"]               # Sum of all retry events
-```
-
-**Use Cases**: Production monitoring, cost optimization, provider reliability analysis, temperature tuning
-
-## API Reference
-
-### Main Methods
-
-#### `create_chat_completion(messages, model, tags=[], **kwargs)`
-
-Creates a chat completion with automatic candidate iteration and fallback.
-
-**Parameters:**
-- `messages` (List[Dict]): List of message dictionaries
-- `model` (str): Model string in "provider:model" or "virtual:model" format
-- `tags` (Union[str, List[str]]): Tags for cost tracking
-- `**kwargs`: Additional OpenAI API parameters
-
-**Returns:**
-- OpenAI-compatible response with `choices[0].message.content` access
-
-#### `get_stats()`
-
-Returns overall usage statistics including reasoning tokens.
-
-**Returns:**
-- Dictionary with token counts, costs, call counts, reasoning analytics
-
-#### `get_stats_by_tag(tag)`
-
-Returns usage statistics filtered by a specific tag.
-
-**Parameters:**
-- `tag` (str): Tag to filter statistics by
-
-**Returns:**
-- Dictionary with tag-specific statistics
-
-#### `list_models()`
-
-Returns all available models with rich metadata.
-
-**Returns:**
-- Dictionary with model information including display names, owners, capabilities
-
-## Special Features
-
-### Reasoning Token Analytics
-- **OpenAI o3/o3-mini**: Native reasoning_tokens field extraction
-- **GROQ**: Output tokens details parsing
-- **Parasail DeepSeek**: `<think>` tag content analysis with character ratio estimation
-- **Cost Analysis**: Separate reasoning and output cost tracking
-
-### Thinking Mode (DeepSeek)
-```python
-# Enable thinking mode
-response = await elelem.create_chat_completion(
-    messages=[{"role": "user", "content": "What's 2+2? Think step by step."}],
-    model="parasail:deepseek-3.1-think",  # Automatically includes thinking: true
-    tags=["thinking"]
-)
-```
-
-- Automatically removes `<think>...</think>` tags from response
-- Estimates reasoning tokens using character count ratios
-- Provides clean output while preserving reasoning analytics
-
-### Virtual Model Fallback
-Virtual models automatically try multiple providers:
-```python
-# This model tries GROQ first, then falls back to Scaleway
-model="virtual:gpt-oss-120b"
-```
-
-**Timeout Hierarchy:**
-1. Candidate-level timeout (if specified)
-2. Model-level timeout (if specified)  
-3. Global timeout (default: 120s)
-
-### Cost Tracking
-- **Reasoning Token Costs**: Separate tracking for reasoning vs output tokens
-- **Provider Comparison**: Runtime costs from OpenRouter when available
-- **Tag-Based Analytics**: Project and category-based cost allocation
-
-## Architecture
-
-Elelem follows a modular, provider-agnostic architecture:
-
-- **elelem.py**: Main Elelem class with candidate-based iteration
-- **config.py**: Unified configuration system with metadata resolution
-- **providers/**: Provider-specific YAML files with model definitions
-- **providers/_metadata.yaml**: Centralized metadata definitions
-- **telelem.py**: Comprehensive batch testing and benchmarking tool
-
-### Configuration System
-- **Provider Files**: `src/elelem/providers/openai.yaml`, `parasail.yaml`, etc.
-- **Metadata References**: DRY system using `metadata_ref` to shared definitions
-- **Auto-Discovery**: Automatically loads all provider YAML files
-- **Backward Compatibility**: Maintains existing API while adding new features
+Full model list: Run `elelem.list_models()` or `curl http://localhost:8000/v1/models`
 
 ## Development
 
 ### Running Tests
 
 ```bash
-# Run all tests (simple - works out of the box!)
+# All tests
 uv run pytest
 
-# Run with more details
-uv run pytest -v
+# Specific test categories
+uv run pytest tests/test_config_validation.py    # Config validation
+uv run pytest tests/test_elelem_with_faker.py    # No API keys needed
+uv run pytest tests/test_real_providers.py       # Requires API keys
 
-# Run specific test categories
-uv run pytest tests/test_config_validation.py    # Config validation only
-uv run pytest tests/test_real_providers.py       # Real provider tests (needs API keys)
-uv run pytest tests/test_elelem_with_faker.py    # Faker tests (no API keys needed)
-
-# Run with coverage report
+# With coverage
 uv run pytest --cov=elelem --cov-report=html
 ```
+
+### Adding Providers
+
+1. Create `src/elelem/providers/yourprovider.yaml`
+2. Define models with `metadata_ref` to `_metadata.yaml`
+3. Add API key environment variable
+4. Run tests: `uv run pytest tests/test_config_validation.py`
 
 ## License
 
@@ -593,15 +451,12 @@ MIT License - see LICENSE file for details.
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with proper tests
-4. Add models to provider YAML files with metadata_ref
-5. Run the test suite (`pytest`)
-6. Submit a pull request
+2. Create a feature branch
+3. Add tests for new functionality
+4. Run test suite: `uv run pytest`
+5. Submit a pull request
 
 ## Support
 
-For issues and questions:
-- Check the [documentation](SPECIFICATION.md)
-- Review existing [issues](https://github.com/guybrush1984/Elelem/issues)
-- Submit a [new issue](https://github.com/guybrush1984/Elelem/issues/new)
+- Issues: [GitHub Issues](https://github.com/guybrush1984/Elelem/issues)
+- Documentation: [SPECIFICATION.md](SPECIFICATION.md)

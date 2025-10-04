@@ -465,12 +465,13 @@ class Elelem:
             except (AuthenticationError, PermissionDeniedError) as e:
                 # Authentication/permission errors are infrastructure issues - try next candidate
                 raise InfrastructureError(f"Authentication/permission error: {e}")
-            except (InternalServerError, BadRequestError) as e:
-                # Server errors and bad requests are infrastructure issues - try next candidate
+            except (InternalServerError, BadRequestError, NotFoundError) as e:
+                # Server errors, bad requests, and model not found are infrastructure issues
+                # (e.g., model might exist on another provider) - try next candidate
                 raise InfrastructureError(f"Server/request error: {e}")
-            except (NotFoundError, ConflictError, UnprocessableEntityError) as e:
-                # These are typically model/request issues - don't retry candidate
-                raise ModelError(f"Model/request error: {e}")
+            except (ConflictError, UnprocessableEntityError) as e:
+                # These are request validation issues - don't retry candidate
+                raise ModelError(f"Request validation error: {e}")
             except Exception as e:
                 # Fallback for any other unexpected errors
                 # Check if it might be a rate limit that wasn't caught as RateLimitError

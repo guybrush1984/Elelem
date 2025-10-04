@@ -30,7 +30,8 @@ from ._request_execution import prepare_api_kwargs
 class Elelem:
     """Unified API wrapper with cost tracking, JSON validation, and retry logic."""
     
-    def __init__(self, metrics_persist_file: Optional[str] = None, extra_provider_dirs: Optional[List[str]] = None):
+    def __init__(self, metrics_persist_file: Optional[str] = None, extra_provider_dirs: Optional[List[str]] = None,
+                 cache_enabled: bool = False, cache_ttl: int = 300, cache_max_size: int = 50000):
         self.logger = logging.getLogger("elelem")
         self.config = Config(extra_provider_dirs)
         self._models = self._load_models()
@@ -38,6 +39,18 @@ class Elelem:
 
         # Initialize metrics system (unified SQLAlchemy backend)
         self._metrics_store = MetricsStore()
+
+        # Initialize cache if enabled (shares database with metrics)
+        if cache_enabled:
+            from .cache import PostgresCache
+            self.cache = PostgresCache(
+                engine=self._metrics_store.engine,
+                ttl_seconds=cache_ttl,
+                max_response_size=cache_max_size,
+                logger=self.logger
+            )
+        else:
+            self.cache = None
     
     def _load_models(self) -> Dict[str, Any]:
         """Load model definitions using the Config system."""
@@ -178,6 +191,50 @@ class Elelem:
         elif not tags:
             tags = []
 
+        # Check cache BEFORE creating tracker or making request
+        if self.cache:
+            cache_key = self.cache.get_cache_key(model, messages, **kwargs)
+            cache_result = self.cache.get(cache_key)
+
+            if cache_result:
+                cached_response, cache_age = cache_result
+
+                # Reconstruct response object from cached data
+                from openai.types.chat import ChatCompletion
+                response = ChatCompletion(**cached_response)
+
+                # Mark as cached in elelem_metrics
+                response.elelem_metrics['cached'] = True
+                response.elelem_metrics['cache_age_seconds'] = cache_age
+                response.elelem_metrics['cost_usd'] = 0.0  # Cached = free!
+                response.elelem_metrics['total_duration_seconds'] = time.time() - start_time
+
+                # Track cache hit in metrics (minimal record)
+                cache_tracker = self._metrics_store.start_request(
+                    request_id=request_id,
+                    requested_model=model,
+                    tags=tags,
+                    temperature=kwargs.get("temperature"),
+                    max_tokens=kwargs.get("max_tokens"),
+                    stream=kwargs.get("stream", False)
+                )
+                cache_tracker.cache_hit = True
+                cache_tracker.cache_age_seconds = cache_age
+                cache_tracker.finalize_success(
+                    self._metrics_store,
+                    actual_provider="cache",
+                    actual_model=model,
+                    input_tokens=response.usage.prompt_tokens,
+                    output_tokens=response.usage.completion_tokens,
+                    reasoning_tokens=getattr(response.usage, 'reasoning_tokens', 0),
+                    total_cost_usd=0.0,
+                    duration=time.time() - start_time
+                )
+
+                self.logger.info(f"[{request_id}] ✅ Cache HIT (age: {cache_age:.1f}s)")
+                return response
+
+        # Cache miss - continue with normal request
         # Create RequestTracker for unified metrics
         request_tracker = self._metrics_store.start_request(
             request_id=request_id,
@@ -444,6 +501,12 @@ class Elelem:
                 if reasoning_content:
                     response.elelem_metrics["reasoning_content"] = reasoning_content
                     response.choices[0].message.reasoning = reasoning_content
+
+                # Cache the successful response
+                if self.cache:
+                    cache_key = self.cache.get_cache_key(model, messages, **kwargs)
+                    if cache_key:  # Will be None if cache=False or non-cacheable
+                        self.cache.set(cache_key, model, response)
 
                 return response
                 

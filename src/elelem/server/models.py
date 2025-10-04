@@ -32,6 +32,7 @@ class ChatCompletionRequest(BaseModel):
     # Elelem-specific parameters
     tags: Optional[Union[str, List[str]]] = None
     json_schema: Optional[Dict[str, Any]] = None
+    cache: Optional[bool] = True  # Enable cache by default, set False to bypass
 
 
 class ErrorResponse(BaseModel):

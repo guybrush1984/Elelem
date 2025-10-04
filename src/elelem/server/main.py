@@ -53,8 +53,17 @@ async def startup_event():
     global elelem
     logger.info("🚀 Starting Elelem server...")
 
+    # Read cache configuration from environment
+    cache_enabled = os.getenv('ELELEM_CACHE_ENABLED', 'false').lower() == 'true'
+    cache_ttl = int(os.getenv('ELELEM_CACHE_TTL', '300'))
+    cache_max_size = int(os.getenv('ELELEM_CACHE_MAX_SIZE', '50000'))
+
     # Initialize Elelem instance (auto-creates PostgreSQL tables if configured)
-    elelem = Elelem()
+    elelem = Elelem(
+        cache_enabled=cache_enabled,
+        cache_ttl=cache_ttl,
+        cache_max_size=cache_max_size
+    )
 
     # Log startup status using proper encapsulation
     if os.getenv('ELELEM_DATABASE_URL'):
@@ -65,6 +74,28 @@ async def startup_event():
             logger.warning(f"⚠️ PostgreSQL connection issue: {health['postgresql']['error']}")
     else:
         logger.info("📊 Running with SQLite metrics backend")
+
+    # Log cache status
+    if cache_enabled:
+        logger.info(f"✅ Response cache enabled (TTL: {cache_ttl}s, max size: {cache_max_size} bytes)")
+
+        # Start background cleanup task (runs every 10 minutes)
+        import asyncio
+        asyncio.create_task(cache_cleanup_task())
+    else:
+        logger.info("📦 Response cache disabled")
+
+
+async def cache_cleanup_task():
+    """Background task to cleanup expired cache entries (leader-elected)."""
+    import asyncio
+    while True:
+        try:
+            await asyncio.sleep(600)  # Run every 10 minutes
+            if elelem and elelem.cache:
+                elelem.cache.cleanup_expired()
+        except Exception as e:
+            logger.warning(f"Cache cleanup error: {e}")
 
 
 

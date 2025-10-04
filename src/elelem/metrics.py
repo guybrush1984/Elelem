@@ -332,7 +332,9 @@ class MetricsStore:
                 response_format_removals INTEGER DEFAULT 0,
                 candidate_iterations INTEGER DEFAULT 0,
                 final_failures INTEGER DEFAULT 0,
-                total_retry_attempts INTEGER DEFAULT 0
+                total_retry_attempts INTEGER DEFAULT 0,
+                cache_hit BOOLEAN DEFAULT false,
+                cache_age_seconds REAL
             )
             """
 

@@ -48,6 +48,11 @@ jobs:
         echo "🌐 Running server mode tests (HTTP API)..."
         uv run python tests/test_elelem_server_mode.py
 
+    - name: Run cache tests
+      run: |
+        echo "💾 Running cache tests (SQLite-based unit tests)..."
+        uv run pytest tests/test_cache.py -v
+
     - name: Run Docker Compose integration tests
       env:
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_FREE_API_KEY }}

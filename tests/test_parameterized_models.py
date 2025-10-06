@@ -5,6 +5,7 @@ from unittest.mock import patch
 from elelem.config import expand_parameterized_models
 
 
+@pytest.mark.unit
 class TestParameterizedModels:
     """Test parameterized model expansion functionality."""
 

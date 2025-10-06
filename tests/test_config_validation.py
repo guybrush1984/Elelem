@@ -17,6 +17,7 @@ def config():
     return Config()
 
 
+@pytest.mark.unit
 class TestConfigValidation:
     """Test configuration validation."""
 

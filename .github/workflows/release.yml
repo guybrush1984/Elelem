@@ -43,6 +43,24 @@ jobs:
         echo "🎭 Running faker tests (no real API calls)..."
         uv run pytest tests/test_elelem_with_faker.py -v
 
+    - name: Run server mode tests
+      run: |
+        echo "🌐 Running server mode tests (HTTP API)..."
+        uv run python tests/test_elelem_server_mode.py
+
+    - name: Run cache tests
+      run: |
+        echo "💾 Running cache tests (SQLite-based unit tests)..."
+        uv run pytest tests/test_cache.py -v
+
+    - name: Run Docker Compose integration tests
+      env:
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_FREE_API_KEY }}
+      run: |
+        echo "🐳 Running Docker Compose integration tests..."
+        echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" > .env
+        uv run pytest -v -m integration
+
   build-python:
     name: Build Python Package
     needs: test  # Only run if tests pass
@@ -73,7 +91,7 @@ jobs:
           path: dist/*
 
   build-docker:
-    name: Build and Push Docker Image
+    name: Build and Push Docker Images
     needs: test  # Only run if tests pass
     runs-on: ubuntu-latest
 
@@ -90,40 +108,62 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Extract metadata
-      id: meta
+    # Build Elelem Server Image
+    - name: Extract metadata for server
+      id: meta-server
       uses: docker/metadata-action@v5
       with:
-        images: ${{ secrets.DOCKERHUB_USERNAME }}/elelem
+        images: ${{ secrets.DOCKERHUB_USERNAME }}/elelem-server
         tags: |
           type=ref,event=tag
           type=raw,value=latest
 
-    - name: Build and push Docker image
+    - name: Build and push server image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: src/elelem/server/Dockerfile
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ steps.meta-server.outputs.tags }}
+        labels: ${{ steps.meta-server.outputs.labels }}
         platforms: linux/amd64
 
-    - name: Test Docker image
-      run: |
-        echo "🧪 Testing Docker image functionality..."
+    # Build Elelem Dashboard Image
+    - name: Extract metadata for dashboard
+      id: meta-dashboard
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard
+        tags: |
+          type=ref,event=tag
+          type=raw,value=latest
 
-        # Pull and run the image locally
-        docker run -d -p 8000:8000 --name test-container ${{ secrets.DOCKERHUB_USERNAME }}/elelem:${{ github.ref_name }}
+    - name: Build and push dashboard image
+      uses: docker/build-push-action@v5
+      with:
+        context: src/elelem/dashboard
+        file: src/elelem/dashboard/Dockerfile
+        push: true
+        tags: ${{ steps.meta-dashboard.outputs.tags }}
+        labels: ${{ steps.meta-dashboard.outputs.labels }}
+        platforms: linux/amd64
+
+    # Test Server Image
+    - name: Test server image
+      run: |
+        echo "🧪 Testing server image functionality..."
+
+        # Pull and run the server image locally
+        docker run -d -p 8000:8000 --name test-server ${{ secrets.DOCKERHUB_USERNAME }}/elelem-server:${{ github.ref_name }}
 
         # Wait for server startup
         echo "⏳ Waiting for server to start..."
         sleep 15
 
         # Check if container is running
-        if ! docker ps | grep test-container; then
-          echo "❌ Container failed to start"
-          docker logs test-container
+        if ! docker ps | grep test-server; then
+          echo "❌ Server container failed to start"
+          docker logs test-server
           exit 1
         fi
 
@@ -131,7 +171,7 @@ jobs:
         echo "🔍 Testing /health endpoint..."
         if ! curl -f --max-time 10 http://localhost:8000/health; then
           echo "❌ Health check failed"
-          docker logs test-container
+          docker logs test-server
           exit 1
         fi
 
@@ -139,22 +179,64 @@ jobs:
         echo "🔍 Testing /v1/models endpoint..."
         if ! curl -f --max-time 10 http://localhost:8000/v1/models; then
           echo "❌ Models endpoint failed"
-          docker logs test-container
+          docker logs test-server
           exit 1
         fi
 
-        echo "✅ Docker image tests passed!"
+        echo "✅ Server image tests passed!"
 
         # Cleanup
-        docker stop test-container
-        docker rm test-container
+        docker stop test-server
+        docker rm test-server
+
+    # Test Dashboard Image (basic startup test)
+    - name: Test dashboard image
+      run: |
+        echo "🧪 Testing dashboard image startup..."
+
+        # Note: Dashboard requires DATABASE_URL, so we just test if it starts without crashing
+        echo "📦 Running dashboard container with 30s timeout..."
+        timeout 30 docker run --name test-dashboard ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }} || echo "⏰ Timeout or container exited (expected)"
+
+        # Wait a moment for container to settle
+        echo "⏳ Waiting 2 seconds..."
+        sleep 2
+
+        # Check if container exists
+        echo "🔍 Checking if container exists..."
+        docker ps -a | grep test-dashboard || true
+
+        if ! docker ps -a | grep -q test-dashboard; then
+          echo "❌ Container never started - listing all containers:"
+          docker ps -a
+          exit 1
+        fi
+
+        # Get and display logs
+        echo "📋 Container logs:"
+        docker logs test-dashboard 2>&1 || echo "⚠️  Failed to get logs"
+
+        # Check if it started (even if it failed due to missing DATABASE_URL)
+        echo "🔍 Checking for Streamlit in logs..."
+        if docker logs test-dashboard 2>&1 | grep -qi "streamlit"; then
+          echo "✅ Dashboard image started successfully (found Streamlit)"
+        else
+          echo "❌ Dashboard image failed to start (no Streamlit found)"
+          exit 1
+        fi
+
+        # Cleanup
+        echo "🧹 Cleaning up..."
+        docker rm test-dashboard
 
     - name: Print image details
       run: |
-        echo "🐳 Docker image built, tested, and pushed successfully!"
-        echo "📦 Image: ${{ secrets.DOCKERHUB_USERNAME }}/elelem:${{ github.ref_name }}"
-        echo "🏷️  All tags: ${{ steps.meta.outputs.tags }}"
-        echo "🌐 Image is publicly available on Docker Hub"
+        echo "🐳 Docker images built, tested, and pushed successfully!"
+        echo "📦 Server Image: ${{ secrets.DOCKERHUB_USERNAME }}/elelem-server:${{ github.ref_name }}"
+        echo "📦 Dashboard Image: ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }}"
+        echo "🏷️  Server tags: ${{ steps.meta-server.outputs.tags }}"
+        echo "🏷️  Dashboard tags: ${{ steps.meta-dashboard.outputs.tags }}"
+        echo "🌐 Both images are publicly available on Docker Hub"
 
   release:
     name: Create GitHub Release
@@ -181,16 +263,41 @@ jobs:
 
             ### What's included:
             - 📦 **Python package**: Available in release assets
-            - 🐳 **Docker image**: `guybrush1984/elelem:${{ github.ref_name }}`
-            - 🐳 **Latest tag**: `guybrush1984/elelem:latest`
+            - 🐳 **API Server image**: `guybrush1984/elelem-server:${{ github.ref_name }}`
+            - 📊 **Dashboard image**: `guybrush1984/elelem-dashboard:${{ github.ref_name }}`
+            - 🏷️ **Latest tags**: Both images also tagged as `:latest`
 
             ### Usage:
+
+            #### 🚀 API Server (OpenAI-compatible)
             ```bash
-            # Install Python package from GitHub
+            # Run API server with PostgreSQL
+            docker run -p 8000:8000 \
+              -e ELELEM_DATABASE_URL="postgresql://user:pass@host:5432/db" \
+              guybrush1984/elelem-server:${{ github.ref_name }}
+
+            # Test with OpenAI SDK
+            curl http://localhost:8000/v1/models
+            ```
+
+            #### 📊 Dashboard (Metrics visualization)
+            ```bash
+            # Run dashboard (requires same PostgreSQL)
+            docker run -p 8501:8501 \
+              -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
+              guybrush1984/elelem-dashboard:${{ github.ref_name }}
+
+            # Access at http://localhost:8501
+            ```
+
+            #### 🐍 Python Library
+            ```bash
+            # Install from GitHub
             pip install git+https://github.com/guybrush1984/Elelem@${{ github.ref_name }}
 
-            # Run Docker server (no authentication needed!)
-            docker run -p 8000:8000 --env-file .env guybrush1984/elelem:${{ github.ref_name }}
+            # Use in code
+            from elelem import Elelem
+            elelem = Elelem()  # Auto-detects PostgreSQL via ELELEM_DATABASE_URL
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -62,22 +62,6 @@ models:
     default_params:
       stream: true
 
-  "free@openrouter:openai/gpt-oss-120b":
-    metadata:
-      model_reference: "openai_gpt_oss_120b"
-    provider: free@openrouter
-    model_id: openai/gpt-oss-120b:free
-    capabilities:
-      supports_json_mode: false  
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.0
-      output_cost_per_1m: 0.0
-      currency: USD
-    default_params:
-      stream: true
-
   "free@openrouter:meta-llama/llama-4-scout-17b":
     metadata:
       model_reference: "meta_llama4_scout"

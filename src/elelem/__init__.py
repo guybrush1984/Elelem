@@ -3,7 +3,7 @@ Elelem - Unified API wrapper for OpenAI, GROQ, and DeepInfra
 Provides cost tracking, JSON validation, and retry logic.
 """
 
-from .elelem import Elelem
+from .core import Elelem
 
 try:
     from ._version import version as __version__

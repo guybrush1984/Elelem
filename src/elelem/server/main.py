@@ -10,6 +10,8 @@ Usage:
 
 import logging
 import traceback
+import os
+import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -20,7 +22,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from elelem.elelem import Elelem
+from elelem import Elelem
 from elelem import __version__
 from elelem.server.models import (
     ChatCompletionRequest,
@@ -41,8 +43,93 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Initialize Elelem instance
-elelem = Elelem()
+# Global variables
+elelem = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Elelem on server startup."""
+    global elelem
+    logger.info("🚀 Starting Elelem server...")
+
+    # Read cache configuration from environment
+    cache_enabled = os.getenv('ELELEM_CACHE_ENABLED', 'false').lower() == 'true'
+    cache_ttl = int(os.getenv('ELELEM_CACHE_TTL', '300'))
+    cache_max_size = int(os.getenv('ELELEM_CACHE_MAX_SIZE', '50000'))
+
+    # Initialize Elelem instance (auto-creates PostgreSQL tables if configured)
+    elelem = Elelem(
+        cache_enabled=cache_enabled,
+        cache_ttl=cache_ttl,
+        cache_max_size=cache_max_size
+    )
+
+    # Log startup status using proper encapsulation
+    if os.getenv('ELELEM_DATABASE_URL'):
+        health = elelem.get_health_status()
+        if health["postgresql"]["connected"]:
+            logger.info("✅ PostgreSQL metrics backend ready")
+        else:
+            logger.warning(f"⚠️ PostgreSQL connection issue: {health['postgresql']['error']}")
+    else:
+        logger.info("📊 Running with SQLite metrics backend")
+
+    # Log cache status
+    if cache_enabled:
+        logger.info(f"✅ Response cache enabled (TTL: {cache_ttl}s, max size: {cache_max_size} bytes)")
+
+        # Start background cleanup task (checks every 10s, cleans when needed)
+        import asyncio
+        asyncio.create_task(cache_cleanup_task())
+    else:
+        logger.info("📦 Response cache disabled")
+
+
+async def cache_cleanup_task():
+    """Background task to cleanup expired cache entries.
+
+    Each worker tries cleanup at the specified interval.
+    PostgreSQL advisory lock ensures only one worker cleans at a time.
+    """
+    import asyncio
+
+    # Get cleanup interval from environment (default 600s = 10 min)
+    cleanup_interval = int(os.getenv('ELELEM_CACHE_CLEANUP_INTERVAL', '600'))
+
+    logger.info(f"Cache cleanup task started (interval: {cleanup_interval}s)")
+
+    while True:
+        try:
+            await asyncio.sleep(cleanup_interval)
+
+            if elelem and elelem.cache:
+                # Try to cleanup (acquires lock, only one worker succeeds)
+                deleted = elelem.cache.cleanup_expired()
+
+                if deleted == 0:
+                    logger.debug("Cache cleanup: no expired entries or another worker is cleaning")
+
+        except Exception as e:
+            logger.error(f"Cache cleanup task error: {e}")
+
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up on server shutdown."""
+    global elelem
+    logger.info("🛑 Shutting down Elelem server...")
+
+    # Clean up using proper encapsulation
+    if elelem:
+        try:
+            elelem.close()
+            logger.info("✅ Elelem resources cleaned up")
+        except Exception as e:
+            logger.error(f"❌ Error during cleanup: {e}")
+
+    logger.info("👋 Shutdown complete")
 
 
 @app.exception_handler(Exception)
@@ -65,9 +152,27 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health")
-async def health_check() -> HealthResponse:
-    """Health check endpoint."""
-    return HealthResponse(status="healthy", version=__version__)
+async def health_check():
+    """Health check endpoint with detailed status."""
+    if not elelem:
+        return {"status": "error", "message": "Elelem not initialized"}
+
+    health = elelem.get_health_status()
+
+    # Simple cache status
+    cache_info = {"enabled": elelem.cache is not None}
+
+    # Determine overall status
+    overall_status = "healthy"
+    if health["postgresql"]["enabled"] and not health["postgresql"]["connected"]:
+        overall_status = "degraded"
+
+    return {
+        "status": overall_status,
+        "version": __version__,
+        "metrics": health,
+        "cache": cache_info
+    }
 
 
 @app.get("/v1/models")
@@ -194,12 +299,10 @@ async def get_metrics_data(
     tags: Optional[str] = Query(None, description="Comma-separated list of tags to filter by"),
     format: str = Query("json", description="Output format (currently only 'json' supported)")
 ):
-    """Get raw metrics data as JSON array.
+    """Get raw unified metrics data as JSON array.
 
-    Returns array of call records with all fields:
-    - timestamp, model, provider, tags
-    - Token counts, costs, duration
-    - call_id for correlation
+    Returns array of request records from unified metrics structure.
+    Works with both PostgreSQL and local pandas.
     """
     try:
         if format != "json":
@@ -211,7 +314,9 @@ async def get_metrics_data(
         # Convert DataFrame to JSON records
         # Handle datetime serialization
         df_copy = df.copy()
-        if 'timestamp' in df_copy.columns:
+        if 'timestamp' in df_copy.columns and not df_copy.empty:
+            # Convert to datetime if not already
+            df_copy['timestamp'] = pd.to_datetime(df_copy['timestamp'])
             df_copy['timestamp'] = df_copy['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
         return df_copy.to_dict(orient="records")

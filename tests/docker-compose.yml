@@ -1,0 +1,82 @@
+# Docker Compose for integration testing Elelem server with PostgreSQL
+# Tests the real deployment scenario: Elelem server + PostgreSQL + API calls
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: elelem_test
+      POSTGRES_USER: elelem
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elelem -d elelem_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      # Use tmpfs for faster tests (data doesn't need to persist)
+      - /var/lib/postgresql/data
+
+  # Elelem server for integration tests
+  elelem-server:
+    build:
+      context: ../
+      dockerfile: src/elelem/server/Dockerfile
+    env_file:
+      - ../.env  # Load .env from project root for local development
+    environment:
+      # These override .env file values (shell env has highest priority)
+      - ELELEM_DATABASE_URL=postgresql://elelem:test_password@postgres:5432/elelem_test
+      - PORT=8000
+      - ELELEM_CACHE_ENABLED=true
+      - ELELEM_CACHE_TTL=120  # Short TTL for testing
+      - ELELEM_CACHE_CLEANUP_INTERVAL=30  # Cleanup every 30s for testing
+      # OPENROUTER_API_KEY is loaded from .env file (local) or shell (CI)
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Standalone Elelem Dashboard
+  elelem-dashboard:
+    build:
+      context: ../src/elelem/dashboard
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://elelem:test_password@postgres:5432/elelem_test
+      - DASHBOARD_TITLE=Elelem Test Dashboard
+    ports:
+      - "8501:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Simple web-based PostgreSQL viewer with auto-connection
+  db-viewer:
+    image: sosedoff/pgweb
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    environment:
+      PGWEB_DATABASE_URL: postgres://elelem:test_password@postgres:5432/elelem_test?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+# No persistent volumes needed for testing

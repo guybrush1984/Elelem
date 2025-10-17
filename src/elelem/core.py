@@ -93,10 +93,10 @@ class Elelem:
         """Check if the error is a json_validate_failed API error."""
         return is_json_validation_api_error(error)
         
-    def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict) -> List[Dict[str, str]]:
+    def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict, json_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
         """Add JSON formatting instructions to messages when response_format is JSON."""
         supports_system = capabilities.get("supports_system", True)
-        return add_json_instructions_to_messages(messages, supports_system)
+        return add_json_instructions_to_messages(messages, supports_system, json_schema, enforce_schema_in_prompt)
         
     def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None, candidate_cost_config: Dict = None) -> Dict[str, float]:
         """Calculate costs based on model pricing or runtime data from provider."""
@@ -108,11 +108,12 @@ class Elelem:
         
     
     
-    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, capabilities: Dict) -> List[Dict[str, str]]:
+    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, capabilities: Dict, json_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
         """Preprocess messages for the request."""
         if json_mode_requested:
             # Always add JSON instructions when JSON is requested
-            return self._add_json_instructions_to_messages(messages, capabilities)
+            # Include schema in instructions only if enforce_schema_in_prompt is True
+            return self._add_json_instructions_to_messages(messages, capabilities, json_schema, enforce_schema_in_prompt)
         return messages
     
     def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
@@ -148,6 +149,10 @@ class Elelem:
             if "temperature" in api_kwargs:
                 self.logger.debug(f"Removing temperature for {model} (not supported)")
                 api_kwargs.pop("temperature")
+
+        # Remove Elelem-specific parameter that should not be passed to provider APIs
+        if "enforce_schema_in_prompt" in api_kwargs:
+            api_kwargs.pop("enforce_schema_in_prompt")
 
         self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
 
@@ -193,7 +198,9 @@ class Elelem:
         elif not tags:
             tags = []
 
-        # Check cache BEFORE creating tracker or making request
+        # Compute cache key ONCE with original unmodified values (before any preprocessing)
+        # This key will be reused for both checking and saving to ensure consistency
+        cache_key = None
         if self.cache and cache:
             cache_key = self.cache.get_cache_key(model, messages, **kwargs)
             cache_result = self.cache.get(cache_key)
@@ -263,18 +270,52 @@ class Elelem:
             request_tracker.finalize_failure(self._metrics_store, "ModelNotFound", str(e))
             raise ValueError(f"Model configuration error: {e}")
         
-        # Extract common parameters
-        json_mode_requested = kwargs.get("response_format", {}).get("type") == "json_object"
-        json_schema = kwargs.get("json_schema")
+        # Extract response_format and detect format type
+        response_format = kwargs.get("response_format", {})
+        response_format_type = response_format.get("type") if isinstance(response_format, dict) else None
+
+        # Detect JSON mode request (both old and new formats)
+        json_mode_requested = response_format_type in ["json_object", "json_schema"]
+
+        # Extract json_schema from either source
+        json_schema = None
+
+        if response_format_type == "json_object":
+            # Old JSON mode - schema provided separately (Elelem-specific)
+            json_schema = kwargs.get("json_schema")
+
+        elif response_format_type == "json_schema":
+            # New structured outputs format (OpenAI standard)
+            # Extract nested schema
+            json_schema_obj = response_format.get("json_schema", {})
+            json_schema = json_schema_obj.get("schema")
+
+            # Validate exclusivity (can't use both formats)
+            if "json_schema" in kwargs:
+                raise ValueError(
+                    "Cannot use both response_format with type='json_schema' "
+                    "and the separate json_schema parameter. Use one or the other."
+                )
+
+            # CRITICAL: Downgrade to basic JSON mode for providers
+            # No provider is guaranteed to support structured outputs format
+            # We'll validate the schema client-side instead
+            kwargs["response_format"] = {"type": "json_object"}
+            self.logger.debug(f"[{request_id}] Converted structured outputs format to basic JSON mode (client-side validation)")
+
+        # Get original temperature
         original_temperature = kwargs.get("temperature", 1.0)
 
-        # Remove Elelem-specific parameters from kwargs (not part of OpenAI API)
+        # Remove Elelem-specific parameter (if present)
         if "json_schema" in kwargs:
             kwargs.pop("json_schema")
 
         # Warn if json_schema provided without JSON response format
         if json_schema and not json_mode_requested:
-            self.logger.warning(f"[{request_id}] json_schema provided but response_format is not set to json_object. Schema validation will be skipped.")
+            self.logger.warning(
+                f"[{request_id}] json_schema provided but response_format is not set to json_object or json_schema. "
+                "Schema validation will be skipped."
+            )
         
         self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s)")
         if json_mode_requested:
@@ -288,7 +329,7 @@ class Elelem:
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
                     json_mode_requested, json_schema, original_temperature,
-                    tags, cache, start_time, request_tracker, **kwargs
+                    tags, cache, cache_key, start_time, request_tracker, **kwargs
                 )
             except InfrastructureError as e:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed: {e}")
@@ -313,7 +354,7 @@ class Elelem:
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
                                 messages, original_model, model_config, request_id,
                                 json_mode_requested, json_schema, original_temperature,
-                                tags, cache, start_time, request_tracker, **kwargs):
+                                tags, cache, cache_key, start_time, request_tracker, **kwargs):
         """Attempt to complete request with a specific candidate."""
         
         # Get timeout for this candidate
@@ -348,9 +389,11 @@ class Elelem:
         self.logger.debug(f"[{request_id}] Before cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
         self._cleanup_api_kwargs(api_kwargs, candidate_key, {'capabilities': capabilities})
         self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
-        
+
         # Preprocess messages for JSON mode if needed
-        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, capabilities)
+        # Only inject schema into prompt if enforce_schema_in_prompt=True (default False to save tokens)
+        enforce_schema_in_prompt = kwargs.get('enforce_schema_in_prompt', False)
+        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, capabilities, json_schema, enforce_schema_in_prompt)
 
         # Retry logic for this candidate (temperature reduction, JSON validation)
         max_retries = self.config.retry_settings["max_json_retries"]
@@ -511,11 +554,10 @@ class Elelem:
                     response.elelem_metrics["reasoning_content"] = reasoning_content
                     response.choices[0].message.reasoning = reasoning_content
 
-                # Cache the successful response
-                if self.cache and cache:
-                    cache_key = self.cache.get_cache_key(original_model, messages, **kwargs)
-                    if cache_key:
-                        self.cache.set(cache_key, original_model, response)
+                # Cache the successful response using the key computed at the start
+                # (before any message preprocessing or kwargs modifications)
+                if self.cache and cache and cache_key:
+                    self.cache.set(cache_key, original_model, response)
 
                 return response
                 

@@ -125,6 +125,7 @@ class PostgresCache:
             'max_tokens': kwargs.get('max_tokens'),
             'response_format': kwargs.get('response_format'),
             'json_schema': kwargs.get('json_schema'),
+            'enforce_schema_in_prompt': kwargs.get('enforce_schema_in_prompt', False),  # Affects prompt content
             # Explicitly exclude metadata/format-only params:
             # - tags: metadata for tracking
             # - stream: format preference

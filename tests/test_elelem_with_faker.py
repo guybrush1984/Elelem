@@ -314,6 +314,143 @@ class TestElelemWithFaker:
         assert len(requests) >= 1
 
     @pytest.mark.asyncio
+    async def test_structured_outputs_format(self, elelem_with_faker_env):
+        """Test that Elelem supports OpenAI's structured outputs format."""
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with JSON schema scenario
+        faker.configure_scenario('elelem_json_schema')
+        faker.reset_state()
+
+        # Test structured outputs format (OpenAI standard)
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "number"},
+                "email": {"type": "string"},
+                "active": {"type": "boolean"}
+            },
+            "required": ["name", "age", "email"]
+        }
+
+        response = await elelem.create_chat_completion(
+            model="faker:json-schema-test",
+            messages=[{"role": "user", "content": "Generate a user profile"}],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "UserProfile",
+                    "schema": schema,
+                    "strict": True
+                }
+            },
+            temperature=1.0,  # Matches valid_schema condition
+            enforce_schema_in_prompt=True  # Inject schema so test can verify it
+        )
+
+        # Should succeed with valid JSON
+        assert response
+        content = response.choices[0].message.content
+
+        # Verify it's valid JSON matching schema
+        import json
+        parsed = json.loads(content)
+        assert "name" in parsed
+        assert "age" in parsed
+        assert "email" in parsed
+        assert isinstance(parsed["age"], (int, float))
+
+        # Verify Elelem downgraded to json_object for the provider
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) >= 1
+        last_request = requests[-1]
+        request_body = last_request.get('body', {})
+        # Should be downgraded to basic JSON mode
+        assert request_body.get('response_format', {}).get('type') == 'json_object'
+        # Should NOT have json_schema in request to provider
+        assert 'json_schema' not in request_body.get('response_format', {})
+
+        # CRITICAL: Verify schema was injected into the prompt
+        messages = request_body.get('messages', [])
+        # Find system message (or last user message if no system support)
+        system_content = None
+        for msg in messages:
+            if msg.get('role') == 'system':
+                system_content = msg.get('content', '')
+                break
+
+        assert system_content is not None, "Expected system message with JSON instructions"
+        # Verify schema was included in the prompt
+        assert '=== REQUIRED OUTPUT FORMAT ===' in system_content
+        assert '"type": "object"' in system_content
+        assert '"name"' in system_content
+        assert '"age"' in system_content
+        assert '"email"' in system_content
+        assert 'required' in system_content.lower()
+
+    @pytest.mark.asyncio
+    async def test_structured_outputs_exclusivity(self, elelem_with_faker_env):
+        """Test that using both formats simultaneously raises an error."""
+        elelem, faker = elelem_with_faker_env
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"}
+            }
+        }
+
+        # Should raise ValueError when using both formats
+        with pytest.raises(ValueError, match="Cannot use both"):
+            await elelem.create_chat_completion(
+                model="faker:json-schema-test",
+                messages=[{"role": "user", "content": "Test"}],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "schema": schema
+                    }
+                },
+                json_schema=schema  # Conflict!
+            )
+
+    @pytest.mark.asyncio
+    async def test_structured_outputs_backward_compatibility(self, elelem_with_faker_env):
+        """Test that old json_schema parameter still works."""
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with JSON schema scenario
+        faker.configure_scenario('elelem_json_schema')
+        faker.reset_state()
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "number"}
+            },
+            "required": ["name", "age"]
+        }
+
+        # Old API should still work
+        response = await elelem.create_chat_completion(
+            model="faker:json-schema-test",
+            messages=[{"role": "user", "content": "Generate a user profile"}],
+            response_format={"type": "json_object"},
+            json_schema=schema,
+            temperature=1.0
+        )
+
+        # Should succeed
+        assert response
+        content = response.choices[0].message.content
+        import json
+        parsed = json.loads(content)
+        assert "name" in parsed
+        assert "age" in parsed
+
+    @pytest.mark.asyncio
     async def test_reasoning_token_extraction(self, elelem_with_faker_env):
         """Test that Elelem correctly extracts reasoning tokens from different provider formats."""
         elelem, faker = elelem_with_faker_env
@@ -946,5 +1083,72 @@ class TestElelemWithFaker:
         print(f"✅ Found {len(faker_models)} faker models")
         print("✅ Parameterized model system compatible with faker")
         print("✅ Existing functionality preserved after parameterized model expansion")
+
+    @pytest.mark.asyncio
+    async def test_pydantic_openai_style_json_schema(self, elelem_with_faker_env):
+        """Test Pydantic models with OpenAI-style response_format.type='json_schema'."""
+        from pydantic import BaseModel
+
+        class CalcResult(BaseModel):
+            steps: list[str]
+            answer: int
+
+        elelem, faker = elelem_with_faker_env
+        faker.configure_scenario('happy_path')
+        faker.reset_state()
+
+        response = await elelem.create_chat_completion(
+            model="faker:basic",
+            messages=[
+                {"role": "user", "content": "Calculate 2+2"}
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "calc_result",
+                    "schema": CalcResult.model_json_schema()
+                }
+            },
+            enforce_schema_in_prompt=True  # Inject schema so faker can read it
+        )
+
+        # Verify response
+        assert response.choices[0].message.content
+        parsed = json.loads(response.choices[0].message.content)
+        result = CalcResult(**parsed)
+        assert isinstance(result, CalcResult)
+
+        print("✅ OpenAI-style json_schema format works with Pydantic")
+
+    @pytest.mark.asyncio
+    async def test_pydantic_elelem_style_json_schema(self, elelem_with_faker_env):
+        """Test Pydantic models with Elelem-style json_schema parameter."""
+        from pydantic import BaseModel
+
+        class CalcResult(BaseModel):
+            steps: list[str]
+            answer: int
+
+        elelem, faker = elelem_with_faker_env
+        faker.configure_scenario('happy_path')
+        faker.reset_state()
+
+        response = await elelem.create_chat_completion(
+            model="faker:basic",
+            messages=[
+                {"role": "user", "content": "Calculate 2+2"}
+            ],
+            response_format={"type": "json_object"},
+            json_schema=CalcResult.model_json_schema(),
+            enforce_schema_in_prompt=True  # Inject schema so faker can read it
+        )
+
+        # Verify response
+        assert response.choices[0].message.content
+        parsed = json.loads(response.choices[0].message.content)
+        result = CalcResult(**parsed)
+        assert isinstance(result, CalcResult)
+
+        print("✅ Elelem-style json_schema parameter works with Pydantic")
 
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

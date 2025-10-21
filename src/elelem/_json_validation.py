@@ -42,11 +42,19 @@ def is_json_validation_api_error(error: Exception) -> bool:
     return "json_validate_failed" in error_str and "400" in error_str
 
 
-def add_json_instructions_to_messages(messages: List[Dict[str, str]], supports_system: bool) -> List[Dict[str, str]]:
-    """Add JSON formatting instructions to messages when response_format is JSON."""
+def add_json_instructions_to_messages(messages: List[Dict[str, str]], supports_system: bool, json_schema: Optional[Dict[str, Any]] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
+    """Add JSON formatting instructions to messages when response_format is JSON.
+
+    Args:
+        messages: Original message list
+        supports_system: Whether the model supports system messages
+        json_schema: Optional JSON schema to include in instructions for structured outputs
+        enforce_schema_in_prompt: If True, force including schema in prompt (default False)
+                                   By default, assumes user already included schema to save tokens
+    """
     modified_messages = messages.copy()
 
-    # Add JSON instruction to system message or create one
+    # Build JSON instruction
     json_instruction = (
         "\n\nCRITICAL: You must respond with ONLY a clean JSON object - no markdown, no code blocks, no extra text. "
         "Do not wrap the JSON in ```json``` blocks or any other formatting. "
@@ -54,6 +62,23 @@ def add_json_instructions_to_messages(messages: List[Dict[str, str]], supports_s
         "Start your response with { and end with }. "
         "Any non-JSON content will cause a parsing error."
     )
+
+    # Only include schema in prompt if explicitly requested via enforce_schema_in_prompt
+    # By default (False), we assume the user has already included schema in their prompt
+    if json_schema and enforce_schema_in_prompt:
+        import json as json_module
+        schema_str = json_module.dumps(json_schema, indent=2)
+        json_instruction += (
+            "\n\n=== REQUIRED OUTPUT FORMAT ===\n"
+            "Your response MUST conform to this exact JSON schema:\n\n"
+            f"{schema_str}\n\n"
+            "Follow the schema precisely:\n"
+            "- Include all required fields\n"
+            "- Use correct data types (string, number, boolean, array, object)\n"
+            "- Do not add extra fields unless allowed by the schema\n"
+            "- Respect any constraints (enums, patterns, min/max values)\n"
+            "=== END REQUIRED FORMAT ==="
+        )
 
     if supports_system:
         # Find system message and append instruction

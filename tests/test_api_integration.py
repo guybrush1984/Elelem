@@ -38,7 +38,7 @@ class TestElelemAPIIntegration:
     def test_chat_completion_basic(self, api_client):
         """Test basic chat completion through OpenAI client."""
         response = api_client.chat.completions.create(
-            model="free@openrouter:deepseek/deepseek-3.1",
+            model="free@openrouter:openai/gpt-oss-20b",
             messages=[
                 {"role": "user", "content": "Say 'test successful' and nothing else"}
             ]
@@ -146,7 +146,7 @@ def test_cache_hit_and_miss(api_client, elelem_server_url):
 
     # Make first request - should be cache MISS
     response1 = api_client.chat.completions.create(
-        model="free@openrouter:deepseek/deepseek-3.1",
+        model="free@openrouter:openai/gpt-oss-20b",
         messages=[
             {"role": "user", "content": "Say exactly: 'cache test response'"}
         ],
@@ -159,7 +159,7 @@ def test_cache_hit_and_miss(api_client, elelem_server_url):
 
     # Make identical request - should be cache HIT
     response2 = api_client.chat.completions.create(
-        model="free@openrouter:deepseek/deepseek-3.1",
+        model="free@openrouter:openai/gpt-oss-20b",
         messages=[
             {"role": "user", "content": "Say exactly: 'cache test response'"}
         ],
@@ -175,7 +175,7 @@ def test_cache_hit_and_miss(api_client, elelem_server_url):
 
     # Make request with different temperature - should be cache MISS (different cache key)
     response3 = api_client.chat.completions.create(
-        model="free@openrouter:deepseek/deepseek-3.1",
+        model="free@openrouter:openai/gpt-oss-20b",
         messages=[
             {"role": "user", "content": "Say exactly: 'cache test response'"}
         ],

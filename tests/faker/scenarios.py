@@ -158,6 +158,32 @@ class ScenarioManager:
                     break
 
             if json_requested_via_format or json_requested_via_prompt:
+                # Check if json_schema is provided in request body
+                json_schema = body.get('json_schema')
+
+                # Also check if schema is injected in the messages (via enforce_schema_in_prompt)
+                if not json_schema:
+                    import json as json_module
+                    import re
+                    for message in messages:
+                        content_text = message.get('content', '')
+                        # Look for schema in the REQUIRED OUTPUT FORMAT section
+                        if '=== REQUIRED OUTPUT FORMAT ===' in content_text:
+                            # Extract JSON between the markers
+                            match = re.search(r'Your response MUST conform to this exact JSON schema:\s*(\{.*?\})\s*Follow the schema', content_text, re.DOTALL)
+                            if match:
+                                try:
+                                    json_schema = json_module.loads(match.group(1))
+                                except:
+                                    pass
+
+                if json_schema:
+                    # Generate response matching the provided schema
+                    return self.response_generator.generate_json_schema_response(
+                        schema=json_schema,
+                        valid=response_config.get('valid_json', True)
+                    )
+
                 # Return JSON response - either use configured json_data or convert content to JSON
                 if 'json_data' in response_config:
                     json_data = response_config['json_data']

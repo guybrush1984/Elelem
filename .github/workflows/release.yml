@@ -54,6 +54,8 @@ jobs:
         uv run pytest tests/test_cache.py -v
 
     - name: Run Docker Compose integration tests
+      # Only run on pushes from repo owner to prevent unauthorized API usage
+      if: github.actor == 'guybrush1984' || github.repository_owner == 'guybrush1984'
       env:
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_FREE_API_KEY }}
       run: |

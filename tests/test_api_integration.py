@@ -38,7 +38,7 @@ class TestElelemAPIIntegration:
     def test_chat_completion_basic(self, api_client):
         """Test basic chat completion through OpenAI client."""
         response = api_client.chat.completions.create(
-            model="free@openrouter:openai/gpt-oss-20b",
+            model="cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
             messages=[
                 {"role": "user", "content": "Say 'test successful' and nothing else"}
             ]
@@ -57,7 +57,7 @@ class TestElelemAPIIntegration:
 
         # Make an API call
         api_client.chat.completions.create(
-            model="free@openrouter:meta-llama/llama-4-scout-17b",
+            model="cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
             messages=[{"role": "user", "content": "test"}]
         )
 
@@ -111,7 +111,7 @@ class TestElelemAPIIntegration:
 
         def make_request(i):
             response = api_client.chat.completions.create(
-                model="free@openrouter:openai/gpt-oss-20b",
+                model="cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
                 messages=[{"role": "user", "content": f"Say the number {i}"}]            )
             return response.choices[0].message.content is not None
 
@@ -146,7 +146,7 @@ def test_cache_hit_and_miss(api_client, elelem_server_url):
 
     # Make first request - should be cache MISS
     response1 = api_client.chat.completions.create(
-        model="free@openrouter:openai/gpt-oss-20b",
+        model="cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
         messages=[
             {"role": "user", "content": "Say exactly: 'cache test response'"}
         ],
@@ -159,7 +159,7 @@ def test_cache_hit_and_miss(api_client, elelem_server_url):
 
     # Make identical request - should be cache HIT
     response2 = api_client.chat.completions.create(
-        model="free@openrouter:openai/gpt-oss-20b",
+        model="cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
         messages=[
             {"role": "user", "content": "Say exactly: 'cache test response'"}
         ],
@@ -175,7 +175,7 @@ def test_cache_hit_and_miss(api_client, elelem_server_url):
 
     # Make request with different temperature - should be cache MISS (different cache key)
     response3 = api_client.chat.completions.create(
-        model="free@openrouter:openai/gpt-oss-20b",
+        model="cerebras@openrouter:openai/gpt-oss-120b?reasoning=low",
         messages=[
             {"role": "user", "content": "Say exactly: 'cache test response'"}
         ],

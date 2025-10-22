@@ -10,9 +10,9 @@ models:
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.1"
         timeout: 120s
-      - model: "fireworks:deepseek/deepseek-3.1"
+      - model: "novita:deepseek/deepseek-3.1"
         timeout: 120s
-      - model: "parasail:deepseek/deepseek-3.1"
+      - model: "fireworks:deepseek/deepseek-3.1"
         timeout: 120s
 
   "virtual:deepseek-v3.1-quick":
@@ -22,7 +22,7 @@ models:
     candidates:
       - model: "fireworks:deepseek/deepseek-3.1"
         timeout: 120s
-      - model: "parasail:deepseek/deepseek-3.1"
+      - model: "novita:deepseek/deepseek-3.1"
         timeout: 120s
       - model: "deepinfra:deepseek/deepseek-3.1"
         timeout: 120s
@@ -60,9 +60,9 @@ models:
     candidates:
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
         timeout: 120s
-      - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
         timeout: 120s
-      - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
         timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
@@ -86,9 +86,9 @@ models:
     candidates:
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
         timeout: 120s
-      - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
         timeout: 120s
-      - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
         timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
@@ -101,8 +101,8 @@ models:
         timeout: 120s   
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"    
         timeout: 120s
-      - model: "cerebras@openrouter:openai/gpt-oss-120b?reasoning=$reasoning"     
-        timeout: 120s        
+      - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"    
+        timeout: 120s
      
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:qwen3-30b-a3b-cheap?reasoning":

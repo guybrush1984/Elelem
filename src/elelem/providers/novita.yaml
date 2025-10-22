@@ -1,0 +1,69 @@
+# Fireworks provider configuration and models
+provider:
+  endpoint: https://api.novita.ai/openai
+  default_params:
+    stream: true
+
+models:
+  "novita:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=$reasoning"
+    provider: novita
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.04
+      output_cost_per_1m: 0.15
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+
+  "novita:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=$reasoning"
+    provider: novita
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.25
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+
+  "novita:deepseek/deepseek-3.1":
+    metadata:
+      model_reference: "deepseek_v31"
+    provider: novita
+    model_id: deepseek/deepseek-v3.1
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.27
+      output_cost_per_1m: 1.00
+      currency: USD
+      
+
+  "novita:deepseek/deepseek-3.1-terminus":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+    provider: novita
+    model_id: deepseek/deepseek-v3.1-terminus
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.27
+      output_cost_per_1m: 1.00
+      currency: USD

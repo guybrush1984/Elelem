@@ -105,8 +105,9 @@ class RequestTracker:
             if not clean_tag:
                 continue  # Skip empty tags
 
-            if len(clean_tag) > 50:
-                raise ValueError(f"Tag too long: '{clean_tag}'. Maximum 50 characters allowed.")
+            # Trim tag if too long (don't crash)
+            if len(clean_tag) > 128:
+                clean_tag = clean_tag[:128]
 
             if ',' in clean_tag:
                 raise ValueError(f"Tag cannot contain commas: '{clean_tag}'")

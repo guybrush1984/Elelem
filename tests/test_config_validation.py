@@ -185,14 +185,24 @@ class TestConfigValidation:
         issues = []
 
         for provider_name, provider_config in providers.items():
-            # Each provider should have an endpoint
-            if 'endpoint' not in provider_config:
-                issues.append(f"Provider '{provider_name}' missing 'endpoint' field")
+            # Each provider should have an endpoint (single) or endpoints (multiple)
+            if 'endpoint' not in provider_config and 'endpoints' not in provider_config:
+                issues.append(f"Provider '{provider_name}' missing 'endpoint' or 'endpoints' field")
 
-            # Endpoint should be a valid URL
+            # Single endpoint should be a valid URL
             endpoint = provider_config.get('endpoint', '')
             if endpoint and not (endpoint.startswith('http://') or endpoint.startswith('https://')):
                 issues.append(f"Provider '{provider_name}' endpoint '{endpoint}' should be a valid HTTP(S) URL")
+
+            # Multiple endpoints should all be valid URLs
+            endpoints = provider_config.get('endpoints', [])
+            if endpoints:
+                if not isinstance(endpoints, list):
+                    issues.append(f"Provider '{provider_name}' endpoints should be a list")
+                else:
+                    for idx, ep in enumerate(endpoints):
+                        if not (ep.startswith('http://') or ep.startswith('https://')):
+                            issues.append(f"Provider '{provider_name}' endpoints[{idx}] '{ep}' should be a valid HTTP(S) URL")
 
         if issues:
             pytest.fail(f"Provider configuration issues found:\n" + "\n".join(f"  - {issue}" for issue in issues))

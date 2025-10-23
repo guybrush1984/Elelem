@@ -20,6 +20,8 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
+      - model: "ollama:deepseek/deepseek-3.1"
+        timeout: 120s
       - model: "fireworks:deepseek/deepseek-3.1"
         timeout: 120s
       - model: "novita:deepseek/deepseek-3.1"
@@ -32,6 +34,8 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
+      - model: "ollama:deepseek/deepseek-3.1?reasoning"
+        timeout: 120s
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning=medium"
         timeout: 120s
       - model: "fireworks:deepseek/deepseek-3.1?reasoning=medium"
@@ -84,6 +88,8 @@ models:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
+      - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
+        timeout: 120s
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
         timeout: 120s
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"

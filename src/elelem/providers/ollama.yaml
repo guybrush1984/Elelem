@@ -1,0 +1,74 @@
+# Ollama provider configuration and models
+# Supports multiple endpoints - will auto-probe and use the first one that responds
+provider:
+  endpoints:
+    - http://localhost:11434/v1          # Direct localhost (works when Elelem runs on host)
+    - http://172.17.0.1:11434/v1         # Docker bridge network (Linux) ✅
+    - http://host.docker.internal:11434/v1  # Docker Desktop (Mac/Windows)
+    - http://192.168.65.2:11434/v1       # Docker for Mac alternative
+  probe_timeout: 2  # Seconds to wait per endpoint probe
+
+models:
+  "ollama:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=$reasoning"
+    provider: ollama
+    model_id: gpt-oss:20b-cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+
+  "ollama:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=$reasoning"
+    provider: ollama
+    model_id: gpt-oss:120b-cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+
+  "ollama:deepseek/deepseek-3.1":
+    metadata:
+      model_reference: "deepseek_v31"
+    provider: ollama
+    model_id: deepseek-v3.1:671b-cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD
+
+  "ollama:deepseek/deepseek-3.1?reasoning":
+    metadata:
+      model_reference: "deepseek_v31"
+    provider: ollama
+    model_id: deepseek-v3.1:671b-cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD      
+    default_params:
+      reasoning_effort: medium

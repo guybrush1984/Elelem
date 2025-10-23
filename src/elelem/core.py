@@ -62,7 +62,7 @@ class Elelem:
         
     def _initialize_providers(self) -> Dict[str, Any]:
         """Initialize provider clients."""
-        return initialize_providers(self.config.providers, self.config.timeout_seconds, self.logger)
+        return initialize_providers(self.config.providers, self.config.timeout_seconds, self.logger, self._models)
         
     def _reset_stats(self):
         """Reset all statistics."""
@@ -265,11 +265,33 @@ class Elelem:
         try:
             model_config = self.config.get_model_config(model)
             candidates = model_config['candidates']
+
+            # Filter out candidates whose providers are not available
+            # (providers may be skipped during init if endpoints are unreachable, e.g., ollama in production)
+            available_candidates = [
+                c for c in candidates
+                if c.get('provider') in self._providers
+            ]
+
+            if len(available_candidates) < len(candidates):
+                skipped_count = len(candidates) - len(available_candidates)
+                skipped_providers = set(c.get('provider') for c in candidates if c.get('provider') not in self._providers)
+                self.logger.info(
+                    f"[{request_id}] Skipped {skipped_count} candidate(s) with unavailable provider(s): {', '.join(skipped_providers)}"
+                )
+
+            if not available_candidates:
+                # All candidates filtered out - no providers available
+                request_tracker.finalize_failure(self._metrics_store, "NoProvidersAvailable", "All candidate providers are unavailable")
+                raise ValueError(f"No available providers for model {model} (all endpoints unreachable)")
+
+            candidates = available_candidates
+
         except ValueError as e:
             # Record failure for invalid model
             request_tracker.finalize_failure(self._metrics_store, "ModelNotFound", str(e))
             raise ValueError(f"Model configuration error: {e}")
-        
+
         # Extract response_format and detect format type
         response_format = kwargs.get("response_format", {})
         response_format_type = response_format.get("type") if isinstance(response_format, dict) else None
@@ -317,7 +339,9 @@ class Elelem:
                 "Schema validation will be skipped."
             )
         
-        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s)")
+        # Build list of candidate providers for logging
+        candidate_providers = [c.get('provider') for c in candidates]
+        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_providers)}")
         if json_mode_requested:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
         
@@ -502,13 +526,6 @@ class Elelem:
                 
                 # Success! Calculate duration and return
                 duration = time.time() - start_time
-                
-                # Log success with provider info
-                provider_info = ""
-                if hasattr(response, 'provider') and response.provider:
-                    provider_info = f" via {response.provider}"
-                
-                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s")
 
                 # Get cost configuration for this candidate
                 candidate_cost_config = candidate.get('cost', {})
@@ -517,6 +534,22 @@ class Elelem:
                 runtime_costs = self._extract_runtime_costs(response, candidate_cost_config)
                 costs = self._calculate_costs(stats_model_name, total_input_tokens, total_output_tokens,
                                             total_reasoning_tokens, runtime_costs, candidate_cost_config)
+
+                # Log success with provider info, tokens, and cost
+                provider_info = ""
+                if hasattr(response, 'provider') and response.provider:
+                    provider_info = f" via {response.provider}"
+
+                # Build token/cost info string
+                token_info = f"tokens: {total_input_tokens}→{total_output_tokens}"
+                if total_reasoning_tokens > 0:
+                    token_info += f" (reasoning: {total_reasoning_tokens})"
+
+                cost_info = ""
+                if costs and costs.get('total_cost_usd', 0) > 0:
+                    cost_info = f", cost: ${costs['total_cost_usd']:.6f}"
+
+                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s | {token_info}{cost_info}")
 
                 # Finalize request tracking with candidate details and store
                 request_tracker.finalize_with_candidate(

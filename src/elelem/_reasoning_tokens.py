@@ -9,6 +9,8 @@ import re
 from typing import Any, Optional, Set, Tuple
 import logging
 
+from ._response_processing import extract_text_from_content_parts
+
 
 def extract_token_counts(response: Any, logger: Optional[logging.Logger] = None) -> Tuple[int, int, int, int]:
     """
@@ -185,6 +187,30 @@ def extract_reasoning_from_content(response: Any, logger: Optional[logging.Logge
         first_choice = response.choices[0]
         if hasattr(first_choice, 'message') and first_choice.message.content:
             content = first_choice.message.content
+
+            # Handle content as list (structured content parts) or string
+            if isinstance(content, list):
+                logger.debug(f"Content is a list with {len(content)} parts")
+                reasoning_text, response_text = extract_text_from_content_parts(content, logger)
+
+                # If we found structured reasoning, calculate tokens and return
+                if reasoning_text:
+                    reasoning_chars = len(reasoning_text)
+                    response_chars = len(response_text) if response_text else 0
+                    total_chars = reasoning_chars + response_chars
+
+                    if total_chars > 0:
+                        reasoning_ratio = reasoning_chars / total_chars
+                        total_completion_tokens = getattr(usage, 'completion_tokens', 0)
+                        estimated_reasoning_tokens = int(total_completion_tokens * reasoning_ratio)
+
+                        logger.debug(f"Extracted structured reasoning: {estimated_reasoning_tokens} tokens "
+                                   f"({reasoning_ratio:.1%} of {total_completion_tokens} total)")
+                        return estimated_reasoning_tokens, reasoning_text
+
+                # No structured reasoning found, concatenate all parts for further processing
+                content = (response_text or '') + (reasoning_text or '')
+
             logger.debug(f"Checking content for <think> tags, length: {len(content)}")
 
             # Extract reasoning content from <think> tags

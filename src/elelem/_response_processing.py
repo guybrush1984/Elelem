@@ -4,9 +4,54 @@ Response processing functions for Elelem.
 
 import re
 import logging
-from typing import Any
+from typing import Any, Tuple, Optional, List
 
 from ._exceptions import ModelError
+
+
+def extract_text_from_content_parts(content: list, logger: Optional[logging.Logger] = None) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extract reasoning and response text from structured content parts.
+
+    Returns:
+        (reasoning_text, response_text) tuple where either can be None
+    """
+    reasoning_parts = []
+    response_parts = []
+
+    for part in content:
+        if isinstance(part, dict):
+            part_type = part.get('type', '')
+
+            # Extract text from the part based on its structure
+            text_content = None
+            if 'text' in part:
+                text_content = part['text']
+            elif 'thinking' in part:
+                # Nested thinking/reasoning structure
+                thinking_items = part.get('thinking', [])
+                if isinstance(thinking_items, list):
+                    texts = [item.get('text', '') for item in thinking_items if isinstance(item, dict)]
+                    text_content = '\n'.join(texts)
+                elif isinstance(thinking_items, str):
+                    text_content = thinking_items
+
+            # Categorize based on type field
+            if text_content:
+                if part_type in ['thinking', 'reasoning']:
+                    reasoning_parts.append(text_content)
+                else:
+                    response_parts.append(text_content)
+        elif isinstance(part, str):
+            response_parts.append(part)
+
+    reasoning_text = '\n'.join(reasoning_parts) if reasoning_parts else None
+    response_text = '\n'.join(response_parts) if response_parts else None
+
+    if logger and reasoning_text:
+        logger.debug(f"Extracted {len(reasoning_parts)} reasoning part(s), {len(response_parts)} response part(s)")
+
+    return reasoning_text, response_text
 
 
 async def collect_streaming_response(stream, logger=None, request_id=None):
@@ -169,6 +214,12 @@ def process_response_content(response: Any, json_mode_requested: bool, logger: l
     if content is None:
         logger.warning("Response content is None despite finish_reason being 'stop'")
         content = ""
+
+    # Handle content as list (structured content parts) or string
+    if isinstance(content, list):
+        logger.debug(f"Content is a list with {len(content)} parts")
+        _, response_text = extract_text_from_content_parts(content, logger)
+        content = response_text or ""
 
     # Remove think tags if present
     content = remove_think_tags(content, logger)

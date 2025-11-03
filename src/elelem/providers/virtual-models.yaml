@@ -114,6 +114,7 @@ models:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
+      - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"    

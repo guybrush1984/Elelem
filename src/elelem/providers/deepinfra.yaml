@@ -64,19 +64,6 @@ models:
       output_cost_per_1m: 0.30
       currency: USD
 
-  "deepinfra:moonshotai/kimi-k2-instruct":
-    metadata:
-      model_reference: "moonshot_kimi_k2"
-    provider: deepinfra
-    model_id: moonshotai/Kimi-K2-Instruct
-    capabilities:
-      supports_json_mode: false
-      supports_temperature: true
-    cost:
-      input_cost_per_1m: 0.50
-      output_cost_per_1m: 2.00
-      currency: USD
-
   "deepinfra:deepseek/deepseek-3.1":
     metadata:
       model_reference: "deepseek_v31"
@@ -89,8 +76,11 @@ models:
       input_cost_per_1m: 0.30
       output_cost_per_1m: 1.00
       currency: USD
+    default_params:
+      stream: true
 
-  "deepinfra:deepseek/deepseek-3.1?reasoning=@[low,medium,high]":
+
+  "deepinfra:deepseek/deepseek-3.1?reasoning":
     metadata:
       model_reference: "deepseek_v31"
       model_configuration: "reasoning=$reasoning"
@@ -103,10 +93,43 @@ models:
     cost:
       input_cost_per_1m: 0.30
       output_cost_per_1m: 1.00
-      currency: USD      
+      currency: USD
     default_params:
-      stream: true    
-      reasoning_effort: $reasoning
+      stream: true
+      reasoning_effort: medium
+
+  "deepinfra:deepseek/deepseek-3.1-terminus":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.1-Terminus
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.30
+      output_cost_per_1m: 1.00
+      currency: USD
+    default_params:
+      stream: true
+
+  "deepinfra:deepseek/deepseek-3.1-terminus?reasoning":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+      model_configuration: "reasoning=$reasoning"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.1-Terminus
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+    cost:
+      input_cost_per_1m: 0.30
+      output_cost_per_1m: 1.00
+      currency: USD
+    default_params:
+      stream: true
+      reasoning_effort: medium
 
   "deepinfra:qwen/qwen3-30b-a3b?reasoning=@[none,high]":
     metadata:
@@ -124,24 +147,5 @@ models:
       currency: USD
     default_params:
       stream: true
-      reasoning_effort: $reasoning      
-
-  "deepinfra:qwen/qwen3-235b-a22b?reasoning=@[none,high]":
-    metadata:
-      model_reference: "alibaba_qwen3_235b_a22b"
-      model_configuration: "reasoning=$reasoning"
-    provider: deepinfra
-    model_id: Qwen/Qwen3-235B-A22B
-    capabilities:
-      supports_json_mode: false  
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.18
-      output_cost_per_1m: 0.54
-      currency: USD
-    default_params:
-      stream: true
-      reasoning_effort: $reasoning  
-
+      reasoning_effort: $reasoning
 

@@ -20,10 +20,10 @@ models:
       output_cost_per_1m: 1.68
       currency: USD
 
-  "fireworks:deepseek/deepseek-3.1?reasoning=@[low,medium,high]":
+  "fireworks:deepseek/deepseek-3.1?reasoning":
     metadata:
       model_reference: "deepseek_v31"
-      model_configuration: "reasoning=$reasoning"      
+      model_configuration: "reasoning=$reasoning"
     provider: fireworks
     model_id: accounts/fireworks/models/deepseek-v3p1
     capabilities:
@@ -35,7 +35,38 @@ models:
       output_cost_per_1m: 1.68
       currency: USD
     default_params:
-      reasoning_effort: $reasoning
+      reasoning_effort: medium
+
+  "fireworks:deepseek/deepseek-3.1-terminus":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v3p1-terminus
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+
+  "fireworks:deepseek/deepseek-3.1-terminus?reasoning":
+    metadata:
+      model_reference: "deepseek_v31-terminus"
+      model_configuration: "reasoning=$reasoning"
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v3p1-terminus
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+    default_params:
+      reasoning_effort: medium
 
   "fireworks:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
     metadata:

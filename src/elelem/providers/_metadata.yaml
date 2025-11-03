@@ -107,6 +107,27 @@ model_metadata:
     license: "Apache 2.0"
     reasoning: "no"
 
+  mistral_medium_31: &mistral-medium-31
+    model_owner: "Mistral AI"
+    model_nickname: "mistral-medium-31"
+    model_page: "https://docs.mistral.ai/models/mistral-medium-3-1-25-08"
+    license: "Apache 2.0"
+    reasoning: "no"
+
+  magistral_small: &magistral-small-12
+    model_owner: "Mistral AI"
+    model_nickname: "magistral-small-12"
+    model_page: "https://huggingface.co/mistralai/Magistral-Small-2509"
+    license: "Apache 2.0"
+    reasoning: "no"
+
+  magistral_medium: &magistral-medium-12
+    model_owner: "Mistral AI"
+    model_nickname: "magistral-medium-12"
+    model_page: "https://docs.mistral.ai/models/magistral-medium-1-2-25-09"
+    license: "Apache 2.0"
+    reasoning: "no"
+
   alibaba_qwen3_235b_a22b: &alibaba-qwen3-235b-a22b
     model_owner: "Alibaba"
     model_nickname: "qwen3-235b-a22b"

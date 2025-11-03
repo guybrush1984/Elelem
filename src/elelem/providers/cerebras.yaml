@@ -1,0 +1,21 @@
+# Cerebras provider configuration and models
+provider:
+  endpoint: https://api.cerebras.ai/v1
+
+models:
+  "cerebras:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=$reasoning"
+    provider: cerebras
+    model_id: gpt-oss-120b
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.35
+      output_cost_per_1m: 0.75
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning

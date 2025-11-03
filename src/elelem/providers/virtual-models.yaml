@@ -2,32 +2,25 @@
 # These models automatically failover between providers based on candidate configuration
 
 models:
-  # Virtual model for DeepSeek variants across providers
+  # DEEPSEEK 3.1 VARIANTS
   "virtual:deepseek-v3.1-cheap":
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
+      - model: "ollama:deepseek/deepseek-3.1"
       - model: "deepinfra:deepseek/deepseek-3.1"
-        timeout: 120s
       - model: "novita:deepseek/deepseek-3.1"
-        timeout: 120s
       - model: "fireworks:deepseek/deepseek-3.1"
-        timeout: 120s
 
   "virtual:deepseek-v3.1-quick":
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
-      - model: "ollama:deepseek/deepseek-3.1"
-        timeout: 120s
       - model: "fireworks:deepseek/deepseek-3.1"
-        timeout: 120s
       - model: "novita:deepseek/deepseek-3.1"
-        timeout: 120s
       - model: "deepinfra:deepseek/deepseek-3.1"
-        timeout: 120s
 
   "virtual:deepseek-v3.1-cheap?reasoning":
     metadata:
@@ -35,67 +28,85 @@ models:
     timeout: 120s
     candidates:
       - model: "ollama:deepseek/deepseek-3.1?reasoning"
-        timeout: 120s
-      - model: "deepinfra:deepseek/deepseek-3.1?reasoning=medium"
-        timeout: 120s
-      - model: "fireworks:deepseek/deepseek-3.1?reasoning=medium"
-        timeout: 120s
+      - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
+      - model: "fireworks:deepseek/deepseek-3.1?reasoning"
       - model: "parasail:deepseek/deepseek-3.1?reasoning"
-        timeout: 120s
 
   "virtual:deepseek-v3.1-quick?reasoning":
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
-      - model: "fireworks:deepseek/deepseek-3.1?reasoning=medium"
-        timeout: 120s
+      - model: "fireworks:deepseek/deepseek-3.1?reasoning"
       - model: "parasail:deepseek/deepseek-3.1?reasoning"
-        timeout: 120s
-      - model: "deepinfra:deepseek/deepseek-3.1?reasoning=medium"
-        timeout: 120s
+      - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
 
+  # DEEPSEEK 3.1-TERMINUS VARIANTS
+  "virtual:deepseek-v3.1-terminus-cheap":
+    metadata:
+      model_reference: "deepseek_v31"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-3.1-terminus"
+      - model: "novita:deepseek/deepseek-3.1-terminus"
+      - model: "fireworks:deepseek/deepseek-3.1-terminus"
 
-  # Cost-optimized routing (cheapest first)
+  "virtual:deepseek-v3.1-terminus-quick":
+    metadata:
+      model_reference: "deepseek_v31"
+    timeout: 120s
+    candidates:
+      - model: "fireworks:deepseek/deepseek-3.1-terminus"
+      - model: "novita:deepseek/deepseek-3.1-terminus"
+      - model: "deepinfra:deepseek/deepseek-3.1-terminus"
+
+  "virtual:deepseek-v3.1-terminus-cheap?reasoning":
+    metadata:
+      model_reference: "deepseek_v31"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-3.1-terminus?reasoning"
+      - model: "novita:deepseek/deepseek-3.1-terminus"
+      - model: "fireworks:deepseek/deepseek-3.1-terminus?reasoning"
+
+  "virtual:deepseek-v3.1-terminus-quick?reasoning":
+    metadata:
+      model_reference: "deepseek_v31"
+    timeout: 120s
+    candidates:
+      - model: "fireworks:deepseek/deepseek-3.1-terminus?reasoning"
+      - model: "novita:deepseek/deepseek-3.1-terminus"
+      - model: "deepinfra:deepseek/deepseek-3.1-terminus?reasoning"
+
+  # OPENAI GPT-OSS 20B VARIANTS
   "virtual:gpt-oss-20b-cheap?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_20b"
     timeout: 120s
     candidates:
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
-        timeout: 120s
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
-        timeout: 120s
       - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
-        timeout: 120s
 
-  # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:gpt-oss-20b-quick?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_20b"
     timeout: 120s
     candidates:
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
-        timeout: 120s
       - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
-        timeout: 120s
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
-        timeout: 120s
 
-  # Cost-optimized routing (cheapest first)
+  # OPENAI GPT-OSS 120B VARIANTS
   "virtual:gpt-oss-120b-cheap?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
-        timeout: 120s
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
-        timeout: 120s
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
-        timeout: 120s
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
-        timeout: 120s
 
   # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:gpt-oss-120b-quick?reasoning=@[low,medium,high]":
@@ -104,30 +115,5 @@ models:
     timeout: 120s
     candidates:
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
-        timeout: 120s   
-      - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"    
-        timeout: 120s
+      - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"    
-        timeout: 120s
-     
-  # Speed-optimized routing (fastest first) - shorter timeouts for speed
-  "virtual:qwen3-30b-a3b-cheap?reasoning":
-    metadata:
-      model_reference: "alibaba_qwen3_30b_a3b"
-    timeout: 120s
-    candidates:
-      - model: "deepinfra:qwen/qwen3-30b-a3b?reasoning=high"
-        timeout: 120s
-      - model: "fireworks:qwen/qwen3-30b-a3b?reasoning=high"  
-        timeout: 120s     
-
-  # Speed-optimized routing (fastest first) - shorter timeouts for speed
-  "virtual:qwen3-235b-a22b-cheap?reasoning":
-    metadata:
-      model_reference: "alibaba_qwen3_235b_a22b"
-    timeout: 120s
-    candidates:
-      - model: "deepinfra:qwen/qwen3-235b-a22b?reasoning=high"
-        timeout: 120s
-      - model: "fireworks:qwen/qwen3-235b-a22b?reasoning=high"
-        timeout: 120s

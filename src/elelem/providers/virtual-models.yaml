@@ -118,3 +118,21 @@ models:
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"    
+
+  # MISTRAL SMALL/MEDIUM VARIANTS
+  "virtual:mistral-small-quick":
+    metadata:
+      model_reference: "mistral_small_32"
+    timeout: 120s
+    candidates:
+      - model: "mistral:mistral/mistral-small"
+      - model: "deepinfra:mistral/mistral-small"
+
+  # MISTRAL SMALL/MEDIUM VARIANTS
+  "virtual:mistral-small-cheap":
+    metadata:
+      model_reference: "mistral_small_32"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:mistral/mistral-small"
+      - model: "mistral:mistral/mistral-small"

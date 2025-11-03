@@ -109,8 +109,8 @@ class RequestTracker:
             if len(clean_tag) > 128:
                 clean_tag = clean_tag[:128]
 
-            if ',' in clean_tag:
-                raise ValueError(f"Tag cannot contain commas: '{clean_tag}'")
+            # Commas are now allowed - the 2-table design with parameterized queries
+            # protects against SQL injection, and commas don't break anything
 
             validated_tags.append(clean_tag)
 

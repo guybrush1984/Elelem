@@ -149,3 +149,17 @@ models:
       stream: true
       reasoning_effort: $reasoning
 
+  "deepinfra:mistral/mistral-small":
+    metadata:
+      model_reference: "mistral_small_32"
+    provider: deepinfra
+    model_id: mistralai/Mistral-Small-3.2-24B-Instruct-2506
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.075
+      output_cost_per_1m: 0.20
+      currency: USD
+

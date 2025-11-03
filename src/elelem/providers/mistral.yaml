@@ -1,0 +1,62 @@
+# Mistral provider configuration and models
+provider:
+  endpoint: https://api.mistral.ai/v1/
+  default_params: {}
+
+models:
+  "mistral:mistral/mistral-small":
+    provider: mistral
+    model_id: mistral-small-2506
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.1
+      output_cost_per_1m: 0.3
+      currency: USD
+    metadata:
+      model_reference: "mistral_small_32"
+
+  "mistral:mistral/mistral-medium":
+    provider: mistral
+    model_id: mistral-medium-2508
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.4
+      output_cost_per_1m: 2.0
+      currency: USD
+    metadata:
+      model_reference: "mistral_medium_31"
+
+  "mistral:mistral/magistral-small":
+    provider: mistral
+    model_id: magistral-small-2509
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.5
+      output_cost_per_1m: 1.5
+      currency: USD
+    metadata:
+      model_reference: "magistral_small"
+
+  "mistral:mistral/magistral-medium":
+    provider: mistral
+    model_id: magistral-medium-2509
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 2.0
+      output_cost_per_1m: 5.0
+      currency: USD
+    metadata:
+      model_reference: "magistral_medium"
+

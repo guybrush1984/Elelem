@@ -57,10 +57,10 @@ jobs:
       # Only run on pushes from repo owner to prevent unauthorized API usage
       if: github.actor == 'guybrush1984' || github.repository_owner == 'guybrush1984'
       env:
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_FREE_API_KEY }}
+        GROQ_LIMITED_API_KEY: ${{ secrets.GROQ_LIMITED_API_KEY }}
       run: |
         echo "🐳 Running Docker Compose integration tests..."
-        echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" > .env
+        echo "GROQ_API_KEY=$GROQ_LIMITED_API_KEY" > .env
         uv run pytest -v -m integration
 
   build-python:

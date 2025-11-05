@@ -7,7 +7,9 @@ provider:
     - http://host.docker.internal:11434/v1  # Docker Desktop (Mac/Windows)
     - http://192.168.65.2:11434/v1       # Docker for Mac alternative
   probe_timeout: 2  # Seconds to wait per endpoint probe
-
+  default_params:
+    stream: true
+    
 models:
   "ollama:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
     metadata:
@@ -69,6 +71,20 @@ models:
     cost:
       input_cost_per_1m: 0.00
       output_cost_per_1m: 0.00
-      currency: USD      
+      currency: USD
     default_params:
       reasoning_effort: medium
+
+  "ollama:moonshotai/kimi-k2-instruct":
+    metadata:
+      model_reference: "moonshot_kimi_k2"
+    provider: ollama
+    model_id: kimi-k2:1t-cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD

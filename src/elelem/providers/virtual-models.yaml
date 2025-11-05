@@ -37,6 +37,8 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     candidates:
+      - model: "ollama:deepseek/deepseek-3.1?reasoning"
+
       - model: "fireworks:deepseek/deepseek-3.1?reasoning"
       - model: "parasail:deepseek/deepseek-3.1?reasoning"
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
@@ -114,6 +116,7 @@ models:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     candidates:
+      - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
@@ -136,3 +139,28 @@ models:
     candidates:
       - model: "deepinfra:mistral/mistral-small"
       - model: "mistral:mistral/mistral-small"
+
+  # KIMI K2 VARIANTS
+  "virtual:kimi-k2-quick":
+    metadata:
+      model_reference: "moonshot_kimi_k2"
+    timeout: 120s
+    candidates:
+      - model: "ollama:moonshotai/kimi-k2-instruct"
+      - model: "groq:moonshotai/kimi-k2-instruct"
+      - model: "fireworks:moonshotai/kimi-k2-instruct"
+      - model: "parasail:moonshotai/kimi-k2-instruct"
+      - model: "deepinfra:moonshotai/kimi-k2-instruct"
+      - model: "novita:moonshotai/kimi-k2-instruct"
+
+  "virtual:kimi-k2-cheap":
+    metadata:
+      model_reference: "moonshot_kimi_k2"
+    timeout: 120s
+    candidates:
+      - model: "ollama:moonshotai/kimi-k2-instruct"
+      - model: "deepinfra:moonshotai/kimi-k2-instruct"
+      - model: "parasail:moonshotai/kimi-k2-instruct"
+      - model: "novita:moonshotai/kimi-k2-instruct"
+      - model: "fireworks:moonshotai/kimi-k2-instruct"
+      - model: "groq:moonshotai/kimi-k2-instruct"

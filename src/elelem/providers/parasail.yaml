@@ -54,3 +54,17 @@ models:
       model_configuration: "reasoning=$reasoning"
     default_params:
       reasoning_effort: low
+
+  "parasail:moonshotai/kimi-k2-instruct":
+    provider: parasail
+    model_id: moonshotai/Kimi-K2-Instruct-0905
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.55
+      output_cost_per_1m: 2.99
+      currency: USD
+    metadata:
+      model_reference: "moonshot_kimi_k2"

@@ -89,7 +89,7 @@ model_metadata:
   moonshot_kimi_k2: &moonshot-kimi-k2
     model_owner: "Moonshot AI"
     model_nickname: "kimi-k2-instruct"
-    model_page: "https://huggingface.co/moonshotai/kimi-k2-instruct"
+    model_page: "https://huggingface.co/moonshotai/Kimi-K2-Instruct-0905"
     license: "Apache 2.0"
     reasoning: "no"
 

@@ -41,7 +41,7 @@ models:
 
   "groq:moonshotai/kimi-k2-instruct":
     provider: groq
-    model_id: moonshotai/kimi-k2-instruct
+    model_id: moonshotai/kimi-k2-instruct-0905
     capabilities:
       supports_json_mode: true
       supports_temperature: true

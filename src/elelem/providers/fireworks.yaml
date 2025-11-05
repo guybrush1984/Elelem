@@ -127,7 +127,7 @@ models:
     provider: fireworks
     model_id: accounts/fireworks/models/qwen3-235b-a22b
     capabilities:
-      supports_json_mode: false  
+      supports_json_mode: false
       supports_temperature: true
       supports_system: true
     cost:
@@ -136,4 +136,18 @@ models:
       currency: USD
     default_params:
       stream: true
-      reasoning_effort: $reasoning  
+      reasoning_effort: $reasoning
+
+  "fireworks:moonshotai/kimi-k2-instruct":
+    metadata:
+      model_reference: "moonshot_kimi_k2"
+    provider: fireworks
+    model_id: accounts/fireworks/models/kimi-k2-instruct-0905
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.60
+      output_cost_per_1m: 2.50
+      currency: USD  

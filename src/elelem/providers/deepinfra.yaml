@@ -163,3 +163,17 @@ models:
       output_cost_per_1m: 0.20
       currency: USD
 
+  "deepinfra:moonshotai/kimi-k2-instruct":
+    metadata:
+      model_reference: "moonshot_kimi_k2"
+    provider: deepinfra
+    model_id: moonshotai/Kimi-K2-Instruct-0905
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.50
+      output_cost_per_1m: 2.00
+      currency: USD
+

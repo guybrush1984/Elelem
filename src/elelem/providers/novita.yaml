@@ -84,3 +84,17 @@ models:
       currency: USD
     default_params:
       reasoning_effort: $reasoning
+
+  "novita:moonshotai/kimi-k2-instruct":
+    metadata:
+      model_reference: "moonshot_kimi_k2"
+    provider: novita
+    model_id: moonshotai/kimi-k2-0905
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.60
+      output_cost_per_1m: 2.50
+      currency: USD

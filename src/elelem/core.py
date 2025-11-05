@@ -341,7 +341,7 @@ class Elelem:
         
         # Build list of candidate providers for logging
         candidate_providers = [c.get('provider') for c in candidates]
-        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_providers)}")
+        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_providers)} (temp={original_temperature})")
         if json_mode_requested:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
         

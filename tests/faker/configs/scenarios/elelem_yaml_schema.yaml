@@ -1,0 +1,65 @@
+scenario: "elelem_yaml_schema"
+description: "Test Elelem's YAML schema validation functionality"
+type: "conditional"
+
+models:
+  "yaml-schema-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  - condition: "valid_schema"
+    match:
+      temperature: 1.0
+    response:
+      type: "success"
+      content: |
+        name: John Doe
+        age: 30
+        email: john@example.com
+        active: true
+      tokens:
+        input: 80
+        output: 25
+
+  - condition: "invalid_schema"
+    match:
+      temperature: 0.9
+    response:
+      type: "success"
+      content: |
+        name: Jane Smith
+        age: "thirty"
+        email: jane@example.com
+        active: false
+      tokens:
+        input: 80
+        output: 25
+
+  - condition: "retry_fixed"
+    match:
+      temperature: 0.4
+    response:
+      type: "success"
+      content: |
+        name: Fixed User
+        age: 35
+        email: fixed@example.com
+        active: false
+      tokens:
+        input: 80
+        output: 30
+
+default_response:
+  type: "success"
+  content: |
+    name: Default User
+    age: 25
+    email: default@example.com
+    active: true
+  tokens:
+    input: 80
+    output: 25

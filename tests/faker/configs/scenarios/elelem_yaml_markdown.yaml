@@ -1,0 +1,35 @@
+scenario: "elelem_yaml_markdown"
+description: "Test Elelem's YAML extraction from markdown code blocks"
+type: "static"
+
+models:
+  "yaml-markdown-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+
+response:
+  type: "success"
+  content: |
+    Here's the YAML response:
+
+    ```yaml
+    name: Jane Smith
+    age: 28
+    email: jane@example.com
+    active: false
+    tags:
+      - designer
+      - ui-ux
+    address:
+      street: 456 Oak Ave
+      city: Portland
+      state: OR
+    ```
+
+    This is the structured data you requested.
+  tokens:
+    input: 85
+    output: 60

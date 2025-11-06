@@ -1,0 +1,29 @@
+scenario: "elelem_yaml_clean"
+description: "Test Elelem's YAML parsing with clean YAML response"
+type: "static"
+
+models:
+  "yaml-clean-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+
+response:
+  type: "success"
+  content: |
+    name: John Doe
+    age: 30
+    email: john@example.com
+    active: true
+    tags:
+      - developer
+      - python
+    address:
+      street: 123 Main St
+      city: San Francisco
+      state: CA
+  tokens:
+    input: 80
+    output: 40

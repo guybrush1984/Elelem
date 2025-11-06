@@ -133,3 +133,52 @@ models:
       input_cost_per_1m: 0.12
       output_cost_per_1m: 0.35
       currency: USD
+
+  # YAML testing models
+  "faker:yaml-clean-test":
+    provider: faker
+    model_id: yaml-clean-test
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  "faker:yaml-markdown-test":
+    provider: faker
+    model_id: yaml-markdown-test
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  "faker:yaml-malformed-test":
+    provider: faker
+    model_id: yaml-malformed-test
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  "faker:yaml-schema-test":
+    provider: faker
+    model_id: yaml-schema-test
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD

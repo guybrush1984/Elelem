@@ -1,0 +1,49 @@
+scenario: "elelem_yaml_malformed"
+description: "Test Elelem's handling of malformed YAML (should trigger retry)"
+type: "conditional"
+
+models:
+  "yaml-malformed-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  - condition: "first_attempt"
+    match:
+      temperature: 1.0
+    response:
+      type: "success"
+      content: |
+        name: "Unclosed quote
+        age: 25
+        email: test@example.com
+      tokens:
+        input: 70
+        output: 20
+
+  - condition: "retry_attempt"
+    match:
+      temperature: 0.9  # After temperature reduction (1.0 - 0.1)
+    response:
+      type: "success"
+      content: |
+        name: Valid User
+        age: 25
+        email: fixed@example.com
+        active: true
+      tokens:
+        input: 70
+        output: 25
+
+default_response:
+  type: "success"
+  content: |
+    name: Default User
+    age: 30
+    email: default@example.com
+  tokens:
+    input: 70
+    output: 20

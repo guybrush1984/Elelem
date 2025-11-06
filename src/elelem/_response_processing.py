@@ -194,7 +194,28 @@ def extract_json_from_markdown(content: str, logger: logging.Logger) -> str:
     return content
 
 
-def process_response_content(response: Any, json_mode_requested: bool, logger: logging.Logger) -> str:
+def extract_yaml_from_markdown(content: str, logger: logging.Logger) -> str:
+    """Extract YAML from markdown code blocks."""
+    # Pattern to match ```yaml\n...\n``` or ```yml\n...\n```
+    patterns = [
+        r'```yaml\s*\n(.*?)\n```',
+        r'```yml\s*\n(.*?)\n```',
+        r'```yaml\s*\n(.*?)```',
+        r'```yml\s*\n(.*?)```'
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, content, re.DOTALL)
+        if match:
+            extracted = match.group(1).strip()
+            logger.debug(f"Extracted YAML from markdown: {extracted}")
+            return extracted
+
+    # If no markdown wrapper found, return original content
+    return content
+
+
+def process_response_content(response: Any, json_mode_requested: bool, yaml_mode_requested: bool, logger: logging.Logger) -> str:
     """Process and clean response content."""
     # Check finish_reason first - this should always be present
     finish_reason = getattr(response.choices[0], 'finish_reason', None)
@@ -227,5 +248,9 @@ def process_response_content(response: Any, json_mode_requested: bool, logger: l
     # Extract JSON from markdown if JSON mode was requested
     if json_mode_requested:
         content = extract_json_from_markdown(content, logger)
+
+    # Extract YAML from markdown if YAML mode was requested
+    if yaml_mode_requested:
+        content = extract_yaml_from_markdown(content, logger)
 
     return content

@@ -20,8 +20,9 @@ from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
 from ._exceptions import InfrastructureError, ModelError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
-from ._response_processing import collect_streaming_response, remove_think_tags, extract_json_from_markdown, process_response_content
+from ._response_processing import collect_streaming_response, remove_think_tags, extract_json_from_markdown, extract_yaml_from_markdown, process_response_content
 from ._json_validation import validate_json_schema, is_json_validation_api_error, add_json_instructions_to_messages, validate_json_response
+from ._yaml_validation import validate_yaml_schema, add_yaml_instructions_to_messages, validate_yaml_response
 from ._provider_management import create_provider_client, initialize_providers, get_model_config
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
@@ -35,7 +36,10 @@ class Elelem:
         self.logger = logging.getLogger("elelem")
         self.config = Config(extra_provider_dirs)
         self._models = self._load_models()
-        self._providers = self._initialize_providers()
+
+        # Lazy provider initialization - start empty, probe on first use
+        self._providers = {}
+        self._probed_providers = set()  # Track which providers have been attempted
 
         # Initialize metrics system (unified SQLAlchemy backend)
         self._metrics_store = MetricsStore()
@@ -59,11 +63,89 @@ class Elelem:
     def _create_provider_client(self, api_key: str, base_url: str, timeout: int = 120, provider_name: str = None, default_headers: Dict = None):
         """Create an OpenAI-compatible client for any provider."""
         return create_provider_client(api_key, base_url, timeout, provider_name, default_headers)
-        
-    def _initialize_providers(self) -> Dict[str, Any]:
-        """Initialize provider clients."""
-        return initialize_providers(self.config.providers, self.config.timeout_seconds, self.logger, self._models)
-        
+
+    def _ensure_provider_initialized(self, provider_name: str) -> bool:
+        """
+        Ensure a provider is probed and initialized on first use.
+        Returns True if provider is ready, False if unavailable.
+        Caches result so subsequent calls are instant.
+        """
+        # Already attempted this provider
+        if provider_name in self._probed_providers:
+            return provider_name in self._providers
+
+        # Mark as probed (whether successful or not)
+        self._probed_providers.add(provider_name)
+
+        # Get provider config
+        provider_config = self.config.providers.get(provider_name)
+        if not provider_config:
+            self.logger.warning(f"[{provider_name}] Provider not found in configuration")
+            return False
+
+        # Import needed functions
+        from ._provider_management import probe_endpoint, select_working_endpoint
+
+        # Determine API key
+        base_provider = provider_config.get("base_provider")
+        if base_provider:
+            env_var = f"{base_provider.upper()}_API_KEY"
+        else:
+            env_var = f"{provider_name.upper()}_API_KEY"
+
+        import os
+        api_key = os.getenv(env_var)
+
+        # Determine endpoint (probe if needed)
+        endpoint = None
+        probe_timeout = provider_config.get("probe_timeout", 2.0)
+
+        if "endpoints" in provider_config:
+            # Multiple endpoints - probe and select
+            self.logger.info(f"[{provider_name}] Probing {len(provider_config['endpoints'])} endpoint(s)...")
+            endpoint = select_working_endpoint(
+                provider_config["endpoints"],
+                probe_timeout,
+                provider_name,
+                self.logger,
+                api_key
+            )
+            if not endpoint:
+                self.logger.warning(f"[{provider_name}] No working endpoints found")
+                return False
+
+        elif "endpoint" in provider_config:
+            # Single endpoint - probe it
+            single_endpoint = provider_config["endpoint"]
+            self.logger.info(f"[{provider_name}] Probing endpoint: {single_endpoint}")
+
+            if probe_endpoint(single_endpoint, probe_timeout, self.logger, api_key):
+                self.logger.info(f"[{provider_name}] ✅ Endpoint accessible")
+                endpoint = single_endpoint
+            else:
+                self.logger.warning(f"[{provider_name}] ❌ Endpoint not accessible")
+                return False
+        else:
+            self.logger.error(f"[{provider_name}] No endpoint configured")
+            return False
+
+        # Check for API key
+        if not api_key:
+            self.logger.warning(f"[{provider_name}] No API key found (env var: {env_var})")
+            return False
+
+        # Create provider client
+        custom_headers = provider_config.get("headers")
+        self._providers[provider_name] = create_provider_client(
+            api_key=api_key,
+            base_url=endpoint,
+            timeout=self.config.timeout_seconds,
+            provider_name=provider_name,
+            default_headers=custom_headers
+        )
+        self.logger.debug(f"[{provider_name}] Initialized successfully")
+        return True
+
     def _reset_stats(self):
         """Reset all statistics."""
         self._metrics_store.reset()
@@ -97,7 +179,24 @@ class Elelem:
         """Add JSON formatting instructions to messages when response_format is JSON."""
         supports_system = capabilities.get("supports_system", True)
         return add_json_instructions_to_messages(messages, supports_system, json_schema, enforce_schema_in_prompt)
-        
+
+    def _extract_yaml_from_markdown(self, content: str) -> str:
+        """Extract YAML from markdown code blocks."""
+        return extract_yaml_from_markdown(content, self.logger)
+
+    def _validate_yaml_schema(self, yaml_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+        """Validate a YAML object against a JSON Schema."""
+        return validate_yaml_schema(yaml_obj, schema)
+
+    def _add_yaml_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict, yaml_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
+        """Add YAML formatting instructions to messages when YAML mode is requested."""
+        supports_system = capabilities.get("supports_system", True)
+        return add_yaml_instructions_to_messages(messages, supports_system, yaml_schema, enforce_schema_in_prompt)
+
+    def _validate_yaml_response(self, content: str, yaml_schema: Any) -> None:
+        """Validate YAML response content and schema."""
+        validate_yaml_response(content, yaml_schema)
+
     def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None, candidate_cost_config: Dict = None) -> Dict[str, float]:
         """Calculate costs based on model pricing or runtime data from provider."""
         return calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs, candidate_cost_config, self.logger)
@@ -108,12 +207,16 @@ class Elelem:
         
     
     
-    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, capabilities: Dict, json_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
+    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, yaml_mode_requested: bool, capabilities: Dict, json_schema: Optional[Dict] = None, yaml_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
         """Preprocess messages for the request."""
         if json_mode_requested:
             # Always add JSON instructions when JSON is requested
             # Include schema in instructions only if enforce_schema_in_prompt is True
             return self._add_json_instructions_to_messages(messages, capabilities, json_schema, enforce_schema_in_prompt)
+        elif yaml_mode_requested:
+            # Always add YAML instructions when YAML is requested (client-side only)
+            # Include schema in instructions only if enforce_schema_in_prompt is True
+            return self._add_yaml_instructions_to_messages(messages, capabilities, yaml_schema, enforce_schema_in_prompt)
         return messages
     
     def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
@@ -150,15 +253,17 @@ class Elelem:
                 self.logger.debug(f"Removing temperature for {model} (not supported)")
                 api_kwargs.pop("temperature")
 
-        # Remove Elelem-specific parameter that should not be passed to provider APIs
+        # Remove Elelem-specific parameters that should not be passed to provider APIs
         if "enforce_schema_in_prompt" in api_kwargs:
             api_kwargs.pop("enforce_schema_in_prompt")
+        if "yaml_schema" in api_kwargs:
+            api_kwargs.pop("yaml_schema")
 
         self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
 
-    def _process_response_content(self, response: Any, json_mode_requested: bool) -> str:
+    def _process_response_content(self, response: Any, json_mode_requested: bool, yaml_mode_requested: bool) -> str:
         """Process and clean response content."""
-        return process_response_content(response, json_mode_requested, self.logger)
+        return process_response_content(response, json_mode_requested, yaml_mode_requested, self.logger)
     
     def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception) -> None:
         """Validate JSON response content and schema."""
@@ -267,10 +372,10 @@ class Elelem:
             candidates = model_config['candidates']
 
             # Filter out candidates whose providers are not available
-            # (providers may be skipped during init if endpoints are unreachable, e.g., ollama in production)
+            # Lazy initialization: probe providers on first use
             available_candidates = [
                 c for c in candidates
-                if c.get('provider') in self._providers
+                if self._ensure_provider_initialized(c.get('provider'))
             ]
 
             if len(available_candidates) < len(candidates):
@@ -325,12 +430,25 @@ class Elelem:
             kwargs["response_format"] = {"type": "json_object"}
             self.logger.debug(f"[{request_id}] Converted structured outputs format to basic JSON mode (client-side validation)")
 
+        # Detect YAML mode request (Elelem-specific, client-side only)
+        yaml_schema = kwargs.get("yaml_schema")
+        yaml_mode_requested = yaml_schema is not None
+
+        # Validate mutual exclusivity between JSON and YAML
+        if json_mode_requested and yaml_mode_requested:
+            raise ValueError(
+                "Cannot use both JSON and YAML modes simultaneously. "
+                "Provide either response_format with json_object/json_schema OR yaml_schema, not both."
+            )
+
         # Get original temperature
         original_temperature = kwargs.get("temperature", 1.0)
 
-        # Remove Elelem-specific parameter (if present)
+        # Remove Elelem-specific parameters (if present)
         if "json_schema" in kwargs:
             kwargs.pop("json_schema")
+        if "yaml_schema" in kwargs:
+            kwargs.pop("yaml_schema")
 
         # Warn if json_schema provided without JSON response format
         if json_schema and not json_mode_requested:
@@ -344,6 +462,8 @@ class Elelem:
         self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_providers)} (temp={original_temperature})")
         if json_mode_requested:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
+        if yaml_mode_requested:
+            self.logger.debug(f"[{request_id}] 📄 YAML mode requested")
         
         # Iterate through candidates
         last_error = None
@@ -352,8 +472,8 @@ class Elelem:
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
-                    json_mode_requested, json_schema, original_temperature,
-                    tags, cache, cache_key, start_time, request_tracker, **kwargs
+                    json_mode_requested, json_schema, yaml_mode_requested, yaml_schema,
+                    original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs
                 )
             except InfrastructureError as e:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed: {e}")
@@ -377,8 +497,8 @@ class Elelem:
     
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
                                 messages, original_model, model_config, request_id,
-                                json_mode_requested, json_schema, original_temperature,
-                                tags, cache, cache_key, start_time, request_tracker, **kwargs):
+                                json_mode_requested, json_schema, yaml_mode_requested, yaml_schema,
+                                original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs):
         """Attempt to complete request with a specific candidate."""
         
         # Get timeout for this candidate
@@ -414,10 +534,10 @@ class Elelem:
         self._cleanup_api_kwargs(api_kwargs, candidate_key, {'capabilities': capabilities})
         self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
 
-        # Preprocess messages for JSON mode if needed
+        # Preprocess messages for JSON/YAML mode if needed
         # Only inject schema into prompt if enforce_schema_in_prompt=True (default False to save tokens)
         enforce_schema_in_prompt = kwargs.get('enforce_schema_in_prompt', False)
-        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, capabilities, json_schema, enforce_schema_in_prompt)
+        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, yaml_mode_requested, capabilities, json_schema, yaml_schema, enforce_schema_in_prompt)
 
         # Retry logic for this candidate (temperature reduction, JSON validation)
         max_retries = self.config.retry_settings["max_json_retries"]
@@ -488,7 +608,7 @@ class Elelem:
                     total_output_tokens += output_tokens
                     total_reasoning_tokens += reasoning_tokens
 
-                    content = self._process_response_content(response, json_mode_requested)
+                    content = self._process_response_content(response, json_mode_requested, yaml_mode_requested)
                 else:
                     content = ""
                     reasoning_content = None
@@ -523,7 +643,31 @@ class Elelem:
                         # All JSON retries exhausted - this is a model error, don't iterate candidates
                         request_tracker.finalize_failure(self._metrics_store, "JSONValidationFailed", str(e))
                         raise ModelError(f"JSON validation failed after all retries: {e}")
-                
+
+                # YAML validation if requested
+                if yaml_mode_requested:
+                    try:
+                        self._validate_yaml_response(content, yaml_schema)
+                    except json.JSONDecodeError as e:
+                        # YAML validation reuses JSONDecodeError for retry compatibility
+                        if attempt < max_retries:
+                            # Try temperature reduction
+                            if temperature_reductions and len(temperature_reductions) > 0:
+                                reduction_idx = min(attempt, len(temperature_reductions) - 1)
+                                reduction = temperature_reductions[reduction_idx]
+                                new_temp = max(current_temp - reduction, min_temp)
+
+                                if new_temp < current_temp:
+                                    api_kwargs['temperature'] = new_temp
+                                    request_tracker.record_retry("temperature_reductions")
+                                    error_snippet = str(e)[:300]
+                                    self.logger.warning(f"[{request_id}] YAML validation failed, reducing temperature to {new_temp} (error: {error_snippet})")
+                                    continue
+
+                        # All YAML retries exhausted - this is a model error, don't iterate candidates
+                        request_tracker.finalize_failure(self._metrics_store, "YAMLValidationFailed", str(e))
+                        raise ModelError(f"YAML validation failed after all retries: {e}")
+
                 # Success! Calculate duration and return
                 duration = time.time() - start_time
 

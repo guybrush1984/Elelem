@@ -96,6 +96,9 @@ class Elelem:
         import os
         api_key = os.getenv(env_var)
 
+        if not api_key:
+            self.logger.debug(f"[{provider_name}] No API key found (env var: {env_var})")
+
         # Determine endpoint (probe if needed)
         endpoint = None
         probe_timeout = provider_config.get("probe_timeout", 2.0)

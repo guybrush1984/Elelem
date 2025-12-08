@@ -68,7 +68,7 @@ def probe_endpoint(endpoint: str, timeout: float, logger: logging.Logger, api_ke
                 logger.debug(f"Endpoint probe failed: {endpoint} (status: {response.status_code})")
                 return False
     except Exception as e:
-        logger.debug(f"Endpoint probe failed: {endpoint} ({type(e).__name__}: {e})")
+        logger.warning(f"Endpoint probe failed: {endpoint} ({type(e).__name__}: {e})")
         return False
 
 

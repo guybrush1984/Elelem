@@ -21,6 +21,8 @@ models:
       currency: USD
     default_params:
       reasoning_effort: $reasoning
+      stream: true
+
 
   "deepinfra:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
     metadata:
@@ -37,6 +39,8 @@ models:
       currency: USD
     default_params:
       reasoning_effort: $reasoning  
+      stream: true
+
 
   "deepinfra:meta-llama/llama-4-maverick-17b":
     metadata:

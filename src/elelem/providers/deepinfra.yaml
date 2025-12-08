@@ -167,6 +167,41 @@ models:
       output_cost_per_1m: 0.20
       currency: USD
 
+  "deepinfra:deepseek/deepseek-3.2":
+    metadata:
+      model_reference: "deepseek_v32"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.2
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.27
+      output_cost_per_1m: 0.40
+      currency: USD
+    default_params:
+      stream: true
+
+  "deepinfra:deepseek/deepseek-3.2?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V3.2
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.27
+      output_cost_per_1m: 0.40
+      currency: USD
+    default_params:
+      stream: true
+      reasoning_effort: medium
+
   "deepinfra:moonshotai/kimi-k2-instruct":
     metadata:
       model_reference: "moonshot_kimi_k2"

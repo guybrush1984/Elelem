@@ -68,12 +68,13 @@ models:
       output_cost_per_1m: 1.00
       currency: USD
 
-  "novita:deepseek/deepseek-3.1-terminus?reasoning=@[low,medium,high]":
+  "novita:deepseek/deepseek-3.1-terminus?reasoning":
     metadata:
       model_reference: "deepseek_v31-terminus"
-      model_configuration: "reasoning=$reasoning"
+      model_configuration: "reasoning"
     provider: novita
     model_id: deepseek/deepseek-v3.1-terminus
+    timeout: 300
     capabilities:
       supports_json_mode: false
       supports_temperature: true
@@ -83,7 +84,43 @@ models:
       output_cost_per_1m: 1.00
       currency: USD
     default_params:
-      reasoning_effort: $reasoning
+      stream: true
+    extra_body:
+      enable_thinking: true
+
+  "novita:deepseek/deepseek-3.2":
+    metadata:
+      model_reference: "deepseek_v32"
+    provider: novita
+    model_id: deepseek/deepseek-v3.2
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.28
+      output_cost_per_1m: 0.42
+      currency: USD
+
+  "novita:deepseek/deepseek-3.2?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    provider: novita
+    model_id: deepseek/deepseek-v3.2
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.28
+      output_cost_per_1m: 0.42
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      enable_thinking: true
 
   "novita:moonshotai/kimi-k2-instruct":
     metadata:

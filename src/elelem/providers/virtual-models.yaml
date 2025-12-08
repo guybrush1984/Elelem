@@ -2,6 +2,43 @@
 # These models automatically failover between providers based on candidate configuration
 
 models:
+  # DEEPSEEK 3.2 VARIANTS
+  "virtual:deepseek-v3.2-cheap":
+    metadata:
+      model_reference: "deepseek_v32"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-3.2"
+      - model: "novita:deepseek/deepseek-3.2"
+      - model: "fireworks:deepseek/deepseek-3.2"
+
+  "virtual:deepseek-v3.2-quick":
+    metadata:
+      model_reference: "deepseek_v32"
+    timeout: 120s
+    candidates:
+      - model: "fireworks:deepseek/deepseek-3.2"
+      - model: "novita:deepseek/deepseek-3.2"
+      - model: "deepinfra:deepseek/deepseek-3.2"
+
+  "virtual:deepseek-v3.2-cheap?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    timeout: 300s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
+      - model: "novita:deepseek/deepseek-3.2?reasoning"
+
+  "virtual:deepseek-v3.2-quick?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    timeout: 300s
+    candidates:
+      - model: "novita:deepseek/deepseek-3.2?reasoning"
+      - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
+
   # DEEPSEEK 3.1 VARIANTS
   "virtual:deepseek-v3.1-cheap":
     metadata:

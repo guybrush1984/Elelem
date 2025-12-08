@@ -191,44 +191,45 @@ jobs:
         docker stop test-server
         docker rm test-server
 
-    # Test Dashboard Image (basic startup test)
+    # Test Dashboard Image
     - name: Test dashboard image
       run: |
-        echo "🧪 Testing dashboard image startup..."
+        echo "🧪 Testing dashboard image functionality..."
 
-        # Note: Dashboard requires DATABASE_URL, so we just test if it starts without crashing
-        echo "📦 Running dashboard container with 30s timeout..."
-        timeout 30 docker run --name test-dashboard ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }} || echo "⏰ Timeout or container exited (expected)"
+        # Pull and run the dashboard image in background
+        docker run -d -p 8501:8501 --name test-dashboard ${{ secrets.DOCKERHUB_USERNAME }}/elelem-dashboard:${{ github.ref_name }}
 
-        # Wait a moment for container to settle
-        echo "⏳ Waiting 2 seconds..."
-        sleep 2
+        # Wait for server startup
+        echo "⏳ Waiting for dashboard to start..."
+        sleep 15
 
-        # Check if container exists
-        echo "🔍 Checking if container exists..."
-        docker ps -a | grep test-dashboard || true
-
-        if ! docker ps -a | grep -q test-dashboard; then
-          echo "❌ Container never started - listing all containers:"
-          docker ps -a
+        # Check if container is running
+        if ! docker ps | grep test-dashboard; then
+          echo "❌ Dashboard container failed to start"
+          docker logs test-dashboard
           exit 1
         fi
 
-        # Get and display logs
-        echo "📋 Container logs:"
-        docker logs test-dashboard 2>&1 || echo "⚠️  Failed to get logs"
-
-        # Check if it started (even if it failed due to missing DATABASE_URL)
-        echo "🔍 Checking for Streamlit in logs..."
-        if docker logs test-dashboard 2>&1 | grep -qi "streamlit"; then
-          echo "✅ Dashboard image started successfully (found Streamlit)"
-        else
-          echo "❌ Dashboard image failed to start (no Streamlit found)"
+        # Test health endpoint (Streamlit built-in)
+        echo "🔍 Testing /_stcore/health endpoint..."
+        if ! curl -f --max-time 10 http://localhost:8501/_stcore/health; then
+          echo "❌ Health check failed"
+          docker logs test-dashboard
           exit 1
         fi
+
+        # Test root endpoint responds
+        echo "🔍 Testing root endpoint..."
+        if ! curl -f --max-time 10 http://localhost:8501/; then
+          echo "❌ Root endpoint failed"
+          docker logs test-dashboard
+          exit 1
+        fi
+
+        echo "✅ Dashboard image tests passed!"
 
         # Cleanup
-        echo "🧹 Cleaning up..."
+        docker stop test-dashboard
         docker rm test-dashboard
 
     - name: Print image details

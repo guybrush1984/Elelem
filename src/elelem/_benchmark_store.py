@@ -154,6 +154,9 @@ class BenchmarkStore:
         Returns:
             True if fetch succeeded, False otherwise
         """
+        # Re-read source from env var (allows runtime changes for tests)
+        self._source = os.getenv('ELELEM_BENCHMARK_SOURCE')
+
         if not self._source:
             return False
 

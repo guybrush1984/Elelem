@@ -1,0 +1,30 @@
+{
+  "models": [
+    "deepinfra:deepseek/deepseek-3.1",
+    "deepinfra:deepseek/deepseek-3.1-terminus",
+    "deepinfra:deepseek/deepseek-3.2",
+    "fireworks:deepseek/deepseek-3.1",
+    "fireworks:deepseek/deepseek-3.1-terminus",
+    "fireworks:deepseek/deepseek-3.2",
+    "novita:deepseek/deepseek-3.1",
+    "novita:deepseek/deepseek-3.1-terminus",
+    "novita:deepseek/deepseek-3.2",
+    "parasail:deepseek/deepseek-3.2",
+    "deepinfra:openai/gpt-oss-20b?reasoning=low",
+    "fireworks:openai/gpt-oss-20b?reasoning=low",
+    "groq:openai/gpt-oss-20b?reasoning=low",
+    "novita:openai/gpt-oss-20b?reasoning=low",
+    "cerebras:openai/gpt-oss-120b?reasoning=low",
+    "deepinfra:openai/gpt-oss-120b?reasoning=low",
+    "deepinfra:openai/gpt-oss-120b-turbo?reasoning=low",
+    "fireworks:openai/gpt-oss-120b?reasoning=low",
+    "groq:openai/gpt-oss-120b?reasoning=low",
+    "novita:openai/gpt-oss-120b?reasoning=low",
+    "parasail:openai/gpt-oss-120b?reasoning=low",
+    "scaleway:openai/gpt-oss-120b?reasoning=low"
+  ],
+  "prompts": [
+    "small.yaml"
+  ],
+  "temperature": 0.1
+}

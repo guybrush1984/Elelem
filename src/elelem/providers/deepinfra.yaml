@@ -16,8 +16,26 @@ models:
       supports_temperature: true
       supports_system: true
     cost:
-      input_cost_per_1m: 0.09
-      output_cost_per_1m: 0.45
+      input_cost_per_1m: 0.039
+      output_cost_per_1m: 0.19
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+      stream: true
+
+  "deepinfra:openai/gpt-oss-120b-turbo?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=$reasoning"
+    provider: deepinfra
+    model_id: openai/gpt-oss-120b-Turbo
+    capabilities:
+      supports_json_mode: false  # DeepInfra doesn't support response_format
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.60
       currency: USD
     default_params:
       reasoning_effort: $reasoning
@@ -34,8 +52,8 @@ models:
       supports_json_mode: false
       supports_temperature: true
     cost:
-      input_cost_per_1m: 0.04
-      output_cost_per_1m: 0.16
+      input_cost_per_1m: 0.03
+      output_cost_per_1m: 0.14
       currency: USD
     default_params:
       reasoning_effort: $reasoning  

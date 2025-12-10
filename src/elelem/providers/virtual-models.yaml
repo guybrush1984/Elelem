@@ -1,5 +1,10 @@
 # Virtual models that reference multiple providers for resilience
 # These models automatically failover between providers based on candidate configuration
+#
+# Optional routing config for benchmark-based candidate ordering:
+#   routing:
+#     speed_weight: 1.0        # Exponent for speed in value score (>1 favors speed, <1 favors cost)
+#     min_tokens_per_sec: 0.0  # Minimum speed requirement (falls back to YAML order if none qualify)
 
 models:
   # DEEPSEEK 3.2 VARIANTS
@@ -7,25 +12,33 @@ models:
     metadata:
       model_reference: "deepseek_v32"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.2"
       - model: "novita:deepseek/deepseek-3.2"
       - model: "fireworks:deepseek/deepseek-3.2"
+      - model: "parasail:deepseek/deepseek-3.2"
 
   "virtual:deepseek-v3.2-quick":
     metadata:
       model_reference: "deepseek_v32"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "fireworks:deepseek/deepseek-3.2"
       - model: "novita:deepseek/deepseek-3.2"
       - model: "deepinfra:deepseek/deepseek-3.2"
+      - model: "parasail:deepseek/deepseek-3.2"
 
   "virtual:deepseek-v3.2-cheap?reasoning":
     metadata:
       model_reference: "deepseek_v32"
       model_configuration: "reasoning"
     timeout: 300s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
       - model: "novita:deepseek/deepseek-3.2?reasoning"
@@ -35,6 +48,8 @@ models:
       model_reference: "deepseek_v32"
       model_configuration: "reasoning"
     timeout: 300s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "novita:deepseek/deepseek-3.2?reasoning"
       - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
@@ -44,6 +59,8 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:deepseek/deepseek-3.1"
       - model: "deepinfra:deepseek/deepseek-3.1"
@@ -54,6 +71,8 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "fireworks:deepseek/deepseek-3.1"
       - model: "novita:deepseek/deepseek-3.1"
@@ -63,21 +82,22 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:deepseek/deepseek-3.1?reasoning"
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
       - model: "fireworks:deepseek/deepseek-3.1?reasoning"
-      - model: "parasail:deepseek/deepseek-3.1?reasoning"
 
   "virtual:deepseek-v3.1-quick?reasoning":
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "ollama:deepseek/deepseek-3.1?reasoning"
-
       - model: "fireworks:deepseek/deepseek-3.1?reasoning"
-      - model: "parasail:deepseek/deepseek-3.1?reasoning"
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
 
   # DEEPSEEK 3.1-TERMINUS VARIANTS
@@ -85,6 +105,8 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.1-terminus"
       - model: "novita:deepseek/deepseek-3.1-terminus"
@@ -94,6 +116,8 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "fireworks:deepseek/deepseek-3.1-terminus"
       - model: "novita:deepseek/deepseek-3.1-terminus"
@@ -103,6 +127,8 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.1-terminus?reasoning"
       - model: "novita:deepseek/deepseek-3.1-terminus"
@@ -112,6 +138,8 @@ models:
     metadata:
       model_reference: "deepseek_v31"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "fireworks:deepseek/deepseek-3.1-terminus?reasoning"
       - model: "novita:deepseek/deepseek-3.1-terminus"
@@ -122,57 +150,78 @@ models:
     metadata:
       model_reference: "openai_gpt_oss_20b"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
 
   "virtual:gpt-oss-20b-quick?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_20b"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
 
   # OPENAI GPT-OSS 120B VARIANTS
   "virtual:gpt-oss-120b-cheap?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "deepinfra:openai/gpt-oss-120b-turbo?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
 
-  # Speed-optimized routing (fastest first) - shorter timeouts for speed
   "virtual:gpt-oss-120b-quick?reasoning=@[low,medium,high]":
     metadata:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
-      - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"    
+      - model: "deepinfra:openai/gpt-oss-120b-turbo?reasoning=$reasoning"
+      - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"    
 
   # MISTRAL SMALL/MEDIUM VARIANTS
   "virtual:mistral-small-quick":
     metadata:
       model_reference: "mistral_small_32"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "mistral:mistral/mistral-small"
       - model: "deepinfra:mistral/mistral-small"
 
-  # MISTRAL SMALL/MEDIUM VARIANTS
   "virtual:mistral-small-cheap":
     metadata:
       model_reference: "mistral_small_32"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "deepinfra:mistral/mistral-small"
       - model: "mistral:mistral/mistral-small"
@@ -182,6 +231,8 @@ models:
     metadata:
       model_reference: "moonshot_kimi_k2"
     timeout: 120s
+    routing:
+      speed_weight: 2.0  # Favor speed
     candidates:
       - model: "ollama:moonshotai/kimi-k2-instruct"
       - model: "groq:moonshotai/kimi-k2-instruct"
@@ -194,6 +245,8 @@ models:
     metadata:
       model_reference: "moonshot_kimi_k2"
     timeout: 120s
+    routing:
+      speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:moonshotai/kimi-k2-instruct"
       - model: "deepinfra:moonshotai/kimi-k2-instruct"

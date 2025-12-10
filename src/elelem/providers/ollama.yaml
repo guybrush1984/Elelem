@@ -75,6 +75,37 @@ models:
     default_params:
       reasoning_effort: medium
 
+  "ollama:deepseek/deepseek-3.2":
+    metadata:
+      model_reference: "deepseek_v32"
+    provider: ollama
+    model_id: deepseek-v3.2:cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD
+
+  "ollama:deepseek/deepseek-3.2?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    provider: ollama
+    model_id: deepseek-v3.2:cloud
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.00
+      output_cost_per_1m: 0.00
+      currency: USD
+    default_params:
+      reasoning_effort: medium
+
   "ollama:moonshotai/kimi-k2-instruct":
     metadata:
       model_reference: "moonshot_kimi_k2"

@@ -3,6 +3,8 @@ provider:
   endpoint: https://api.fireworks.ai/inference/v1
   default_params:
     stream: true
+    stream_options:
+      include_usage: true
   max_tokens_default: 16384
 
 models:

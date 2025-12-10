@@ -24,6 +24,7 @@ load_dotenv()
 
 from elelem import Elelem
 from elelem import __version__
+from elelem._benchmark_store import get_benchmark_store
 from elelem.server.models import (
     ChatCompletionRequest,
     ErrorResponse,
@@ -86,6 +87,12 @@ async def startup_event():
     else:
         logger.info("📦 Response cache disabled")
 
+    # Start benchmark fetching if configured
+    benchmark_store = get_benchmark_store()
+    await benchmark_store.start_background_fetch()
+    if benchmark_store.enabled:
+        logger.info(f"📊 Benchmark routing enabled (source: {benchmark_store.source})")
+
 
 async def cache_cleanup_task():
     """Background task to cleanup expired cache entries.
@@ -121,6 +128,10 @@ async def shutdown_event():
     """Clean up on server shutdown."""
     global elelem
     logger.info("🛑 Shutting down Elelem server...")
+
+    # Stop benchmark fetching
+    benchmark_store = get_benchmark_store()
+    benchmark_store.stop()
 
     # Clean up using proper encapsulation
     if elelem:
@@ -193,6 +204,40 @@ async def list_models():
                 }
             }
         )
+
+
+@app.get("/v1/benchmark/status")
+async def get_benchmark_status():
+    """Get benchmark routing status and current data.
+
+    Returns:
+        - enabled: Whether benchmark routing is configured
+        - source: The configured benchmark source (file path or URL)
+        - interval_seconds: How often benchmarks are refreshed
+        - last_fetch: Timestamp of last successful fetch
+        - last_error: Error message from last failed fetch (if any)
+        - entries_count: Number of models with benchmark data
+    """
+    store = get_benchmark_store()
+    return store.get_status()
+
+
+@app.get("/v1/benchmark/data")
+async def get_benchmark_data():
+    """Get all current benchmark data.
+
+    Returns a dict mapping model references to their benchmark metrics:
+    - tokens_per_second: Average output tokens per second
+    - cost_per_1m_output: Cost per 1M output tokens (extrapolated)
+    - avg_duration: Average request duration in seconds
+    - success_rate: Request success rate (0.0 to 1.0)
+    - sample_count: Number of benchmark samples
+    """
+    store = get_benchmark_store()
+    return {
+        "enabled": store.enabled,
+        "data": store.get_all_benchmarks()
+    }
 
 
 @app.post("/v1/chat/completions")

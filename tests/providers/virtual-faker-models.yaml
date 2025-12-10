@@ -22,3 +22,44 @@ models:
         timeout: 30s
       - model: "faker:rate-limited"  # Will also fail
         timeout: 30s
+
+  # Benchmark routing test - YAML order: slow, medium, fast, unscored
+  # With benchmark data, should be reordered to: fast, medium, slow, unscored
+  "virtual:faker-benchmark-test":
+    timeout: 30s
+    routing:
+      speed_weight: 1.0  # Default value score calculation
+    candidates:
+      - model: "faker:slow-provider"      # Slow - low value score, should move down
+        timeout: 30s
+      - model: "faker:medium-provider"    # Medium - middle value score
+        timeout: 30s
+      - model: "faker:fast-provider"      # Fast - high value score, should move up
+        timeout: 30s
+      - model: "faker:unscored-provider"  # No benchmark data, should stay last
+        timeout: 30s
+
+  # Benchmark routing test with speed_weight=2.0 (strongly favor speed)
+  "virtual:faker-benchmark-speed-favor":
+    timeout: 30s
+    routing:
+      speed_weight: 2.0  # Strongly favor speed
+    candidates:
+      - model: "faker:slow-provider"
+        timeout: 30s
+      - model: "faker:fast-provider"
+        timeout: 30s
+
+  # Benchmark routing test with priority override
+  "virtual:faker-benchmark-priority":
+    timeout: 30s
+    routing:
+      speed_weight: 1.0
+    candidates:
+      - model: "faker:slow-provider"
+        timeout: 30s
+        priority: always_first  # Should stay first despite low score
+      - model: "faker:fast-provider"
+        timeout: 30s
+      - model: "faker:medium-provider"
+        timeout: 30s

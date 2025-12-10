@@ -182,3 +182,56 @@ models:
       input_cost_per_1m: 0.10
       output_cost_per_1m: 0.30
       currency: USD
+
+  # Benchmark routing test models - different speeds and costs for testing
+  # Fast provider - high speed, medium cost (high value score)
+  "faker:fast-provider":
+    provider: faker
+    model_id: fast-provider
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.50
+      currency: USD
+
+  # Slow provider - low speed, low cost (low value score)
+  "faker:slow-provider":
+    provider: faker
+    model_id: slow-provider
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.10
+      currency: USD
+
+  # Medium provider - medium speed, medium cost
+  "faker:medium-provider":
+    provider: faker
+    model_id: medium-provider
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.25
+      currency: USD
+
+  # Unscored provider - no benchmark data available
+  "faker:unscored-provider":
+    provider: faker
+    model_id: unscored-provider
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.08
+      output_cost_per_1m: 0.20
+      currency: USD

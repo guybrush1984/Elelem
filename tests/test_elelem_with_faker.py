@@ -1151,4 +1151,283 @@ class TestElelemWithFaker:
 
         print("✅ Elelem-style json_schema parameter works with Pydantic")
 
+    @pytest.mark.asyncio
+    async def test_benchmark_routing_reorders_candidates(self, elelem_with_faker_env, tmp_path):
+        """Test that benchmark data reorders virtual model candidates by value score."""
+        elelem, faker = elelem_with_faker_env
+
+        # Create test benchmark data file
+        # Value = tokens_per_second / cost_per_1m
+        # where cost_per_1m = (costs.avg / tokens.output.avg) * 1_000_000
+        #
+        # fast:   100 t/s, cost_per_1m = (0.001/100)*1M = 10  → value = 100/10 = 10.0
+        # medium: 50 t/s, cost_per_1m = (0.0005/50)*1M = 10  → value = 50/10 = 5.0
+        # slow:   10 t/s, cost_per_1m = (0.001/10)*1M = 100  → value = 10/100 = 0.1
+        benchmark_data = {
+            "models": {
+                "faker:fast-provider": {
+                    "tokens": {"output": {"avg": 100.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.001},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                },
+                "faker:medium-provider": {
+                    "tokens": {"output": {"avg": 50.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.0005},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                },
+                "faker:slow-provider": {
+                    "tokens": {"output": {"avg": 10.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.001},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                }
+                # Note: faker:unscored-provider has NO benchmark data - should go last
+            }
+        }
+
+        benchmark_file = tmp_path / "test_benchmarks.json"
+        benchmark_file.write_text(json.dumps(benchmark_data))
+
+        # Configure benchmark store
+        import os
+        os.environ['ELELEM_BENCHMARK_SOURCE'] = str(benchmark_file)
+
+        # Reload benchmark store with new data
+        from elelem._benchmark_store import get_benchmark_store
+        store = get_benchmark_store()
+        await store.fetch_once()
+
+        # Verify benchmark data was loaded
+        assert store.get_benchmark("faker:fast-provider") is not None
+        assert store.get_benchmark("faker:slow-provider") is not None
+        assert store.get_benchmark("faker:unscored-provider") is None  # No data
+
+        # Configure faker for benchmark routing scenario
+        faker.configure_scenario('elelem_benchmark_routing')
+        faker.reset_state()
+
+        # Make request to virtual model with benchmark routing
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-benchmark-test",
+            messages=[{"role": "user", "content": "Test benchmark routing"}],
+            tags=["benchmark-routing-test"]
+        )
+
+        # Should succeed
+        assert response is not None
+
+        # The request should have gone to fast-provider first (highest value score)
+        # because benchmark routing reorders candidates
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) >= 1
+
+        # Check which provider received the first request
+        first_request = requests[0]
+        first_model = first_request.get('body', {}).get('model', '')
+
+        # With benchmark data, fast-provider should be tried first
+        # (it has highest tokens_per_second)
+        assert 'fast-provider' in first_model, \
+            f"Expected fast-provider to be tried first, got: {first_model}"
+
+        # Verify response content matches fast provider
+        content = response.choices[0].message.content
+        assert "fast provider" in content.lower(), \
+            f"Expected response from fast provider, got: {content}"
+
+        print("✅ Benchmark routing correctly reordered candidates")
+        print(f"   First provider tried: {first_model}")
+        print(f"   Response: {content}")
+
+        # Cleanup
+        del os.environ['ELELEM_BENCHMARK_SOURCE']
+
+    @pytest.mark.asyncio
+    async def test_benchmark_routing_priority_always_first(self, elelem_with_faker_env, tmp_path):
+        """Test that priority: always_first overrides benchmark ordering."""
+        elelem, faker = elelem_with_faker_env
+
+        # Create benchmark data where fast-provider has highest score
+        benchmark_data = {
+            "models": {
+                "faker:fast-provider": {
+                    "tokens": {"output": {"avg": 100.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.0005},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                },
+                "faker:slow-provider": {
+                    "tokens": {"output": {"avg": 10.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.0001},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                },
+                "faker:medium-provider": {
+                    "tokens": {"output": {"avg": 50.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.00025},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                }
+            }
+        }
+
+        benchmark_file = tmp_path / "test_benchmarks_priority.json"
+        benchmark_file.write_text(json.dumps(benchmark_data))
+
+        import os
+        os.environ['ELELEM_BENCHMARK_SOURCE'] = str(benchmark_file)
+
+        from elelem._benchmark_store import get_benchmark_store
+        store = get_benchmark_store()
+        await store.fetch_once()
+
+        # Configure faker - slow-provider should succeed (despite priority override)
+        faker.configure_scenario('elelem_benchmark_routing')
+        faker.reset_state()
+
+        # Use virtual model where slow-provider has priority: always_first
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-benchmark-priority",
+            messages=[{"role": "user", "content": "Test priority override"}],
+            tags=["priority-test"]
+        )
+
+        # Should succeed
+        assert response is not None
+
+        # The slow-provider should be tried first despite having lower score
+        # because it has priority: always_first
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) >= 1
+
+        first_request = requests[0]
+        first_model = first_request.get('body', {}).get('model', '')
+
+        # Slow provider should be first due to priority override
+        # But it returns 503 overloaded, so fast-provider should eventually succeed
+        # Let's check the response to see which provider actually succeeded
+        content = response.choices[0].message.content
+
+        # The slow-provider returns overloaded error, so we should have fallen back
+        # to fast-provider which succeeds
+        # First request should still be to slow-provider (due to priority)
+        assert 'slow-provider' in first_model, \
+            f"Expected slow-provider to be tried first due to priority, got: {first_model}"
+
+        print("✅ Priority always_first correctly overrides benchmark ordering")
+        print(f"   First provider tried: {first_model}")
+        print(f"   Final response: {content}")
+
+        # Cleanup
+        del os.environ['ELELEM_BENCHMARK_SOURCE']
+
+    @pytest.mark.asyncio
+    async def test_benchmark_routing_unscored_last(self, elelem_with_faker_env, tmp_path):
+        """Test that candidates without benchmark data are tried last."""
+        elelem, faker = elelem_with_faker_env
+
+        # Create benchmark data - only for some providers
+        # unscored-provider has NO data - should be last
+        benchmark_data = {
+            "models": {
+                "faker:slow-provider": {
+                    "tokens": {"output": {"avg": 10.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.0001},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                },
+                "faker:medium-provider": {
+                    "tokens": {"output": {"avg": 50.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.00025},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                },
+                "faker:fast-provider": {
+                    "tokens": {"output": {"avg": 100.0}},
+                    "duration": {"avg": 1.0},
+                    "costs": {"avg": 0.0005},
+                    "requests": {"success_rate": 1.0, "total": 10}
+                }
+                # faker:unscored-provider is NOT in benchmark data
+            }
+        }
+
+        benchmark_file = tmp_path / "test_benchmarks_unscored.json"
+        benchmark_file.write_text(json.dumps(benchmark_data))
+
+        import os
+        os.environ['ELELEM_BENCHMARK_SOURCE'] = str(benchmark_file)
+
+        from elelem._benchmark_store import get_benchmark_store, reorder_candidates_by_benchmark
+        store = get_benchmark_store()
+        await store.fetch_once()
+
+        # Verify unscored-provider has no benchmark data
+        assert store.get_benchmark("faker:unscored-provider") is None
+
+        # Get the model config and check reordering
+        model_config = elelem.config.get_model_config("virtual:faker-benchmark-test")
+        candidates = model_config['candidates']
+
+        # Reorder candidates
+        reordered = reorder_candidates_by_benchmark(candidates)
+
+        # Extract provider names in order
+        provider_order = [c.get('original_model_ref', c.get('provider', '')) for c in reordered]
+
+        print(f"Reordered candidates: {provider_order}")
+
+        # Unscored provider should be LAST
+        unscored_index = None
+        for i, ref in enumerate(provider_order):
+            if 'unscored' in ref:
+                unscored_index = i
+                break
+
+        assert unscored_index is not None, "Unscored provider should be in the list"
+        assert unscored_index == len(provider_order) - 1, \
+            f"Unscored provider should be last, but was at index {unscored_index}"
+
+        print("✅ Unscored candidates correctly placed last")
+        print(f"   Order: {provider_order}")
+
+        # Cleanup
+        del os.environ['ELELEM_BENCHMARK_SOURCE']
+
+    @pytest.mark.asyncio
+    async def test_benchmark_routing_disabled_without_source(self, elelem_with_faker_env):
+        """Test that benchmark routing doesn't affect ordering when disabled."""
+        elelem, faker = elelem_with_faker_env
+
+        # Ensure no benchmark source is configured
+        import os
+        if 'ELELEM_BENCHMARK_SOURCE' in os.environ:
+            del os.environ['ELELEM_BENCHMARK_SOURCE']
+
+        from elelem._benchmark_store import get_benchmark_store, reorder_candidates_by_benchmark
+        store = get_benchmark_store()
+
+        # Store should be disabled
+        assert not store.enabled, "Benchmark store should be disabled without source"
+
+        # Get the model config
+        model_config = elelem.config.get_model_config("virtual:faker-benchmark-test")
+        original_candidates = model_config['candidates'].copy()
+
+        # Reorder should return same order when disabled
+        reordered = reorder_candidates_by_benchmark(original_candidates)
+
+        # Extract refs for comparison
+        original_refs = [c.get('original_model_ref') for c in original_candidates]
+        reordered_refs = [c.get('original_model_ref') for c in reordered]
+
+        assert original_refs == reordered_refs, \
+            f"Order should be unchanged when benchmark store is disabled.\n" \
+            f"Original: {original_refs}\nReordered: {reordered_refs}"
+
+        print("✅ Benchmark routing correctly disabled without source")
+        print(f"   Order preserved: {original_refs}")
+
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

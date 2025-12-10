@@ -29,6 +29,7 @@ services:
       - ../.env  # Load .env from project root for local development
     environment:
       # These override .env file values (shell env has highest priority)
+      - ELELEM_BENCHMARK_SOURCE=https://gist.githubusercontent.com/guybrush1984/2ada15924b22171e01504b223b384306/raw/gistfile1.txt
       - ELELEM_DATABASE_URL=postgresql://elelem:test_password@postgres:5432/elelem_test
       - PORT=8000
       - ELELEM_CACHE_ENABLED=true

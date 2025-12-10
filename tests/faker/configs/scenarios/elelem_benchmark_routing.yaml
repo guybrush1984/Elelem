@@ -1,0 +1,53 @@
+scenario: "elelem_benchmark_routing"
+description: "Test benchmark-based routing - fast provider succeeds, slow provider fails"
+type: "conditional"
+
+# This scenario is used with a virtual model that has multiple faker candidates.
+# The benchmark store will reorder candidates based on their benchmark data.
+# We use model_contains to simulate different provider behaviors.
+
+conditions:
+  # Fast provider (faker:fast-provider) - always succeeds quickly
+  - check: "model_contains"
+    value: "fast-provider"
+    response:
+      type: "success"
+      content: "Response from fast provider"
+      tokens:
+        input: 20
+        output: 10
+
+  # Slow provider (faker:slow-provider) - returns overloaded error
+  # This simulates a provider that's too slow and should be deprioritized
+  - check: "model_contains"
+    value: "slow-provider"
+    response:
+      type: "overloaded"
+
+  # Medium provider (faker:medium-provider) - succeeds but with different response
+  - check: "model_contains"
+    value: "medium-provider"
+    response:
+      type: "success"
+      content: "Response from medium provider"
+      tokens:
+        input: 20
+        output: 10
+
+  # Unscored provider (faker:unscored-provider) - no benchmark data
+  # Should be tried last according to benchmark routing
+  - check: "model_contains"
+    value: "unscored-provider"
+    response:
+      type: "success"
+      content: "Response from unscored provider (fallback)"
+      tokens:
+        input: 20
+        output: 10
+
+default_response:
+  type: "success"
+  content: "Default benchmark routing response"
+  tokens:
+    input: 20
+    output: 10

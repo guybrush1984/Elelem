@@ -38,12 +38,14 @@ class BenchmarkStore:
     @property
     def enabled(self) -> bool:
         """Check if benchmark fetching is enabled (source configured)."""
-        return bool(self._source)
+        # Re-read from env var for runtime changes (tests)
+        return bool(os.getenv('ELELEM_BENCHMARK_SOURCE'))
 
     @property
     def source(self) -> Optional[str]:
         """Get the configured benchmark source."""
-        return self._source
+        # Re-read from env var for runtime changes (tests)
+        return os.getenv('ELELEM_BENCHMARK_SOURCE')
 
     def get_benchmark(self, model_ref: str) -> Optional[Dict[str, Any]]:
         """Get benchmark data for a model reference (thread-safe).

@@ -156,7 +156,7 @@ class TelelemClient:
 
         if self.mode == "direct":
             # Direct mode - use the SAME instance's metrics
-            return self._direct_client._metrics_store.get_summary(
+            return self._direct_client._metrics_store.get_stats(
                 tags=tags,
                 start_time=start_time
             )
@@ -456,7 +456,7 @@ async def run_batch_tests(
         return 1
 
     # Track metrics
-    test_start_time = datetime.now()
+    test_start_time = datetime.utcnow()
     results = []
 
     # Create output directory
@@ -556,9 +556,10 @@ async def run_batch_tests(
     summary["overall"] = overall_summary
 
     if overall_summary:
-        total_calls = overall_summary.get("total_calls", 0)
-        total_successes = overall_summary.get("total_successes", 0)
-        total_cost = overall_summary.get("total_cost_usd", {}).get("total", 0)
+        requests = overall_summary.get("requests", {})
+        total_calls = requests.get("total", 0)
+        total_successes = requests.get("successful", 0)
+        total_cost = overall_summary.get("costs", {}).get("total", 0)
 
         print(f"✅ Overall: {total_successes}/{total_calls} successful")
         if total_cost > 0:
@@ -568,9 +569,10 @@ async def run_batch_tests(
     for model in sorted(tested_models):
         model_stats = summary["models"].get(model, {})
         if model_stats:
-            total_calls = model_stats.get("total_calls", 0)
-            total_successes = model_stats.get("total_successes", 0)
-            total_cost = model_stats.get("total_cost_usd", {}).get("total", 0)
+            requests = model_stats.get("requests", {})
+            total_calls = requests.get("total", 0)
+            total_successes = requests.get("successful", 0)
+            total_cost = model_stats.get("costs", {}).get("total", 0)
             print(f"\n📊 {model}: {total_successes}/{total_calls} "
                   f"(${total_cost:.6f})")
 
@@ -645,14 +647,16 @@ def generate_csv_summary(
         # Get static model info
         model_info = models_config.get(model_key, {})
 
-        # Extract performance metrics exactly like original
-        total_calls = model_stats.get("total_calls", 0)
-        total_successes = model_stats.get("total_successes", 0)
+        # Extract performance metrics from get_stats() format
+        requests_stats = model_stats.get("requests", {})
+        total_calls = requests_stats.get("total", 0)
+        total_successes = requests_stats.get("successful", 0)
         success_rate = (total_successes / total_calls * 100) if total_calls > 0 else 0
 
-        output_tokens = model_stats.get("output_tokens", {}).get("total", 0)
-        reasoning_tokens = model_stats.get("reasoning_tokens", {}).get("total", 0)
-        total_duration = model_stats.get("duration_seconds", {}).get("total", 0)
+        tokens_stats = model_stats.get("tokens", {})
+        output_tokens = tokens_stats.get("output", {}).get("total", 0)
+        reasoning_tokens = tokens_stats.get("reasoning", {}).get("total", 0)
+        total_duration = model_stats.get("duration", {}).get("total", 0)
 
         # Calculate token rates (tokens per second)
         output_token_rate = output_tokens / total_duration if total_duration > 0 else 0
@@ -664,9 +668,9 @@ def generate_csv_summary(
         input_cost_per_1m = cost_config.get("input_cost_per_1m", 0) if isinstance(cost_config, dict) else 0
         output_cost_per_1m = cost_config.get("output_cost_per_1m", 0) if isinstance(cost_config, dict) else 0
 
-        # Calculate real cost per output token (output cost only / real output tokens)
-        output_cost_usd = model_stats.get("output_cost_usd", {}).get("total", 0)
-        real_cost_per_output_token = (output_cost_usd / real_output_tokens) if real_output_tokens > 0 else 0
+        # Calculate real cost per output token (total cost / real output tokens)
+        total_cost_usd = model_stats.get("costs", {}).get("total", 0)
+        real_cost_per_output_token = (total_cost_usd / real_output_tokens) if real_output_tokens > 0 else 0
 
         # Calculate reasoning token ratio (reasoning_tokens / output_tokens)
         reasoning_token_ratio = (reasoning_tokens / output_tokens) if output_tokens > 0 else 0

@@ -157,7 +157,7 @@ models:
     candidates:
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
-      - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
+      # Fireworks excluded: streaming bug with large JSON responses (GPT-OSS model issue)
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
 
   "virtual:gpt-oss-20b-quick?reasoning=@[low,medium,high]":
@@ -168,7 +168,7 @@ models:
       speed_weight: 2.0  # Favor speed
     candidates:
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
-      - model: "fireworks:openai/gpt-oss-20b?reasoning=$reasoning"
+      # Fireworks excluded: streaming bug with large JSON responses (GPT-OSS model issue)
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
 
@@ -185,7 +185,7 @@ models:
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-120b-turbo?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
-      - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
+      # Fireworks excluded: streaming bug with large JSON responses (GPT-OSS model issue)
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
@@ -201,7 +201,7 @@ models:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "groq:openai/gpt-oss-120b?reasoning=$reasoning"
-      - model: "fireworks:openai/gpt-oss-120b?reasoning=$reasoning"
+      # Fireworks excluded: streaming bug with large JSON responses (GPT-OSS model issue)
       - model: "deepinfra:openai/gpt-oss-120b-turbo?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"

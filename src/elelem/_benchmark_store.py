@@ -113,6 +113,25 @@ class BenchmarkStore:
         Returns:
             Dict mapping model_ref -> {tokens_per_second, cost_per_1m_output, ...}
         """
+        # Check data freshness (discard if older than 6 hours)
+        timestamp_str = raw_data.get('timestamp')
+        if timestamp_str:
+            try:
+                # Parse timestamp (format: "2025-12-11 08:04:09 UTC")
+                timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S %Z')
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+                age = datetime.now(timezone.utc) - timestamp
+                max_age_hours = int(os.getenv('ELELEM_BENCHMARK_MAX_AGE_HOURS', '6'))
+
+                if age.total_seconds() > max_age_hours * 3600:
+                    self.logger.warning(
+                        f"Benchmark data is stale ({age.total_seconds() / 3600:.1f}h old, "
+                        f"max {max_age_hours}h). Discarding."
+                    )
+                    return {}
+            except (ValueError, TypeError) as e:
+                self.logger.warning(f"Failed to parse timestamp '{timestamp_str}': {e}")
+
         result = {}
         models = raw_data.get('models', {})
 

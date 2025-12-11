@@ -181,7 +181,7 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
         service_tier=final_chunk.service_tier if hasattr(final_chunk, 'service_tier') else None
     )
 
-    return completion
+    return completion, chunk_count
 
 
 def remove_think_tags(content: str, logger: logging.Logger) -> str:

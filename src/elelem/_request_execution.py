@@ -19,15 +19,22 @@ from ._exceptions import InfrastructureError, ModelError
 
 def prepare_api_kwargs(kwargs: Dict, original_temperature: float, provider_config: Dict,
                       candidate: Dict, original_model: str, config, provider_name: str) -> Dict:
-    """Prepare API parameters with proper precedence: user > model > provider."""
+    """Prepare API parameters with proper precedence: user > model > provider.
+
+    Note: 'stream' is an internal Elelem parameter (controls how we query providers),
+    not a user parameter. Elelem always returns complete responses to users.
+    """
     api_kwargs = kwargs.copy()
     api_kwargs['temperature'] = original_temperature
+
+    # Remove 'stream' from user kwargs - it's an internal-only parameter
+    api_kwargs.pop('stream', None)
 
     # Add provider-specific default parameters
     provider_defaults = provider_config.get("default_params", {})
     for key, value in provider_defaults.items():
         if key == "stream":
-            # Always apply provider stream default, ignore client input
+            # Always apply provider stream default (internal parameter)
             api_kwargs[key] = value
         elif key not in api_kwargs:
             api_kwargs[key] = value
@@ -35,7 +42,10 @@ def prepare_api_kwargs(kwargs: Dict, original_temperature: float, provider_confi
     # Add model-specific default parameters (overrides provider defaults)
     model_defaults = candidate.get("default_params", {})
     for key, value in model_defaults.items():
-        if key not in api_kwargs:
+        if key == "stream":
+            # Always apply model stream default (internal parameter)
+            api_kwargs[key] = value
+        elif key not in api_kwargs:
             api_kwargs[key] = value
 
     # Add max_tokens default if provider specifies it and user didn't provide max_tokens

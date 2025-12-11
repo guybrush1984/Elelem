@@ -167,6 +167,9 @@ class Elelem:
             request_id: Request ID for logging
             chunk_timeout: Optional timeout (seconds) for receiving each chunk.
                           If no chunk arrives within this time, raises ChunkTimeoutError.
+
+        Returns:
+            Tuple of (response, chunk_count)
         """
         return await collect_streaming_response(stream, logger=self.logger, request_id=request_id, chunk_timeout=chunk_timeout)
         
@@ -585,6 +588,7 @@ class Elelem:
                 
                 # Make API call with timeout
                 try:
+                    chunk_count = None  # Track streaming chunks
                     if api_kwargs.get("stream", False):
                         # Handle streaming response
                         # Use timeout for initial connection, then chunk_timeout for streaming
@@ -597,7 +601,7 @@ class Elelem:
                             ),
                             timeout=timeout
                         )
-                        response = await self._collect_streaming_response(stream, request_id, chunk_timeout=chunk_timeout)
+                        response, chunk_count = await self._collect_streaming_response(stream, request_id, chunk_timeout=chunk_timeout)
                     else:
                         # Handle non-streaming response
                         response = await asyncio.wait_for(
@@ -727,7 +731,12 @@ class Elelem:
                 if costs and costs.get('total_cost_usd', 0) > 0:
                     cost_info = f", cost: ${costs['total_cost_usd']:.6f}"
 
-                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s | {token_info}{cost_info}")
+                # Add chunk count for streaming responses
+                chunk_info = ""
+                if chunk_count is not None:
+                    chunk_info = f", chunks: {chunk_count}"
+
+                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s | {token_info}{cost_info}{chunk_info}")
 
                 # Finalize request tracking with candidate details and store
                 request_tracker.finalize_with_candidate(

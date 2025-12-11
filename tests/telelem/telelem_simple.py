@@ -382,7 +382,7 @@ async def run_single_test(
                     "model": model,
                     "temperature": temperature,
                     "json_mode": json_mode,
-                    "prompt_file": prompt_file,
+                    "prompt": prompt_name,
                     "mode": client.mode
                 },
                 "response": {
@@ -420,7 +420,7 @@ async def run_single_test(
                     "model": model,
                     "temperature": temperature,
                     "json_mode": json_mode,
-                    "prompt_file": prompt_file,
+                    "prompt": prompt_name,
                     "mode": client.mode
                 },
                 "error": {
@@ -817,7 +817,7 @@ def main():
 
         return asyncio.run(run_single_test(
             client=client,
-            prompt_file=args.prompt,
+            prompt=args.prompt,
             model=args.model,
             output_file=output_file,
             temperature=args.temperature,

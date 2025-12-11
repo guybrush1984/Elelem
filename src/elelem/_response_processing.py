@@ -54,16 +54,30 @@ def extract_text_from_content_parts(content: list, logger: Optional[logging.Logg
     return reasoning_text, response_text
 
 
-async def collect_streaming_response(stream, logger=None, request_id=None):
-    """Collect streaming chunks and reconstruct a normal response object."""
+class ChunkTimeoutError(Exception):
+    """Raised when no streaming chunk is received within the chunk timeout."""
+    pass
+
+
+async def collect_streaming_response(stream, logger=None, request_id=None, chunk_timeout=None):
+    """Collect streaming chunks and reconstruct a normal response object.
+
+    Args:
+        stream: Async iterator of streaming chunks
+        logger: Optional logger for debug output
+        request_id: Optional request ID for log prefix
+        chunk_timeout: Optional timeout (seconds) for receiving each chunk.
+                       If set and no chunk arrives within this time, raises ChunkTimeoutError.
+                       This helps detect serverless cold starts and stream stalls.
+    """
     import time
     import json
+    import asyncio
 
     content_parts = []
     reasoning_content_parts = []
     final_chunk = None
     finish_reason = None
-
 
     # Trace variables
     chunk_count = 0
@@ -71,7 +85,24 @@ async def collect_streaming_response(stream, logger=None, request_id=None):
     last_trace_time = None
     trace_interval = 30  # 30 seconds
 
-    async for chunk in stream:
+    # Convert stream to async iterator for manual iteration with timeout
+    stream_iter = stream.__aiter__()
+
+    while True:
+        try:
+            if chunk_timeout and chunk_timeout > 0:
+                chunk = await asyncio.wait_for(stream_iter.__anext__(), timeout=chunk_timeout)
+            else:
+                chunk = await stream_iter.__anext__()
+        except asyncio.TimeoutError:
+            timeout_msg = f"No chunk received within {chunk_timeout}s"
+            if chunk_count == 0:
+                timeout_msg += " (cold start?)"
+            else:
+                timeout_msg += f" after {chunk_count} chunks"
+            raise ChunkTimeoutError(timeout_msg)
+        except StopAsyncIteration:
+            break  # Stream ended normally
         chunk_count += 1
         current_time = time.time()
 

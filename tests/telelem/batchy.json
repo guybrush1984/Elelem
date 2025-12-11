@@ -1,0 +1,46 @@
+{
+  "models": [
+    "deepinfra:deepseek/deepseek-3.1",
+    "deepinfra:deepseek/deepseek-3.1-terminus",
+    "deepinfra:deepseek/deepseek-3.2",
+    "fireworks:deepseek/deepseek-3.1",
+    "fireworks:deepseek/deepseek-3.1-terminus",
+    "fireworks:deepseek/deepseek-3.2",
+    "novita:deepseek/deepseek-3.1",
+    "novita:deepseek/deepseek-3.1-terminus",
+    "novita:deepseek/deepseek-3.2",
+    "parasail:deepseek/deepseek-3.2",
+    "deepinfra:openai/gpt-oss-20b?reasoning=low",
+    "deepinfra:openai/gpt-oss-20b?reasoning=medium",
+    "fireworks:openai/gpt-oss-20b?reasoning=low",
+    "fireworks:openai/gpt-oss-20b?reasoning=medium",
+    "groq:openai/gpt-oss-20b?reasoning=low",
+    "groq:openai/gpt-oss-20b?reasoning=medium",
+    "novita:openai/gpt-oss-20b?reasoning=low",
+    "novita:openai/gpt-oss-20b?reasoning=medium",
+    "cerebras:openai/gpt-oss-120b?reasoning=low",
+    "cerebras:openai/gpt-oss-120b?reasoning=medium",
+    "deepinfra:openai/gpt-oss-120b?reasoning=low",
+    "deepinfra:openai/gpt-oss-120b?reasoning=medium",
+    "deepinfra:openai/gpt-oss-120b-turbo?reasoning=low",
+    "deepinfra:openai/gpt-oss-120b-turbo?reasoning=medium",
+    "fireworks:openai/gpt-oss-120b?reasoning=low",
+    "fireworks:openai/gpt-oss-120b?reasoning=medium",
+    "groq:openai/gpt-oss-120b?reasoning=low",
+    "groq:openai/gpt-oss-120b?reasoning=medium",
+    "novita:openai/gpt-oss-120b?reasoning=low",
+    "novita:openai/gpt-oss-120b?reasoning=medium",
+    "parasail:openai/gpt-oss-120b?reasoning=low",
+    "parasail:openai/gpt-oss-120b?reasoning=medium",
+    "scaleway:openai/gpt-oss-120b?reasoning=low",
+    "scaleway:openai/gpt-oss-120b?reasoning=medium"
+  ],
+  "prompts": [
+    {
+      "name": "cake",
+      "system": "You are an assistant generating cake recipes. Generate recipes in 6 steps, about 50 words each. Answer with JSON: {\"step1\": \"...\", \"step2\": \"...\", \"step3\": \"...\", \"step4\": \"...\", \"step5\": \"...\", \"step6\": \"...\"}",
+      "user": "I want a chocolate cake for 8."
+    }
+  ],
+  "temperature": 0.1
+}

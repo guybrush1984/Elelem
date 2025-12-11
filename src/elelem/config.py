@@ -305,7 +305,8 @@ class Config:
                         'cost': ref_config.get('cost'),
                         'default_params': ref_config.get('default_params', {}),
                         'display_metadata': ref_config.get('display_metadata', {}),
-                        'timeout': candidate.get('timeout')  # Candidate timeout override
+                        'timeout': candidate.get('timeout'),  # Candidate timeout override
+                        'priority': candidate.get('priority')  # For benchmark routing (e.g., always_first)
                     }
                 else:
                     # Inline definition (shouldn't happen in new format, but handle it)
@@ -313,12 +314,19 @@ class Config:
                 
                 resolved_candidates.append(resolved)
             
+            # Extract routing configuration for benchmark-based reordering
+            routing = config.get('routing', {})
+
             return {
                 'candidates': resolved_candidates,
-                'timeout': config.get('timeout')
+                'timeout': config.get('timeout'),
+                'routing': {
+                    'speed_weight': routing.get('speed_weight', 1.0),
+                    'min_tokens_per_sec': routing.get('min_tokens_per_sec', 0.0)
+                }
             }
         else:
-            # Regular model - wrap in single candidate structure
+            # Regular model - wrap in single candidate structure (no routing needed)
             return {
                 'candidates': [{
                     'provider': config['provider'],
@@ -329,7 +337,8 @@ class Config:
                     'display_metadata': config.get('display_metadata', {}),
                     'timeout': config.get('timeout')
                 }],
-                'timeout': config.get('timeout')
+                'timeout': config.get('timeout'),
+                'routing': None  # Regular models don't use routing
             }
     
     def get_candidate_timeout(self, candidate: Dict[str, Any], model_config: Dict[str, Any]) -> int:
@@ -369,6 +378,57 @@ class Config:
             
         # Fall back to global timeout
         return self.timeout_seconds
+
+    @property
+    def chunk_timeout_seconds(self) -> int:
+        """Get chunk timeout setting for streaming cold start detection.
+
+        Default is 15 seconds - enough for normal operations but fast enough
+        to detect serverless cold starts.
+        """
+        return self._config.get("chunk_timeout_seconds", 15)
+
+    def get_candidate_chunk_timeout(self, candidate: Dict[str, Any], model_config: Dict[str, Any]) -> int:
+        """Get chunk_timeout for streaming with a specific candidate.
+
+        For streaming responses, this timeout applies per-chunk to detect cold starts
+        and stream stalls. Uses global chunk_timeout_seconds (default 15s) if not
+        overridden at candidate or model level.
+
+        Timeout hierarchy:
+        1. Candidate-level chunk_timeout
+        2. Model-level chunk_timeout
+        3. Global chunk_timeout_seconds (default 15s)
+
+        Args:
+            candidate: Candidate configuration dict
+            model_config: Model configuration dict from get_model_config()
+
+        Returns:
+            Chunk timeout in seconds
+        """
+        # Parse timeout strings to seconds
+        def parse_timeout(timeout_str):
+            if not timeout_str:
+                return None
+            if isinstance(timeout_str, int):
+                return timeout_str
+            if isinstance(timeout_str, str) and timeout_str.endswith('s'):
+                return int(timeout_str[:-1])
+            return int(timeout_str)
+
+        # Try candidate chunk_timeout first
+        candidate_chunk_timeout = parse_timeout(candidate.get('chunk_timeout'))
+        if candidate_chunk_timeout is not None:
+            return candidate_chunk_timeout
+
+        # Try model chunk_timeout
+        model_chunk_timeout = parse_timeout(model_config.get('chunk_timeout'))
+        if model_chunk_timeout is not None:
+            return model_chunk_timeout
+
+        # Fall back to global chunk timeout
+        return self.chunk_timeout_seconds
 
     def _parse_dynamic_model(self, model_string: str) -> Dict[str, Any]:
         """Parse dynamic model specification from YAML syntax.

@@ -1,11 +1,9 @@
   {
     "models": [
-      "fireworks:openai/gpt-oss-120b?reasoning=low",
-      "fireworks:openai/gpt-oss-120b?reasoning=low",
-
-      "deepinfra:openai/gpt-oss-20b?reasoning=low",
-
-      "parasail:deepseek/deepseek-3.1"
+      "deepinfra:deepseek/deepseek-3.1-terminus",
+      "novita:deepseek/deepseek-3.1-terminus",
+      "parasail:deepseek/deepseek-3.1",
+      "fireworks:deepseek/deepseek-3.1-terminus"
     ],
     "prompts": [
       "small.yaml"

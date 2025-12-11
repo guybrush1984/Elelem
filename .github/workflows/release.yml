@@ -53,6 +53,11 @@ jobs:
         echo "💾 Running cache tests (SQLite-based unit tests)..."
         uv run pytest tests/test_cache.py -v
 
+    - name: Run benchmark store tests
+      run: |
+        echo "📊 Running benchmark store tests..."
+        uv run pytest tests/test_benchmark_store.py -v
+
     - name: Run Docker Compose integration tests
       # Only run on pushes from repo owner to prevent unauthorized API usage
       if: github.actor == 'guybrush1984' || github.repository_owner == 'guybrush1984'

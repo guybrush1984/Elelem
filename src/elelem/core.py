@@ -20,12 +20,13 @@ from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
 from ._exceptions import InfrastructureError, ModelError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
-from ._response_processing import collect_streaming_response, remove_think_tags, extract_json_from_markdown, extract_yaml_from_markdown, process_response_content
+from ._response_processing import collect_streaming_response, ChunkTimeoutError, remove_think_tags, extract_json_from_markdown, extract_yaml_from_markdown, process_response_content
 from ._json_validation import validate_json_schema, is_json_validation_api_error, add_json_instructions_to_messages, validate_json_response
 from ._yaml_validation import validate_yaml_schema, add_yaml_instructions_to_messages, validate_yaml_response
 from ._provider_management import create_provider_client, initialize_providers, get_model_config
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
+from ._benchmark_store import reorder_candidates_by_benchmark
 
 
 class Elelem:
@@ -158,9 +159,16 @@ class Elelem:
         return get_model_config(model, self._models, self._providers)
         
         
-    async def _collect_streaming_response(self, stream, request_id=None):
-        """Collect streaming chunks and reconstruct a normal response object."""
-        return await collect_streaming_response(stream, logger=self.logger, request_id=request_id)
+    async def _collect_streaming_response(self, stream, request_id=None, chunk_timeout=None):
+        """Collect streaming chunks and reconstruct a normal response object.
+
+        Args:
+            stream: Async stream of chunks
+            request_id: Request ID for logging
+            chunk_timeout: Optional timeout (seconds) for receiving each chunk.
+                          If no chunk arrives within this time, raises ChunkTimeoutError.
+        """
+        return await collect_streaming_response(stream, logger=self.logger, request_id=request_id, chunk_timeout=chunk_timeout)
         
     def _remove_think_tags(self, content: str) -> str:
         """Remove <think>...</think> tags from content."""
@@ -395,6 +403,18 @@ class Elelem:
 
             candidates = available_candidates
 
+            # Apply benchmark-based reordering if routing config exists (virtual models only)
+            routing = model_config.get('routing')
+            if routing:
+                speed_weight = routing.get('speed_weight', 1.0)
+                min_tokens_per_sec = routing.get('min_tokens_per_sec', 0.0)
+                candidates = reorder_candidates_by_benchmark(
+                    candidates,
+                    speed_weight=speed_weight,
+                    min_tokens_per_sec=min_tokens_per_sec,
+                    logger=self.logger
+                )
+
         except ValueError as e:
             # Record failure for invalid model
             request_tracker.finalize_failure(self._metrics_store, "ModelNotFound", str(e))
@@ -460,9 +480,15 @@ class Elelem:
                 "Schema validation will be skipped."
             )
         
-        # Build list of candidate providers for logging
-        candidate_providers = [c.get('provider') for c in candidates]
-        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_providers)} (temp={original_temperature})")
+        # Build list of candidate providers for logging (with benchmark scores if available)
+        def format_candidate(c):
+            provider = c.get('provider')
+            score = c.get('_benchmark_score')
+            if score is not None:
+                return f"{provider}({score:.1f})"
+            return provider
+        candidate_info = [format_candidate(c) for c in candidates]
+        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_info)} (temp={original_temperature})")
         if json_mode_requested:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
         if yaml_mode_requested:
@@ -561,6 +587,8 @@ class Elelem:
                 try:
                     if api_kwargs.get("stream", False):
                         # Handle streaming response
+                        # Use timeout for initial connection, then chunk_timeout for streaming
+                        chunk_timeout = self.config.get_candidate_chunk_timeout(candidate, model_config)
                         stream = await asyncio.wait_for(
                             provider_client.chat.completions.create(
                                 messages=modified_messages,
@@ -569,7 +597,7 @@ class Elelem:
                             ),
                             timeout=timeout
                         )
-                        response = await self._collect_streaming_response(stream, request_id)
+                        response = await self._collect_streaming_response(stream, request_id, chunk_timeout=chunk_timeout)
                     else:
                         # Handle non-streaming response
                         response = await asyncio.wait_for(
@@ -584,6 +612,9 @@ class Elelem:
                 except asyncio.TimeoutError as e:
                     # Timeout is an infrastructure error - try next candidate
                     raise InfrastructureError(f"Request timed out after {timeout}s")
+                except ChunkTimeoutError as e:
+                    # Chunk timeout (cold start or stream stall) - try next candidate
+                    raise InfrastructureError(f"Streaming chunk timeout: {str(e)}")
                 except RateLimitError:
                     # Let rate limit errors pass through to outer handler for proper retry logic
                     raise

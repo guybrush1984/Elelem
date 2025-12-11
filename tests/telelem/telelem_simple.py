@@ -22,7 +22,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Union
 
 # Load environment variables from .env file
 try:
@@ -226,31 +226,48 @@ def format_duration(seconds: float) -> str:
 
 async def run_single_test(
     client: TelelemClient,
-    prompt_file: str,
+    prompt: Union[str, dict],
     model: str,
     output_file: Optional[str] = None,
     temperature: float = 1.0,
     json_mode: bool = False,
     quiet: bool = False
 ) -> int:
-    """Run a single test with the given parameters."""
+    """Run a single test with the given parameters.
+
+    Args:
+        prompt: Either a file path (str) or inline prompt dict with 'system' and 'user' keys
+    """
+    # Determine prompt name for display
+    if isinstance(prompt, dict):
+        prompt_name = prompt.get('name', 'inline')
+    else:
+        prompt_name = prompt
 
     if not quiet:
         print(f"\n🚀 Running test")
         print(f"   Mode: {client.mode}")
         print(f"   Model: {model}")
-        print(f"   Prompt: {prompt_file}")
+        print(f"   Prompt: {prompt_name}")
         if temperature != 1.0:
             print(f"   Temperature: {temperature}")
         if json_mode:
             print(f"   JSON mode: enabled")
         print("-" * 50)
 
-    # Parse prompt file
+    # Parse prompt - either from file or inline dict
     try:
-        system_content, user_content = parse_prompt_file(prompt_file)
+        if isinstance(prompt, dict):
+            # Inline prompt
+            system_content = prompt.get('system', '').strip()
+            user_content = prompt.get('user', '').strip()
+            if not system_content and not user_content:
+                raise ValueError("Inline prompt must have 'system' or 'user' key")
+        else:
+            # File path
+            system_content, user_content = parse_prompt_file(prompt)
         if not quiet:
-            print(f"✅ Parsed prompt file")
+            print(f"✅ Parsed prompt")
     except Exception as e:
         if not quiet:
             print(f"❌ Failed to parse prompt: {e}")
@@ -365,7 +382,7 @@ async def run_single_test(
                     "model": model,
                     "temperature": temperature,
                     "json_mode": json_mode,
-                    "prompt_file": prompt_file,
+                    "prompt": prompt_name,
                     "mode": client.mode
                 },
                 "response": {
@@ -403,7 +420,7 @@ async def run_single_test(
                     "model": model,
                     "temperature": temperature,
                     "json_mode": json_mode,
-                    "prompt_file": prompt_file,
+                    "prompt": prompt_name,
                     "mode": client.mode
                 },
                 "error": {
@@ -466,7 +483,13 @@ async def run_batch_tests(
     # Run all combinations - parallel execution per prompt
     test_num = 0
     for prompt_idx, prompt in enumerate(prompts, 1):
-        print(f"\n📊 Prompt {prompt_idx}/{len(prompts)}: {Path(prompt).stem}")
+        # Get prompt name for display
+        if isinstance(prompt, dict):
+            prompt_name = prompt.get('name', 'inline')
+        else:
+            prompt_name = Path(prompt).stem
+
+        print(f"\n📊 Prompt {prompt_idx}/{len(prompts)}: {prompt_name}")
         print(f"   Running {len(models)} models in parallel...")
 
         # Create tasks for all models with this prompt
@@ -476,20 +499,20 @@ async def run_batch_tests(
 
             # Generate output filename
             model_safe = model.replace(':', '_').replace('/', '_')
-            prompt_safe = Path(prompt).stem
+            prompt_safe = prompt_name
             output_file = output_path / f"{model_safe}_{prompt_safe}.json"
 
             # Create task for this model/prompt combination
             task = run_single_test(
                 client=client,
-                prompt_file=prompt,
+                prompt=prompt,
                 model=model,
                 output_file=str(output_file),
                 temperature=config.get("temperature", 1.0),
                 json_mode=config.get("json", False),
                 quiet=True  # Suppress verbose output in parallel mode
             )
-            tasks.append((model, prompt, output_file, task))
+            tasks.append((model, prompt_name, output_file, task))
 
         # Run all models for this prompt in parallel
         print(f"⚡ Executing {len(tasks)} requests in parallel...")
@@ -794,7 +817,7 @@ def main():
 
         return asyncio.run(run_single_test(
             client=client,
-            prompt_file=args.prompt,
+            prompt=args.prompt,
             model=args.model,
             output_file=output_file,
             temperature=args.temperature,

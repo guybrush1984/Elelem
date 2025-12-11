@@ -63,6 +63,7 @@ models:
       speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:deepseek/deepseek-3.1"
+        priority: always_first
       - model: "deepinfra:deepseek/deepseek-3.1"
       - model: "novita:deepseek/deepseek-3.1"
       - model: "fireworks:deepseek/deepseek-3.1"
@@ -86,6 +87,7 @@ models:
       speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:deepseek/deepseek-3.1?reasoning"
+        priority: always_first
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
       - model: "fireworks:deepseek/deepseek-3.1?reasoning"
 
@@ -179,6 +181,7 @@ models:
       speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
+        priority: always_first
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-120b-turbo?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
@@ -249,6 +252,7 @@ models:
       speed_weight: 0.5  # Favor cost
     candidates:
       - model: "ollama:moonshotai/kimi-k2-instruct"
+        priority: always_first
       - model: "deepinfra:moonshotai/kimi-k2-instruct"
       - model: "parasail:moonshotai/kimi-k2-instruct"
       - model: "novita:moonshotai/kimi-k2-instruct"

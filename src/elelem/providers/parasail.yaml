@@ -20,6 +20,7 @@ models:
       model_configuration: "reasoning=$reasoning"
     default_params:
       reasoning_effort: low
+      stream: true
 
   "parasail:deepseek/deepseek-3.2":
     provider: parasail
@@ -34,6 +35,8 @@ models:
       currency: USD
     metadata:
       model_reference: "deepseek_v32"
+    default_params:
+      stream: true
 
   "parasail:deepseek/deepseek-3.2?reasoning":
     provider: parasail
@@ -69,3 +72,5 @@ models:
       currency: USD
     metadata:
       model_reference: "moonshot_kimi_k2"
+    default_params:
+      stream: true

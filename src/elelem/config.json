@@ -3,8 +3,8 @@
         "max_json_retries": 3,
         "temperature_reductions": [0.1, 0.3],
         "min_temp": 0.3,
-        "rate_limit_backoff": [1, 2, 4, 8],
-        "max_rate_limit_retries": 4
+        "rate_limit_backoff": [1, 2],
+        "max_rate_limit_retries": 2
     },
     "timeout_seconds": 120,
     "logging_level": "INFO"

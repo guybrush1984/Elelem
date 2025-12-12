@@ -1,0 +1,31 @@
+scenario: "elelem_rate_limit_failover"
+description: "Test that rate limit exhaustion triggers failover to next candidate"
+type: "sequence"
+
+models:
+  "rate-exhaust":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+# This sequence returns more rate limits than max_rate_limit_retries (2)
+# forcing Elelem to exhaust retries and failover to next candidate
+response_sequence:
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "rate_limit"
+    retry_after: 1
+  - type: "rate_limit"
+    retry_after: 1
+  # If we somehow reach here, return success
+  - type: "success"
+    content: "Should not reach this - should have failed over"
+    tokens:
+      input: 50
+      output: 10

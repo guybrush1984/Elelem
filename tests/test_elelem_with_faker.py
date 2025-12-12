@@ -227,6 +227,52 @@ class TestElelemWithFaker:
         # The response should come from the successful candidate
 
     @pytest.mark.asyncio
+    async def test_rate_limit_exhaustion_triggers_failover(self, elelem_with_faker_env):
+        """Test that exhausting rate limit retries triggers failover to next candidate.
+
+        This tests the fix for the bug where rate limit exhaustion raised ModelError
+        instead of InfrastructureError, preventing failover to the next candidate.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with rate limit failover scenario
+        # This scenario returns more 429s than max_rate_limit_retries (2)
+        faker.configure_scenario('elelem_rate_limit_failover')
+        faker.reset_state()
+
+        start_time = time.time()
+
+        # Use virtual model where first candidate exhausts rate limits
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-rate-exhaust-failover",
+            messages=[{"role": "user", "content": "Test rate limit exhaustion failover"}],
+            tags=["rate-exhaust-failover-test"]
+        )
+
+        elapsed_time = time.time() - start_time
+
+        # Should succeed via second candidate after first exhausts rate limits
+        assert response is not None
+        assert hasattr(response, "choices")
+        assert len(response.choices) > 0
+
+        # Should have taken some time due to rate limit backoff (1s + 2s = 3s minimum)
+        assert elapsed_time >= 2.0, f"Expected at least 2s for rate limit backoff, got {elapsed_time:.1f}s"
+
+        # Verify the response came from the second candidate (basic), not the first
+        assert response.elelem_metrics["model_used"] == "faker:basic", \
+            f"Expected failover to faker:basic, got {response.elelem_metrics['model_used']}"
+
+        # Verify multiple requests were made (at least 3: 2 rate limits + 1 success)
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) >= 3, f"Expected at least 3 requests, got {len(requests)}"
+
+        print(f"✅ Rate limit exhaustion correctly triggered failover")
+        print(f"   Time elapsed: {elapsed_time:.1f}s")
+        print(f"   Requests made: {len(requests)}")
+        print(f"   Final model: {response.elelem_metrics['model_used']}")
+
+    @pytest.mark.asyncio
     async def test_request_validation_through_elelem(self, elelem_with_faker_env):
         """Test that requests through Elelem are properly formatted."""
         elelem, faker = elelem_with_faker_env

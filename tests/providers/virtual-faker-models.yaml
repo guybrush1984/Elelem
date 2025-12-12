@@ -63,3 +63,13 @@ models:
         timeout: 30s
       - model: "faker:medium-provider"
         timeout: 30s
+
+  # Virtual model for testing rate limit exhaustion failover
+  # First candidate will exhaust rate limits, second should succeed
+  "virtual:faker-rate-exhaust-failover":
+    timeout: 60s
+    candidates:
+      - model: "faker:rate-exhaust"  # Will return 429s until rate limit retries exhausted
+        timeout: 30s
+      - model: "faker:basic"         # Second candidate - should succeed after first fails
+        timeout: 30s

@@ -235,3 +235,17 @@ models:
       input_cost_per_1m: 0.08
       output_cost_per_1m: 0.20
       currency: USD
+
+  # Model for testing rate limit exhaustion failover
+  # Will return more 429s than max_rate_limit_retries to force failover
+  "faker:rate-exhaust":
+    provider: faker
+    model_id: rate-exhaust
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.15
+      currency: USD

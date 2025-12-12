@@ -576,12 +576,15 @@ class Elelem:
         max_rate_limit_retries = self.config.retry_settings["max_rate_limit_retries"]
         temperature_reductions = self.config.retry_settings["temperature_reductions"]
         min_temp = self.config.retry_settings["min_temp"]
-        
+
         total_input_tokens = 0
         total_output_tokens = 0
         total_reasoning_tokens = 0
-        
-        for attempt in range(max_retries + 1):
+        rate_limit_attempts = 0  # Separate counter for rate limit retries
+
+        # Use max of JSON retries and rate limit retries to ensure both can complete
+        max_loop_iterations = max(max_retries, max_rate_limit_retries) + 1
+        for attempt in range(max_loop_iterations):
             try:
                 current_temp = api_kwargs.get('temperature', original_temperature)
                 self.logger.debug(f"[{request_id}] 🔄 Attempt {attempt + 1}/{max_retries + 1} - temp={current_temp}")
@@ -786,16 +789,17 @@ class Elelem:
                 raise
             except RateLimitError as e:
                 # Handle OpenAI rate limit errors with dedicated retry logic
-                if attempt < max_rate_limit_retries:
+                if rate_limit_attempts < max_rate_limit_retries:
                     backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                    wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
+                    wait_time = backoff_times[min(rate_limit_attempts, len(backoff_times) - 1)]
+                    rate_limit_attempts += 1
                     request_tracker.record_retry("rate_limit_retries")
-                    self.logger.warning(f"[{request_id}] Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_rate_limit_retries + 1})")
+                    self.logger.warning(f"[{request_id}] Rate limit hit, waiting {wait_time}s (attempt {rate_limit_attempts}/{max_rate_limit_retries})")
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     # Rate limit exhaustion is infrastructure issue - try next candidate
-                    raise InfrastructureError(f"Rate limit exhausted after {max_rate_limit_retries + 1} attempts: {e}")
+                    raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}")
             except (AuthenticationError, PermissionDeniedError) as e:
                 # Authentication/permission errors are infrastructure issues - try next candidate
                 raise InfrastructureError(f"Authentication/permission error: {e}")
@@ -810,21 +814,23 @@ class Elelem:
                 # Fallback for any other unexpected errors
                 # Check if it might be a rate limit that wasn't caught as RateLimitError
                 if "429" in str(e) or "rate limit" in str(e).lower():
-                    if attempt < max_rate_limit_retries:
+                    if rate_limit_attempts < max_rate_limit_retries:
                         backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                        wait_time = backoff_times[min(attempt, len(backoff_times) - 1)]
+                        wait_time = backoff_times[min(rate_limit_attempts, len(backoff_times) - 1)]
+                        rate_limit_attempts += 1
                         request_tracker.record_retry("rate_limit_retries")
-                        self.logger.warning(f"[{request_id}] Rate limit (fallback), waiting {wait_time}s")
+                        self.logger.warning(f"[{request_id}] Rate limit (fallback), waiting {wait_time}s (attempt {rate_limit_attempts}/{max_rate_limit_retries})")
                         await asyncio.sleep(wait_time)
                         continue
                     else:
-                        raise InfrastructureError(f"Rate limit exhausted: {e}")
+                        raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}")
 
                 # Other unexpected errors
                 raise ModelError(f"Unexpected error: {e}")
         
-        # Should not reach here
-        raise ModelError("Exhausted all attempts for candidate")
+        # Should not reach here - if we do, something unexpected happened
+        self.logger.error(f"[{request_id}] ⚠️ Unexpected: loop exhausted without resolution (attempt={attempt}, rate_limit_attempts={rate_limit_attempts})")
+        raise InfrastructureError("Exhausted all retry attempts for candidate (unexpected state)")
     
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""

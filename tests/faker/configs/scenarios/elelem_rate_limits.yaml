@@ -10,9 +10,8 @@ models:
       supports_temperature: true
       supports_system: true
 
+# Returns 2 rate limits then success (max_rate_limit_retries = 2)
 response_sequence:
-  - type: "rate_limit"
-    retry_after: 1
   - type: "rate_limit"
     retry_after: 1
   - type: "rate_limit"

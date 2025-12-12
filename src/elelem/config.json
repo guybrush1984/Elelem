@@ -2,7 +2,7 @@
     "retry_settings": {
         "max_json_retries": 3,
         "temperature_reductions": [0.1, 0.3],
-        "min_temp": 0.3,
+        "min_temp": 0,
         "rate_limit_backoff": [1, 2],
         "max_rate_limit_retries": 2
     },

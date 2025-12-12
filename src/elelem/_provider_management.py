@@ -60,8 +60,8 @@ def probe_endpoint(endpoint: str, timeout: float, logger: logging.Logger, api_ke
 
         with httpx.Client(timeout=timeout) as client:
             response = client.get(probe_url, headers=headers)
-            # Accept both 200 (success) and 401/403 (auth required but endpoint exists)
-            if response.status_code in [200, 401, 403]:
+            # Only accept 200 - 401/403 means auth failed, provider won't work
+            if response.status_code == 200:
                 logger.debug(f"Endpoint probe successful: {endpoint} (status: {response.status_code})")
                 return True
             else:

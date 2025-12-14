@@ -1,0 +1,80 @@
+# GMI Cloud provider configuration and models
+# API docs: https://docs.gmicloud.ai/inference-engine/api-reference/llm-api-reference
+provider:
+  endpoint: https://api.gmi-serving.com/v1
+  default_params:
+    stream: true
+
+models:
+  # DeepSeek V3.2 - no reasoning support on GMI
+  "gmi:deepseek/deepseek-3.2":
+    metadata:
+      model_reference: "deepseek_v32"
+    provider: gmi
+    model_id: deepseek-ai/DeepSeek-V3.2
+    capabilities:
+      supports_json_mode: false  # Returns markdown-wrapped JSON
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.28
+      output_cost_per_1m: 0.40
+      currency: USD
+
+  # DeepSeek V3.1 - no reasoning support on GMI
+  "gmi:deepseek/deepseek-3.1":
+    metadata:
+      model_reference: "deepseek_v31"
+    provider: gmi
+    model_id: deepseek-ai/DeepSeek-V3.1
+    capabilities:
+      supports_json_mode: false  # Returns markdown-wrapped JSON
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.27
+      output_cost_per_1m: 1.00
+      currency: USD
+
+  # GPT-OSS 120B with reasoning parameter
+  "gmi:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=$reasoning"
+    provider: gmi
+    model_id: openai/gpt-oss-120b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.25
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        effort: $reasoning
+
+  # GPT-OSS 20B with reasoning parameter
+  "gmi:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=$reasoning"
+    provider: gmi
+    model_id: openai/gpt-oss-20b
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.04
+      output_cost_per_1m: 0.15
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        effort: $reasoning
+

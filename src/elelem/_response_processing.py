@@ -82,8 +82,10 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
     # Trace variables
     chunk_count = 0
     first_chunk_time = None
+    last_chunk_time = None
     last_trace_time = None
     trace_interval = 30  # 30 seconds
+    long_gap_threshold = 15  # Warn if gap between chunks exceeds this
 
     # Convert stream to async iterator for manual iteration with timeout
     stream_iter = stream.__aiter__()
@@ -106,6 +108,12 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
         chunk_count += 1
         current_time = time.time()
 
+        # Warn if large gap between chunks (potential provider stall)
+        if last_chunk_time and logger:
+            gap = current_time - last_chunk_time
+            if gap >= long_gap_threshold:
+                request_prefix = f"[{request_id}] " if request_id else ""
+                logger.warning(f"{request_prefix}⏳ Long inter-chunk gap: {gap:.1f}s before chunk {chunk_count}")
 
         # Log first chunk received
         if chunk_count == 1:
@@ -141,6 +149,7 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
 
         # Keep the last chunk for metadata (id, usage, etc.)
         final_chunk = chunk
+        last_chunk_time = current_time
 
     if not final_chunk:
         raise ValueError("No chunks received from stream")

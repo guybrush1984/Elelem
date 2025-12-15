@@ -41,6 +41,8 @@ class Elelem:
         # Lazy provider initialization - start empty, probe on first use
         self._providers = {}
         self._probed_providers = set()  # Track which providers have been attempted
+        self._failed_providers = {}  # provider_name -> (timestamp, retryable)
+        self._provider_retry_interval = 300  # Retry failed providers after 5 minutes
 
         # Initialize metrics system (unified SQLAlchemy backend)
         self._metrics_store = MetricsStore()
@@ -70,10 +72,33 @@ class Elelem:
         Ensure a provider is probed and initialized on first use.
         Returns True if provider is ready, False if unavailable.
         Caches result so subsequent calls are instant.
+        Retries failed providers after retry interval if failure was retryable.
         """
-        # Already attempted this provider
+        import time
+        import os
+
+        # Already initialized successfully
+        if provider_name in self._providers:
+            return True
+
+        # Check if we should retry a failed provider
+        if provider_name in self._failed_providers:
+            failed_time, retryable = self._failed_providers[provider_name]
+            if not retryable:
+                # Permanent failure (auth error) - never retry
+                return False
+            elapsed = time.time() - failed_time
+            if elapsed < self._provider_retry_interval:
+                # Not enough time passed - skip retry
+                return False
+            # Enough time passed - retry
+            self.logger.info(f"[{provider_name}] Retrying after {elapsed:.0f}s...")
+            del self._failed_providers[provider_name]
+            self._probed_providers.discard(provider_name)
+
+        # Already attempted this provider (and not retrying)
         if provider_name in self._probed_providers:
-            return provider_name in self._providers
+            return False
 
         # Mark as probed (whether successful or not)
         self._probed_providers.add(provider_name)
@@ -94,20 +119,23 @@ class Elelem:
         else:
             env_var = f"{provider_name.upper()}_API_KEY"
 
-        import os
         api_key = os.getenv(env_var)
 
         if not api_key:
             self.logger.debug(f"[{provider_name}] No API key found (env var: {env_var})")
+            # No API key is a permanent failure
+            self._failed_providers[provider_name] = (time.time(), False)
+            return False
 
         # Determine endpoint (probe if needed)
         endpoint = None
-        probe_timeout = provider_config.get("probe_timeout", 2.0)
+        retryable = True
+        probe_timeout = provider_config.get("probe_timeout", 5.0)
 
         if "endpoints" in provider_config:
             # Multiple endpoints - probe and select
             self.logger.info(f"[{provider_name}] Probing {len(provider_config['endpoints'])} endpoint(s)...")
-            endpoint = select_working_endpoint(
+            endpoint, retryable = select_working_endpoint(
                 provider_config["endpoints"],
                 probe_timeout,
                 provider_name,
@@ -115,7 +143,8 @@ class Elelem:
                 api_key
             )
             if not endpoint:
-                self.logger.warning(f"[{provider_name}] No working endpoints found")
+                self.logger.warning(f"[{provider_name}] No working endpoints found (retryable={retryable})")
+                self._failed_providers[provider_name] = (time.time(), retryable)
                 return False
 
         elif "endpoint" in provider_config:
@@ -123,19 +152,17 @@ class Elelem:
             single_endpoint = provider_config["endpoint"]
             self.logger.info(f"[{provider_name}] Probing endpoint: {single_endpoint}")
 
-            if probe_endpoint(single_endpoint, probe_timeout, self.logger, api_key):
+            result = probe_endpoint(single_endpoint, probe_timeout, self.logger, api_key)
+            if result.success:
                 self.logger.info(f"[{provider_name}] ✅ Endpoint accessible")
                 endpoint = single_endpoint
             else:
-                self.logger.warning(f"[{provider_name}] ❌ Endpoint not accessible")
+                self.logger.warning(f"[{provider_name}] ❌ Endpoint not accessible (retryable={result.retryable})")
+                self._failed_providers[provider_name] = (time.time(), result.retryable)
                 return False
         else:
             self.logger.error(f"[{provider_name}] No endpoint configured")
-            return False
-
-        # Check for API key
-        if not api_key:
-            self.logger.warning(f"[{provider_name}] No API key found (env var: {env_var})")
+            self._failed_providers[provider_name] = (time.time(), False)
             return False
 
         # Create provider client

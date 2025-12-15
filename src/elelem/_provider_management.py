@@ -38,7 +38,18 @@ def fetch_available_models(endpoint: str, timeout: float, api_key: Optional[str]
         return None
 
 
-def probe_endpoint(endpoint: str, timeout: float, logger: logging.Logger, api_key: Optional[str] = None) -> bool:
+class ProbeResult:
+    """Result of an endpoint probe with failure classification."""
+    def __init__(self, success: bool, retryable: bool = True, reason: str = ""):
+        self.success = success
+        self.retryable = retryable  # False for auth failures (401/403), True for timeouts/network errors
+        self.reason = reason
+
+    def __bool__(self):
+        return self.success
+
+
+def probe_endpoint(endpoint: str, timeout: float, logger: logging.Logger, api_key: Optional[str] = None) -> ProbeResult:
     """Probe an endpoint to check if it's accessible.
 
     Args:
@@ -48,7 +59,7 @@ def probe_endpoint(endpoint: str, timeout: float, logger: logging.Logger, api_ke
         api_key: Optional API key for authentication
 
     Returns:
-        True if endpoint responds successfully, False otherwise
+        ProbeResult with success status and whether failure is retryable
     """
     try:
         # Try to access /models endpoint which should be available on all OpenAI-compatible APIs
@@ -60,19 +71,30 @@ def probe_endpoint(endpoint: str, timeout: float, logger: logging.Logger, api_ke
 
         with httpx.Client(timeout=timeout) as client:
             response = client.get(probe_url, headers=headers)
-            # Only accept 200 - 401/403 means auth failed, provider won't work
-            if response.status_code == 200:
-                logger.debug(f"Endpoint probe successful: {endpoint} (status: {response.status_code})")
-                return True
+            status = response.status_code
+
+            if status == 200:
+                logger.debug(f"Endpoint probe successful: {endpoint} (status: {status})")
+                return ProbeResult(success=True)
+            elif status in (401, 403):
+                # Auth failure - don't retry
+                logger.debug(f"Endpoint probe failed (auth): {endpoint} (status: {status})")
+                return ProbeResult(success=False, retryable=False, reason=f"auth_failed_{status}")
             else:
-                logger.debug(f"Endpoint probe failed: {endpoint} (status: {response.status_code})")
-                return False
-    except Exception as e:
+                # Other HTTP errors - might be temporary
+                logger.debug(f"Endpoint probe failed: {endpoint} (status: {status})")
+                return ProbeResult(success=False, retryable=True, reason=f"http_{status}")
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.ConnectTimeout) as e:
+        # Network/timeout errors - retryable
         logger.warning(f"Endpoint probe failed: {endpoint} ({type(e).__name__}: {e})")
-        return False
+        return ProbeResult(success=False, retryable=True, reason=type(e).__name__)
+    except Exception as e:
+        # Unknown errors - assume retryable
+        logger.warning(f"Endpoint probe failed: {endpoint} ({type(e).__name__}: {e})")
+        return ProbeResult(success=False, retryable=True, reason=type(e).__name__)
 
 
-def select_working_endpoint(endpoints: List[str], timeout: float, provider_name: str, logger: logging.Logger, api_key: Optional[str] = None) -> Optional[str]:
+def select_working_endpoint(endpoints: List[str], timeout: float, provider_name: str, logger: logging.Logger, api_key: Optional[str] = None) -> Tuple[Optional[str], bool]:
     """Try multiple endpoints and return the first one that works.
 
     Args:
@@ -83,18 +105,23 @@ def select_working_endpoint(endpoints: List[str], timeout: float, provider_name:
         api_key: Optional API key for authentication
 
     Returns:
-        First working endpoint URL, or None if none work
+        Tuple of (endpoint_url or None, retryable: bool)
+        retryable is False only if ALL failures were auth errors (401/403)
     """
     logger.info(f"[{provider_name}] Probing {len(endpoints)} endpoint(s) to find working connection...")
 
+    any_retryable = False
     for endpoint in endpoints:
         logger.debug(f"[{provider_name}] Trying endpoint: {endpoint}")
-        if probe_endpoint(endpoint, timeout, logger, api_key):
+        result = probe_endpoint(endpoint, timeout, logger, api_key)
+        if result.success:
             logger.info(f"[{provider_name}] ✅ Selected working endpoint: {endpoint}")
-            return endpoint
+            return endpoint, True
+        if result.retryable:
+            any_retryable = True
 
     logger.warning(f"[{provider_name}] ❌ No working endpoints found among {len(endpoints)} candidates")
-    return None
+    return None, any_retryable
 
 
 def validate_provider_models(provider_name: str, endpoint: str, api_key: Optional[str], models_config: Dict, logger: logging.Logger):
@@ -191,7 +218,7 @@ def initialize_providers(providers_config: Dict, timeout_seconds: int, logger: l
         endpoint = None
         if "endpoints" in provider_config:
             # Multiple endpoints - probe and select the first working one
-            probe_timeout = provider_config.get("probe_timeout", 2.0)
+            probe_timeout = provider_config.get("probe_timeout", 5.0)
             endpoint = select_working_endpoint(
                 provider_config["endpoints"],
                 probe_timeout,
@@ -204,7 +231,7 @@ def initialize_providers(providers_config: Dict, timeout_seconds: int, logger: l
                 continue
         elif "endpoint" in provider_config:
             # Single endpoint - probe it to verify it's accessible
-            probe_timeout = provider_config.get("probe_timeout", 2.0)
+            probe_timeout = provider_config.get("probe_timeout", 5.0)
             single_endpoint = provider_config["endpoint"]
 
             logger.info(f"[{provider_name}] Probing endpoint: {single_endpoint}")

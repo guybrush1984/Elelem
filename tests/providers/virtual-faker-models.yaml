@@ -73,3 +73,33 @@ models:
         timeout: 30s
       - model: "faker:basic"         # Second candidate - should succeed after first fails
         timeout: 30s
+
+  # Virtual model for testing model-level failover (ModelError skips same model_reference)
+  # Candidate 1 and 2 have same model_reference (faker_model_error)
+  # Candidate 3 has different model_reference (faker_basic)
+  # When candidate 1 fails with ModelError, candidate 2 should be skipped, candidate 3 should succeed
+  "virtual:faker-model-error-failover":
+    timeout: 60s
+    candidates:
+      - model: "faker:model-error"      # Will return ModelError
+        timeout: 30s
+      - model: "faker:model-error-alt"  # Same model_reference - should be SKIPPED
+        timeout: 30s
+      - model: "faker:basic"            # Different model_reference - should succeed
+        timeout: 30s
+
+  # Virtual model that chains to another virtual (tests recursive resolution)
+  "virtual:faker-model-error-inner":
+    timeout: 60s
+    candidates:
+      - model: "faker:model-error"      # Will return ModelError
+        timeout: 30s
+      - model: "faker:model-error-alt"  # Same model_reference - should be SKIPPED
+        timeout: 30s
+
+  # Virtual model chaining test: references another virtual + fallback
+  "virtual:faker-chained-failover":
+    timeout: 60s
+    candidates:
+      - model: "virtual:faker-model-error-inner"  # Will be flattened, both fail with same model_ref
+      - model: "faker:basic"                       # Different model_reference - should succeed

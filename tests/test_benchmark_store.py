@@ -395,6 +395,106 @@ class TestReorderCandidates:
         assert refs[3] == "unscored1:model"
         assert refs[4] == "unscored2:model"
 
+    def test_priority_always_last_placed_at_end(self):
+        """Candidates with priority: always_last should be placed last regardless of score."""
+        candidates = [
+            {"original_model_ref": "fallback:model", "provider": "fallback", "priority": "always_last"},
+            {"original_model_ref": "fast:model", "provider": "fast"},
+            {"original_model_ref": "slow:model", "provider": "slow"},
+        ]
+
+        mock_store = MagicMock()
+        mock_store.enabled = True
+        mock_store.get_benchmark.side_effect = lambda ref: {
+            "fast:model": {"tokens_per_second": 100.0},
+            "slow:model": {"tokens_per_second": 10.0},
+            "fallback:model": {"tokens_per_second": 1000.0},  # Highest score but should be last
+        }.get(ref)
+        mock_store.calculate_value_score.side_effect = lambda ref, speed_weight=1.0, min_tokens_per_sec=0.0: {
+            "fast:model": 100.0,
+            "slow:model": 10.0,
+            "fallback:model": 1000.0,  # Best score but always_last
+        }.get(ref)
+
+        with patch('elelem._benchmark_store.get_benchmark_store', return_value=mock_store):
+            result = reorder_candidates_by_benchmark(candidates)
+
+        refs = [c["original_model_ref"] for c in result]
+
+        # fallback:model should be LAST despite highest score (has always_last)
+        assert refs[0] == "fast:model"
+        assert refs[1] == "slow:model"
+        assert refs[2] == "fallback:model"
+
+    def test_multiple_always_last_preserves_yaml_order(self):
+        """Multiple always_last candidates should preserve their YAML order among themselves."""
+        candidates = [
+            {"original_model_ref": "fast:model", "provider": "fast"},
+            {"original_model_ref": "fallback1:model", "provider": "fallback1", "priority": "always_last"},
+            {"original_model_ref": "fallback2:model", "provider": "fallback2", "priority": "always_last"},
+        ]
+
+        mock_store = MagicMock()
+        mock_store.enabled = True
+        mock_store.get_benchmark.side_effect = lambda ref: {
+            "fast:model": {"tokens_per_second": 100.0},
+            "fallback1:model": {"tokens_per_second": 50.0},
+            "fallback2:model": {"tokens_per_second": 200.0},  # Better than fallback1 but still last
+        }.get(ref)
+        mock_store.calculate_value_score.side_effect = lambda ref, speed_weight=1.0, min_tokens_per_sec=0.0: {
+            "fast:model": 100.0,
+            "fallback1:model": 50.0,
+            "fallback2:model": 200.0,
+        }.get(ref)
+
+        with patch('elelem._benchmark_store.get_benchmark_store', return_value=mock_store):
+            result = reorder_candidates_by_benchmark(candidates)
+
+        refs = [c["original_model_ref"] for c in result]
+
+        # fast:model first, then both always_last in YAML order
+        assert refs[0] == "fast:model"
+        assert refs[1] == "fallback1:model"
+        assert refs[2] == "fallback2:model"
+
+    def test_always_first_and_always_last_together(self):
+        """Test ordering with both always_first and always_last candidates."""
+        candidates = [
+            {"original_model_ref": "fallback:model", "provider": "fallback", "priority": "always_last"},
+            {"original_model_ref": "priority:model", "provider": "priority", "priority": "always_first"},
+            {"original_model_ref": "scored:model", "provider": "scored"},
+            {"original_model_ref": "unscored:model", "provider": "unscored"},
+        ]
+
+        mock_store = MagicMock()
+        mock_store.enabled = True
+        mock_store.get_benchmark.side_effect = lambda ref: {
+            "scored:model": {"tokens_per_second": 50.0},
+            "priority:model": {"tokens_per_second": 10.0},
+            "fallback:model": {"tokens_per_second": 100.0},
+            # unscored:model has no benchmark data
+        }.get(ref)
+        mock_store.calculate_value_score.side_effect = lambda ref, speed_weight=1.0, min_tokens_per_sec=0.0: {
+            "scored:model": 50.0,
+            "priority:model": 10.0,
+            "fallback:model": 100.0,
+        }.get(ref)
+
+        with patch('elelem._benchmark_store.get_benchmark_store', return_value=mock_store):
+            result = reorder_candidates_by_benchmark(candidates)
+
+        refs = [c["original_model_ref"] for c in result]
+
+        # Expected order:
+        # 1. priority:model (always_first)
+        # 2. scored:model (scored, middle)
+        # 3. unscored:model (unscored, after scored)
+        # 4. fallback:model (always_last)
+        assert refs[0] == "priority:model"
+        assert refs[1] == "scored:model"
+        assert refs[2] == "unscored:model"
+        assert refs[3] == "fallback:model"
+
     def test_all_candidates_missing_benchmark_preserves_yaml_order(self):
         """When no candidates have benchmark data, YAML order is preserved."""
         candidates = [

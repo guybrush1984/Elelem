@@ -76,7 +76,9 @@ def is_infrastructure_error(error) -> bool:
         "connection", "network", "timeout", "503", "502", "500",
         "service unavailable", "bad gateway", "internal server error",
         "401", "402", "403", "unauthorized", "forbidden", "quota", "billing",
-        "429", "rate limit", "too many requests"
+        "429", "rate limit", "too many requests",
+        # Provider returned malformed/non-standard response (e.g., finish_reason='abort')
+        "validationerror", "finish_reason",
     ]
 
     return any(pattern in error_str for pattern in infrastructure_patterns)

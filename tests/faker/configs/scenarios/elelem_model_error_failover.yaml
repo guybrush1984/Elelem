@@ -1,0 +1,33 @@
+scenario: "elelem_model_error_failover"
+description: "Test model-level failover: when a model fails with ModelError, skip all candidates with the same model_reference"
+type: "sequence"
+
+models:
+  "model-error":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+  "model-error-alt":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+  "basic":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+# First call returns model error, second should succeed (after skipping same model_reference)
+response_sequence:
+  - type: "model_error"
+    message: "This model cannot process the request: content policy violation"
+  - type: "success"
+    content: "Success after model-level failover to different model_reference"
+    tokens:
+      input: 50
+      output: 25

@@ -266,6 +266,76 @@ class Config:
         """Get all model configurations."""
         return self._models_config.get("models", {})
     
+    def _get_model_reference(self, config: Dict[str, Any]) -> Optional[str]:
+        """Extract model_reference from config metadata."""
+        metadata = config.get('metadata', {})
+        if isinstance(metadata, dict):
+            return metadata.get('model_reference')
+        return None
+
+    def _resolve_candidate(self, candidate: Dict[str, Any], models: Dict[str, Any],
+                          resolving_chain: Optional[set] = None) -> List[Dict[str, Any]]:
+        """Resolve a single candidate, handling virtual model chaining.
+
+        Args:
+            candidate: Candidate dict with 'model' reference or inline definition
+            models: All models dict
+            resolving_chain: Set of model names being resolved (for cycle detection)
+
+        Returns:
+            List of resolved candidates (may be multiple if referencing a virtual model)
+        """
+        if resolving_chain is None:
+            resolving_chain = set()
+
+        if 'model' not in candidate:
+            # Inline definition
+            return [candidate.copy()]
+
+        ref_model_name = candidate['model']
+
+        # Cycle detection
+        if ref_model_name in resolving_chain:
+            raise ValueError(f"Circular model reference detected: {ref_model_name}")
+
+        if ref_model_name not in models:
+            raise ValueError(f"Referenced model '{ref_model_name}' not found")
+
+        ref_config = models[ref_model_name]
+
+        # Check if referenced model is virtual (has candidates)
+        if 'candidates' in ref_config:
+            # Recursively resolve virtual model's candidates
+            resolving_chain.add(ref_model_name)
+            resolved_list = []
+            for sub_candidate in ref_config['candidates']:
+                sub_resolved = self._resolve_candidate(sub_candidate, models, resolving_chain)
+                for r in sub_resolved:
+                    # Apply parent candidate overrides (timeout, priority)
+                    if candidate.get('timeout'):
+                        r['timeout'] = candidate['timeout']
+                    if candidate.get('priority'):
+                        r['priority'] = candidate['priority']
+                    resolved_list.append(r)
+            resolving_chain.discard(ref_model_name)
+            return resolved_list
+        else:
+            # Regular model - resolve to single candidate
+            model_reference = self._get_model_reference(ref_config)
+            resolved = {
+                'original_model_ref': ref_model_name,
+                'model_reference': model_reference,  # For model-level failover
+                'provider': ref_config['provider'],
+                'model_id': ref_config['model_id'],
+                'capabilities': ref_config.get('capabilities', {}),
+                'cost': ref_config.get('cost'),
+                'default_params': ref_config.get('default_params', {}),
+                'display_metadata': ref_config.get('display_metadata', {}),
+                'timeout': candidate.get('timeout'),
+                'priority': candidate.get('priority')
+            }
+            return [resolved]
+
     def get_model_config(self, model_name: str) -> Dict[str, Any]:
         """Get unified candidate structure for any model (regular, virtual, or dynamic).
 
@@ -280,40 +350,19 @@ class Config:
             return self._parse_dynamic_model(model_name)
 
         models = self.models
-        
+
         if model_name not in models:
             raise ValueError(f"Model '{model_name}' not found in configuration")
-            
+
         config = models[model_name]
-        
+
         if 'candidates' in config:
-            # Virtual model - resolve model references
+            # Virtual model - resolve model references (with chaining support)
             resolved_candidates = []
             for candidate in config['candidates']:
-                if 'model' in candidate:
-                    # Reference to another model
-                    ref_model_name = candidate['model']
-                    if ref_model_name not in models:
-                        raise ValueError(f"Referenced model '{ref_model_name}' not found")
-                    
-                    ref_config = models[ref_model_name]
-                    resolved = {
-                        'original_model_ref': ref_model_name,  # Keep track of original reference
-                        'provider': ref_config['provider'],
-                        'model_id': ref_config['model_id'],
-                        'capabilities': ref_config.get('capabilities', {}),
-                        'cost': ref_config.get('cost'),
-                        'default_params': ref_config.get('default_params', {}),
-                        'display_metadata': ref_config.get('display_metadata', {}),
-                        'timeout': candidate.get('timeout'),  # Candidate timeout override
-                        'priority': candidate.get('priority')  # For benchmark routing (e.g., always_first)
-                    }
-                else:
-                    # Inline definition (shouldn't happen in new format, but handle it)
-                    resolved = candidate.copy()
-                
-                resolved_candidates.append(resolved)
-            
+                resolved_list = self._resolve_candidate(candidate, models)
+                resolved_candidates.extend(resolved_list)
+
             # Extract routing configuration for benchmark-based reordering
             routing = config.get('routing', {})
 
@@ -327,8 +376,10 @@ class Config:
             }
         else:
             # Regular model - wrap in single candidate structure (no routing needed)
+            model_reference = self._get_model_reference(config)
             return {
                 'candidates': [{
+                    'model_reference': model_reference,  # For model-level failover
                     'provider': config['provider'],
                     'model_id': config['model_id'],
                     'capabilities': config.get('capabilities', {}),
@@ -470,43 +521,21 @@ class Config:
             else:
                 raise ValueError(f"Invalid candidate format: {candidate}")
 
-        # Create config in same format as static virtual models
-        parsed_config = {
-            'candidates': candidates,
-            'timeout': config.get('timeout'),
-            'metadata_ref': config.get('metadata_ref')
-        }
-
-        # Apply the same resolution logic as virtual models
+        # Use shared resolution logic (supports virtual chaining and model_reference)
         models = self.models
         resolved_candidates = []
 
         for candidate in candidates:
-            if 'model' in candidate:
-                # Reference to another model
-                ref_model_name = candidate['model']
-                if ref_model_name not in models:
-                    raise ValueError(f"Referenced model '{ref_model_name}' not found")
+            resolved_list = self._resolve_candidate(candidate, models)
+            resolved_candidates.extend(resolved_list)
 
-                ref_config = models[ref_model_name]
-                resolved = {
-                    'original_model_ref': ref_model_name,  # Keep track of original reference
-                    'provider': ref_config['provider'],
-                    'model_id': ref_config['model_id'],
-                    'capabilities': ref_config.get('capabilities', {}),
-                    'cost': ref_config.get('cost'),
-                    'default_params': ref_config.get('default_params', {}),
-                    'display_metadata': ref_config.get('display_metadata', {}),
-                    'timeout': candidate.get('timeout')  # Candidate timeout override
-                }
-            else:
-                # Inline definition (shouldn't happen, but handle it)
-                resolved = candidate.copy()
-
-            resolved_candidates.append(resolved)
+        routing = config.get('routing', {})
 
         return {
             'candidates': resolved_candidates,
-            'timeout': parsed_config.get('timeout'),
-            'metadata_ref': parsed_config.get('metadata_ref')
+            'timeout': config.get('timeout'),
+            'routing': {
+                'speed_weight': routing.get('speed_weight', 1.0),
+                'min_tokens_per_sec': routing.get('min_tokens_per_sec', 0.0)
+            } if routing else None
         }

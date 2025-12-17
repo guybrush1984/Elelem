@@ -339,10 +339,12 @@ def reorder_candidates_by_benchmark(
     1. always_first - Always tried first, in YAML order among themselves
     2. scored - Have benchmark data, sorted by value score (descending)
     3. unscored - No benchmark data, in YAML order among themselves
+    4. always_last - Always tried last (fallbacks), in YAML order among themselves
 
     The 'priority' field on candidates controls ordering:
     - 'always_first': Skip routing, always tried first
-    - Default (no priority): Routing-based if scored, otherwise last
+    - 'always_last': Skip routing, always tried last (for fallbacks)
+    - Default (no priority): Routing-based if scored, otherwise middle
 
     If min_tokens_per_sec filter would exclude ALL routable candidates,
     falls back to original YAML order (no filtering applied).
@@ -368,6 +370,7 @@ def reorder_candidates_by_benchmark(
     scored = []        # Have benchmark score
     unscored = []      # No benchmark data
     filtered_out = []  # Below min_tokens_per_sec threshold
+    always_last = []   # priority: always_last (fallbacks)
 
     for idx, candidate in enumerate(candidates):
         priority = (candidate.get('priority') or '').lower()
@@ -375,6 +378,11 @@ def reorder_candidates_by_benchmark(
         # Handle always_first priority - skip all routing logic
         if priority == 'always_first':
             always_first.append((idx, candidate))
+            continue
+
+        # Handle always_last priority - skip all routing logic, kept at end
+        if priority == 'always_last':
+            always_last.append((idx, candidate))
             continue
 
         model_ref = candidate.get('original_model_ref')
@@ -409,17 +417,19 @@ def reorder_candidates_by_benchmark(
             unscored.append((idx, candidate))
 
     # Check if ALL routable candidates were filtered out - fallback to YAML order
-    # (always_first candidates are not affected by this check)
+    # (always_first and always_last candidates are not affected by this check)
     if filtered_out and not scored and not unscored:
         log.warning(
             f"All {len(filtered_out)} routable candidates below {min_tokens_per_sec} t/s threshold, "
             f"falling back to YAML order for non-priority candidates"
         )
-        # Return always_first + original order for the rest
+        # Return always_first + original order for the rest + always_last
         result = [c for (_, c) in always_first]
         for idx, candidate in enumerate(candidates):
-            if candidate.get('priority', '').lower() != 'always_first':
+            priority = (candidate.get('priority') or '').lower()
+            if priority not in ('always_first', 'always_last'):
                 result.append(candidate)
+        result.extend([c for (_, c) in always_last])
         return result
 
     # Log filtering (only if some were filtered but not all)
@@ -430,10 +440,11 @@ def reorder_candidates_by_benchmark(
     # Sort scored candidates by value score (descending - higher is better)
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    # Build result: always_first, then scored, then unscored
+    # Build result: always_first, then scored, then unscored, then always_last
     result = [c for (_, c) in always_first]
     result.extend([c for (_, _, c) in scored])
     result.extend([c for (_, c) in unscored])
+    result.extend([c for (_, c) in always_last])
 
     # Log reordering
     if log.isEnabledFor(logging.DEBUG):
@@ -443,5 +454,8 @@ def reorder_candidates_by_benchmark(
         if scored:
             order_info = [(c.get('original_model_ref'), round(s, 2)) for s, _, c in scored]
             log.debug(f"Benchmark reorder (speed_weight={speed_weight}): {order_info}")
+        if always_last:
+            last_refs = [c.get('original_model_ref', 'unknown') for (_, c) in always_last]
+            log.debug(f"Priority always_last (fallbacks): {last_refs}")
 
     return result

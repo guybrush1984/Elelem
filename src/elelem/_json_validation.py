@@ -3,8 +3,12 @@ JSON validation functions for Elelem.
 """
 
 import json
+import logging
 from typing import List, Dict, Any, Optional, Tuple
+from json_repair import repair_json
 from jsonschema import validate, ValidationError
+
+logger = logging.getLogger("elelem")
 
 
 def validate_json_schema(json_obj: Any, schema: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
@@ -105,14 +109,68 @@ def add_json_instructions_to_messages(messages: List[Dict[str, str]], supports_s
     return modified_messages
 
 
-def validate_json_response(content: str, json_schema: Optional[Any], api_error: Optional[Exception]) -> None:
-    """Validate JSON response content and schema."""
+def parse_json_with_repair(content: str, request_id: str = None) -> tuple[Any, str, bool]:
+    """Parse JSON content, attempting repair if standard parse fails.
+
+    Args:
+        content: The JSON string to parse
+        request_id: Optional request ID for logging
+
+    Returns:
+        Tuple of (parsed_json, content_string, was_repaired)
+        - parsed_json: The parsed JSON object
+        - content_string: The JSON string (original if valid, repaired if fixed)
+        - was_repaired: True if repair was needed
+
+    Raises:
+        json.JSONDecodeError: If parsing fails even after repair attempt
+    """
+    try:
+        return json.loads(content), content, False
+    except json.JSONDecodeError as original_error:
+        # Attempt repair
+        try:
+            repaired = repair_json(content, return_objects=True)
+
+            # Validate repair result is meaningful (not empty string/list/dict for non-trivial input)
+            if repaired == "" or repaired == [] or repaired == {}:
+                # Repair returned empty result - not a meaningful fix
+                logger.debug(f"JSON repair returned empty result, treating as failure")
+                raise original_error
+
+            repaired_str = json.dumps(repaired)
+            req_id = f"[{request_id}] " if request_id else ""
+            logger.warning(
+                f"{req_id}JSON repair successful - original error: {str(original_error)[:100]}"
+            )
+            return repaired, repaired_str, True
+        except json.JSONDecodeError:
+            # Re-raise JSONDecodeError (including the one we raised above)
+            raise
+        except Exception as repair_error:
+            # Other repair failures
+            logger.debug(f"JSON repair failed: {repair_error}")
+            raise original_error
+
+
+def validate_json_response(content: str, json_schema: Optional[Any], api_error: Optional[Exception], request_id: str = None) -> str:
+    """Validate JSON response content and schema.
+
+    Args:
+        content: The JSON string to validate
+        json_schema: Optional schema to validate against
+        api_error: Optional API error that triggered validation
+        request_id: Optional request ID for logging
+
+    Returns:
+        The content string (possibly repaired if json-repair was needed)
+    """
     if api_error:
         # Force JSON validation to fail so it triggers retry logic
         raise json.JSONDecodeError(f"API JSON validation failed: {str(api_error)}", "", 0)
     else:
-        # First parse the JSON
-        parsed_json = json.loads(content)
+        # First parse the JSON (with repair if needed)
+        parsed_json, repaired_content, was_repaired = parse_json_with_repair(content, request_id)
 
         # Then validate against schema if provided
         if json_schema:
@@ -120,3 +178,6 @@ def validate_json_response(content: str, json_schema: Optional[Any], api_error: 
             if not is_valid:
                 # Treat schema validation failure like JSON parse failure
                 raise json.JSONDecodeError(f"JSON schema validation failed: {schema_error}", "", 0)
+
+        # Return the (possibly repaired) content
+        return repaired_content

@@ -217,12 +217,18 @@ class ScenarioManager:
         elif response_type == 'overloaded':
             return self.response_generator.generate_overloaded_error()
 
+        elif response_type == 'model_error':
+            message = response_config.get('message', None)
+            return self.response_generator.generate_model_error(message)
+
         elif response_type == 'json_error':
             # Return malformed JSON to test error handling
+            error_type = response_config.get('error_type', 'repairable')
             return self.response_generator.generate_json_response(
                 json_data={"test": "data"},
                 model=model,
-                valid=False
+                valid=False,
+                error_type=error_type
             )
 
         elif response_type == 'reasoning':

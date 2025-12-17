@@ -8,6 +8,8 @@ models:
   "faker:basic":
     provider: faker
     model_id: basic
+    metadata:
+      model_reference: "faker_basic"
     capabilities:
       supports_json_mode: true
       supports_temperature: true
@@ -21,6 +23,8 @@ models:
   "faker:rate-limited":
     provider: faker
     model_id: rate-limited
+    metadata:
+      model_reference: "faker_rate_limited"
     capabilities:
       supports_json_mode: true
       supports_temperature: true
@@ -30,10 +34,53 @@ models:
       output_cost_per_1m: 0.15
       currency: USD
 
+  # Model that returns ModelError (for testing model-level failover)
+  "faker:model-error":
+    provider: faker
+    model_id: model-error
+    metadata:
+      model_reference: "faker_model_error"
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.05
+      output_cost_per_1m: 0.15
+      currency: USD
+
+  # Second provider with same model_reference as model-error (for testing skip logic)
+  "faker:model-error-alt":
+    provider: faker
+    model_id: model-error-alt
+    metadata:
+      model_reference: "faker_model_error"  # Same model_reference - should be skipped together
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.06
+      output_cost_per_1m: 0.18
+      currency: USD
+
   # Model for testing JSON temperature reduction
   "faker:json-temp-test":
     provider: faker
     model_id: json-temp-test
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.60
+      currency: USD
+
+  # Model for testing json-repair functionality
+  "faker:json-repair-test":
+    provider: faker
+    model_id: json-repair-test
     capabilities:
       supports_json_mode: true
       supports_temperature: true

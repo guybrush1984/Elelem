@@ -11,17 +11,19 @@ models:
       supports_system: true
 
 conditions:
-  # High temperature (>0.8) - return malformed JSON to trigger retry
+  # High temperature (>0.8) - return unrepairable JSON to trigger retry
   - check: "temperature_above"
     value: 0.8
     response:
       type: "json_error"
+      error_type: "unrepairable"  # Cannot be fixed by json-repair
 
-  # Medium temperature (>0.6) - still return malformed JSON
+  # Medium temperature (>0.6) - still return unrepairable JSON
   - check: "temperature_above"
     value: 0.6
     response:
       type: "json_error"
+      error_type: "unrepairable"  # Cannot be fixed by json-repair
 
   # Low temperature (<=0.6) - return valid JSON
   - check: "json_mode"

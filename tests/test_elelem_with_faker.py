@@ -111,6 +111,36 @@ class TestElelemWithFaker:
         assert temperatures == [0.9, 0.8, 0.5]  # Exact sequence expected
 
     @pytest.mark.asyncio
+    async def test_json_repair_fixes_malformed_json(self, elelem_with_faker_env):
+        """Test that json-repair fixes repairable JSON errors without retrying."""
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with json-repair scenario
+        faker.configure_scenario('elelem_json_repair')
+        faker.reset_state()
+
+        # Make request - faker will return JSON with missing closing brace
+        response = await elelem.create_chat_completion(
+            model="faker:json-repair-test",
+            messages=[{"role": "user", "content": "Return JSON data"}],
+            response_format={"type": "json_object"},
+            temperature=0.5
+        )
+
+        # Should succeed on first attempt (json-repair fixes the malformed JSON)
+        assert response
+        content = response.choices[0].message.content
+
+        # The repaired JSON should be parseable
+        json_data = json.loads(content)
+        assert json_data.get("test") == "data"  # Original data from faker's json_error
+
+        # Verify only ONE request was made (no retry needed due to json-repair)
+        requests = faker.request_analyzer.get_captured_requests()
+        print(f"Number of requests made: {len(requests)}")
+        assert len(requests) == 1, "json-repair should fix the error without retrying"
+
+    @pytest.mark.asyncio
     async def test_rate_limit_retry_then_success(self, elelem_with_faker_env):
         """Test Elelem's rate limit retry logic."""
         elelem, faker = elelem_with_faker_env
@@ -267,10 +297,82 @@ class TestElelemWithFaker:
         requests = faker.request_analyzer.get_captured_requests()
         assert len(requests) >= 3, f"Expected at least 3 requests, got {len(requests)}"
 
-        print(f"✅ Rate limit exhaustion correctly triggered failover")
-        print(f"   Time elapsed: {elapsed_time:.1f}s")
-        print(f"   Requests made: {len(requests)}")
-        print(f"   Final model: {response.elelem_metrics['model_used']}")
+    @pytest.mark.asyncio
+    async def test_model_error_skips_same_model_reference(self, elelem_with_faker_env):
+        """Test that ModelError skips all candidates with the same model_reference.
+
+        When a candidate fails with ModelError (not InfrastructureError), all other
+        candidates with the same model_reference should be skipped, and the system
+        should try the next candidate with a different model_reference.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with model error failover scenario
+        faker.configure_scenario('elelem_model_error_failover')
+        faker.reset_state()
+
+        # Use virtual model with:
+        # - faker:model-error (model_reference: faker_model_error) - will fail with ModelError
+        # - faker:model-error-alt (model_reference: faker_model_error) - should be SKIPPED
+        # - faker:basic (model_reference: faker_basic) - should succeed
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-model-error-failover",
+            messages=[{"role": "user", "content": "Test model error failover"}],
+            tags=["model-error-failover-test"]
+        )
+
+        # Should succeed via the third candidate (faker:basic)
+        assert response is not None
+        assert hasattr(response, "choices")
+        assert len(response.choices) > 0
+        assert "Success after model-level failover" in response.choices[0].message.content
+
+        # Verify the response came from faker:basic (not the skipped faker:model-error-alt)
+        assert response.elelem_metrics["model_used"] == "faker:basic", \
+            f"Expected failover to faker:basic, got {response.elelem_metrics['model_used']}"
+
+        # Verify only 2 requests were made (not 3):
+        # 1. faker:model-error -> ModelError
+        # 2. faker:basic -> Success (faker:model-error-alt was SKIPPED)
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) == 2, f"Expected 2 requests (skipping same model_ref), got {len(requests)}"
+
+    @pytest.mark.asyncio
+    async def test_virtual_chaining_with_model_error_failover(self, elelem_with_faker_env):
+        """Test virtual model chaining with model-level failover.
+
+        A virtual model can reference another virtual model. When the inner virtual's
+        candidates fail with ModelError, the system should skip all candidates with
+        the same model_reference and try the outer virtual's fallback candidates.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with model error failover scenario
+        faker.configure_scenario('elelem_model_error_failover')
+        faker.reset_state()
+
+        # Use chained virtual model:
+        # - virtual:faker-model-error-inner (flattens to: model-error, model-error-alt)
+        # - faker:basic
+        # First candidate from inner virtual fails -> skip second (same model_ref) -> success on faker:basic
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-chained-failover",
+            messages=[{"role": "user", "content": "Test chained virtual failover"}],
+            tags=["chained-failover-test"]
+        )
+
+        # Should succeed via faker:basic after skipping both inner virtual candidates
+        assert response is not None
+        assert hasattr(response, "choices")
+        assert len(response.choices) > 0
+
+        # Verify the response came from faker:basic
+        assert response.elelem_metrics["model_used"] == "faker:basic", \
+            f"Expected failover to faker:basic, got {response.elelem_metrics['model_used']}"
+
+        # Verify only 2 requests were made (inner virtual's second candidate was skipped)
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) == 2, f"Expected 2 requests (skipping same model_ref from chained virtual), got {len(requests)}"
 
     @pytest.mark.asyncio
     async def test_request_validation_through_elelem(self, elelem_with_faker_env):

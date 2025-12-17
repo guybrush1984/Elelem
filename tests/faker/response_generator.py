@@ -53,15 +53,34 @@ class ResponseGenerator:
         json_data: Dict[str, Any],
         tokens: Optional[Dict[str, int]] = None,
         model: str = "faker:default",
-        valid: bool = True
+        valid: bool = True,
+        error_type: str = "repairable"
     ):
-        """Generate JSON mode response."""
+        """Generate JSON mode response.
+
+        Args:
+            json_data: The JSON data to return
+            tokens: Optional token counts
+            model: Model name
+            valid: If True, return valid JSON. If False, return malformed JSON.
+            error_type: Type of JSON error when valid=False:
+                - "repairable": Missing closing brace (json-repair can fix)
+                - "unrepairable": Random gibberish (cannot be repaired)
+                - "extra_brace": Extra closing brace like }]}
+        """
 
         if valid:
             content = json.dumps(json_data)
         else:
-            # Generate malformed JSON for testing error handling
-            content = json.dumps(json_data)[:-1]  # Remove closing brace
+            if error_type == "unrepairable":
+                # Return something that cannot be repaired to valid JSON
+                content = "This is not JSON at all - just random text!"
+            elif error_type == "extra_brace":
+                # Extra closing brace (like the real bug we saw)
+                content = json.dumps(json_data) + "}"
+            else:
+                # Default: repairable - missing closing brace
+                content = json.dumps(json_data)[:-1]
 
         return self.generate_openai_response(
             content=content,
@@ -127,6 +146,19 @@ class ResponseGenerator:
             message="The server is currently overloaded. Please try again later.",
             code="server_overloaded",
             status_code=503
+        )
+
+    def generate_model_error(self, message: str = None):
+        """Generate a model error (non-infrastructure error that won't trigger failover by default).
+
+        This simulates errors like content policy violations, context length exceeded,
+        or other model-specific errors that shouldn't be retried on the same model.
+        """
+        return self.generate_error_response(
+            error_type="invalid_request_error",
+            message=message or "This model cannot process the request: content policy violation",
+            code="content_policy_violation",
+            status_code=400
         )
 
     def generate_json_schema_response(self, schema: Dict[str, Any], valid: bool = True):

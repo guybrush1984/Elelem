@@ -5,6 +5,7 @@ Main Elelem class - Unified API wrapper for OpenAI, GROQ, and DeepInfra
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime
@@ -306,12 +307,81 @@ class Elelem:
         """Process and clean response content."""
         return process_response_content(response, json_mode_requested, yaml_mode_requested, self.logger)
     
-    def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception) -> None:
-        """Validate JSON response content and schema."""
-        validate_json_response(content, json_schema, api_error)
-    
-    
-    
+    def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception, request_id: str = None) -> str:
+        """Validate JSON response content and schema. Returns possibly repaired content."""
+        return validate_json_response(content, json_schema, api_error, request_id)
+
+    def _dump_validation_debug(self, request_id: str, messages: List[Dict[str, str]],
+                                api_kwargs: Dict[str, Any], content: str, error: Exception,
+                                validation_type: str = "json",
+                                provider: str = None, model_id: str = None,
+                                original_model: str = None) -> Optional[str]:
+        """Dump request/response for debugging validation failures.
+
+        Only active when ELELEM_DEBUG_VALIDATION env var is set.
+        Files are written to ELELEM_DEBUG_DIR (default: /tmp/elelem_debug).
+
+        Args:
+            request_id: Unique request identifier
+            messages: The messages sent in the request
+            api_kwargs: The API kwargs used for the request
+            content: The response content that failed validation
+            error: The validation error
+            validation_type: "json" or "yaml"
+            provider: Provider name (e.g., "deepinfra", "fireworks")
+            model_id: Model ID at the provider
+            original_model: Original model requested (e.g., "virtual:deepseek-v3.2-cheap")
+
+        Returns:
+            Path to debug file if created, None otherwise
+        """
+        if not os.environ.get('ELELEM_DEBUG_VALIDATION'):
+            return None
+
+        try:
+            debug_dir = os.environ.get('ELELEM_DEBUG_DIR', '/tmp/elelem_debug')
+            os.makedirs(debug_dir, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{debug_dir}/elelem_debug_{validation_type}_{request_id}_{timestamp}.json"
+
+            # Build safe copy of api_kwargs (exclude non-serializable items)
+            safe_kwargs = {}
+            for k, v in api_kwargs.items():
+                try:
+                    json.dumps(v)  # Test serializability
+                    safe_kwargs[k] = v
+                except (TypeError, ValueError):
+                    safe_kwargs[k] = str(v)
+
+            debug_data = {
+                "request_id": request_id,
+                "timestamp": datetime.now().isoformat(),
+                "validation_type": validation_type,
+                "error": str(error),
+                "model_info": {
+                    "original_model": original_model,
+                    "provider": provider,
+                    "model_id": model_id,
+                },
+                "request": {
+                    "messages": messages,
+                    "api_kwargs": safe_kwargs,
+                },
+                "response": {
+                    "content": content,
+                }
+            }
+
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(debug_data, f, indent=2, ensure_ascii=False)
+
+            self.logger.info(f"[{request_id}] Debug dump written to: {filename}")
+            return filename
+        except Exception as dump_error:
+            self.logger.warning(f"[{request_id}] Failed to write debug dump: {dump_error}")
+            return None
+
     async def create_chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -525,8 +595,17 @@ class Elelem:
             self.logger.debug(f"[{request_id}] 📄 YAML mode requested")
         
         # Iterate through candidates
+        # Track failed model_references to skip candidates with the same underlying model
+        failed_model_refs = set()
         last_error = None
+
         for candidate_idx, candidate in enumerate(candidates):
+            # Skip candidates whose model_reference has already failed with ModelError
+            candidate_model_ref = candidate.get('model_reference')
+            if candidate_model_ref and candidate_model_ref in failed_model_refs:
+                self.logger.debug(f"[{request_id}] Skipping candidate {candidate_idx + 1} (model_reference '{candidate_model_ref}' already failed)")
+                continue
+
             try:
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
@@ -535,20 +614,29 @@ class Elelem:
                     original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs
                 )
             except InfrastructureError as e:
-                self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed: {e}")
+                self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (infra): {e}")
                 request_tracker.record_retry("candidate_iterations")
                 last_error = e
-
-                if candidate_idx < len(candidates) - 1:
-                    continue  # Try next candidate
-                else:
-                    # All candidates exhausted - record failure
-                    request_tracker.finalize_failure(self._metrics_store, "AllCandidatesFailed", str(e))
-                    raise e
+                # Continue to next candidate (infrastructure errors don't blacklist the model)
+                continue
             except ModelError as e:
-                # Model/request errors don't trigger candidate iteration
-                request_tracker.finalize_failure(self._metrics_store, "ModelError", str(e))
-                raise e
+                # Model errors: skip all remaining candidates with the same model_reference
+                if candidate_model_ref:
+                    failed_model_refs.add(candidate_model_ref)
+                    self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (model): {e} - skipping model_reference '{candidate_model_ref}'")
+                    request_tracker.record_retry("candidate_iterations")
+                    last_error = e
+                    # Continue to find a candidate with a different model_reference
+                    continue
+                else:
+                    # No model_reference - can't do model-level failover, raise immediately
+                    request_tracker.finalize_failure(self._metrics_store, "ModelError", str(e))
+                    raise e
+
+        # All candidates exhausted (either tried or skipped)
+        if last_error:
+            request_tracker.finalize_failure(self._metrics_store, "AllCandidatesFailed", str(last_error))
+            raise last_error
 
         # This should never be reached - if it is, there's a logic error
         raise RuntimeError(f"FATAL: Candidate loop completed without returning or raising - this is a bug in Elelem")
@@ -684,7 +772,8 @@ class Elelem:
                 # JSON validation if requested
                 if json_mode_requested:
                     try:
-                        self._validate_json_response(content, json_schema, api_error)
+                        # Validation may repair malformed JSON, update content with repaired version
+                        content = self._validate_json_response(content, json_schema, api_error, request_id)
                     except json.JSONDecodeError as e:
                         if attempt < max_retries:
                             # Try temperature reduction
@@ -696,8 +785,11 @@ class Elelem:
                                 if new_temp < current_temp:
                                     api_kwargs['temperature'] = new_temp
                                     request_tracker.record_retry("temperature_reductions")
-                                    error_snippet = str(e)[:300]
-                                    self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp} (error: {error_snippet})")
+                                    self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp}")
+                                    self.logger.warning(f"[{request_id}] Validation error: {e}")
+                                    self.logger.warning(f"[{request_id}] Failed content:\n{content}")
+                                    self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
+                                                                provider=provider_name, model_id=model_name, original_model=original_model)
                                     continue
                             
                             # Try removing response format
@@ -709,6 +801,8 @@ class Elelem:
                                 continue
                         
                         # All JSON retries exhausted - this is a model error, don't iterate candidates
+                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
+                                                    provider=provider_name, model_id=model_name, original_model=original_model)
                         request_tracker.finalize_failure(self._metrics_store, "JSONValidationFailed", str(e))
                         raise ModelError(f"JSON validation failed after all retries: {e}")
 
@@ -728,11 +822,16 @@ class Elelem:
                                 if new_temp < current_temp:
                                     api_kwargs['temperature'] = new_temp
                                     request_tracker.record_retry("temperature_reductions")
-                                    error_snippet = str(e)[:300]
-                                    self.logger.warning(f"[{request_id}] YAML validation failed, reducing temperature to {new_temp} (error: {error_snippet})")
+                                    self.logger.warning(f"[{request_id}] YAML validation failed, reducing temperature to {new_temp}")
+                                    self.logger.warning(f"[{request_id}] Validation error: {e}")
+                                    self.logger.warning(f"[{request_id}] Failed content:\n{content}")
+                                    self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
+                                                                provider=provider_name, model_id=model_name, original_model=original_model)
                                     continue
 
                         # All YAML retries exhausted - this is a model error, don't iterate candidates
+                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
+                                                    provider=provider_name, model_id=model_name, original_model=original_model)
                         request_tracker.finalize_failure(self._metrics_store, "YAMLValidationFailed", str(e))
                         raise ModelError(f"YAML validation failed after all retries: {e}")
 

@@ -1,0 +1,22 @@
+scenario: "elelem_json_repair"
+description: "Test Elelem's json-repair functionality for fixable JSON errors"
+type: "conditional"
+
+models:
+  "json-repair-test":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  # Always return repairable JSON for json_mode requests
+  - check: "json_mode"
+    response:
+      type: "json_error"
+      error_type: "repairable"  # Missing closing brace - json-repair can fix
+
+default_response:
+  type: "success"
+  content: "Non-JSON mode response"

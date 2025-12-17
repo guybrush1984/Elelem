@@ -80,7 +80,26 @@ class TestConfigValidation:
             else:
                 regular_models.append(model_name)
 
-        # Check virtual model references
+        # Check virtual model references (allow chaining, detect cycles)
+        def detect_cycle(model_name: str, visited: set, path: list) -> list:
+            """Detect circular references in virtual model chains."""
+            if model_name in path:
+                return path + [model_name]  # Cycle found
+            if model_name in visited or model_name not in virtual_models:
+                return []  # Already checked or not a virtual model
+
+            visited.add(model_name)
+            path = path + [model_name]
+
+            for candidate in models[model_name].get('candidates', []):
+                if 'model' in candidate:
+                    ref = candidate['model']
+                    if ref in virtual_models:
+                        cycle = detect_cycle(ref, visited, path)
+                        if cycle:
+                            return cycle
+            return []
+
         for virtual_model in virtual_models:
             model_config = models[virtual_model]
 
@@ -90,9 +109,13 @@ class TestConfigValidation:
 
                     if ref_model not in models:
                         issues.append(f"Virtual model '{virtual_model}' candidate {i} references non-existent model '{ref_model}'")
-                    elif ref_model in virtual_models:
-                        # Check for circular references
-                        issues.append(f"Virtual model '{virtual_model}' references another virtual model '{ref_model}' (not allowed)")
+
+        # Check for circular references across all virtual models
+        visited = set()
+        for virtual_model in virtual_models:
+            cycle = detect_cycle(virtual_model, visited, [])
+            if cycle:
+                issues.append(f"Circular reference detected: {' -> '.join(cycle)}")
 
         if issues:
             pytest.fail(f"Virtual model reference issues found:\n" + "\n".join(f"  - {issue}" for issue in issues))

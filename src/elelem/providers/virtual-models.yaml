@@ -265,6 +265,16 @@ models:
       - model: "deepinfra:mistral/mistral-small"
       - model: "mistral:mistral/mistral-small"
 
+  # MISTRAL LARGE 3 VARIANTS
+  "virtual:mistral-large-3":
+    metadata:
+      model_reference: "mistral_large_3"
+    timeout: 120s
+    candidates:
+      - model: "mistral:mistral/mistral-large-3"
+        priority: always_first
+      - model: "virtual:deepseek-v3.2-cheap"  # Fallback: expands to all DeepSeek 3.2 candidates
+
   # KIMI K2 VARIANTS
   "virtual:kimi-k2-quick":
     metadata:

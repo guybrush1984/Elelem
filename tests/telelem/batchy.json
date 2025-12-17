@@ -13,6 +13,7 @@
     "novita:deepseek/deepseek-3.1-terminus",
     "novita:deepseek/deepseek-3.2",
     "parasail:deepseek/deepseek-3.2",
+    "mistral:mistral/mistral-large-3",
     "baseten:openai/gpt-oss-120b?reasoning=low",
     "baseten:openai/gpt-oss-120b?reasoning=medium",
     "deepinfra:openai/gpt-oss-20b?reasoning=low",

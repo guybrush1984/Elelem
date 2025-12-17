@@ -170,6 +170,13 @@ model_metadata:
     license: "Mistral Research License"
     reasoning: "no"
 
+  mistral_large_3: &mistral-large-3
+    model_owner: "Mistral AI"
+    model_nickname: "mistral-large-3"
+    model_page: "https://docs.mistral.ai/models/mistral-large-3-25-12"
+    license: "Mistral Research License"
+    reasoning: "no"
+
   # Additional models found in provider files
   deepseek_r1_0528: &deepseek-r1-0528
     model_owner: "DeepSeek"

@@ -32,6 +32,22 @@ models:
     metadata:
       model_reference: "mistral_medium_31"
 
+  "mistral:mistral/mistral-large-3":
+    provider: mistral
+    model_id: mistral-large-2512
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.5
+      output_cost_per_1m: 1.5
+      currency: USD
+    metadata:
+      model_reference: "mistral_large_3"
+    default_params:
+      stream: true
+
   "mistral:mistral/magistral-small":
     provider: mistral
     model_id: magistral-small-2509

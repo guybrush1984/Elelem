@@ -34,7 +34,10 @@ services:
       - ELELEM_CACHE_ENABLED=true
       - ELELEM_CACHE_TTL=120  # Short TTL for testing
       - ELELEM_CACHE_CLEANUP_INTERVAL=30  # Cleanup every 30s for testing
+      - ELELEM_DEBUG_DIR=/tmp/elelem_debug  # Debug dumps directory
       # API keys (GROQ_API_KEY, etc.) are loaded from .env file (local) or shell (CI)
+    volumes:
+      - ../debug_dumps:/tmp/elelem_debug  # Mount debug dumps to host
     ports:
       - "8000:8000"
     depends_on:

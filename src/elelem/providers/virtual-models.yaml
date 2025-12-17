@@ -20,6 +20,8 @@ models:
       - model: "novita:deepseek/deepseek-3.2"
       - model: "fireworks:deepseek/deepseek-3.2"
       - model: "parasail:deepseek/deepseek-3.2"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.2-quick":
     metadata:
@@ -33,6 +35,8 @@ models:
       - model: "novita:deepseek/deepseek-3.2"
       - model: "deepinfra:deepseek/deepseek-3.2"
       - model: "parasail:deepseek/deepseek-3.2"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.2-cheap?reasoning":
     metadata:
@@ -44,6 +48,8 @@ models:
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
       - model: "novita:deepseek/deepseek-3.2?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.2-quick?reasoning":
     metadata:
@@ -55,6 +61,8 @@ models:
     candidates:
       - model: "novita:deepseek/deepseek-3.2?reasoning"
       - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   # DEEPSEEK 3.1 VARIANTS
   "virtual:deepseek-v3.1-cheap":
@@ -70,6 +78,8 @@ models:
       - model: "deepinfra:deepseek/deepseek-3.1"
       - model: "novita:deepseek/deepseek-3.1"
       - model: "fireworks:deepseek/deepseek-3.1"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.1-quick":
     metadata:
@@ -82,6 +92,8 @@ models:
       - model: "gmi:deepseek/deepseek-3.1"
       - model: "novita:deepseek/deepseek-3.1"
       - model: "deepinfra:deepseek/deepseek-3.1"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.1-cheap?reasoning":
     metadata:
@@ -94,6 +106,8 @@ models:
         priority: always_first
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
       - model: "fireworks:deepseek/deepseek-3.1?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.1-quick?reasoning":
     metadata:
@@ -105,6 +119,8 @@ models:
       - model: "ollama:deepseek/deepseek-3.1?reasoning"
       - model: "fireworks:deepseek/deepseek-3.1?reasoning"
       - model: "deepinfra:deepseek/deepseek-3.1?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   # DEEPSEEK 3.1-TERMINUS VARIANTS
   "virtual:deepseek-v3.1-terminus-cheap":
@@ -117,6 +133,8 @@ models:
       - model: "deepinfra:deepseek/deepseek-3.1-terminus"
       - model: "novita:deepseek/deepseek-3.1-terminus"
       - model: "fireworks:deepseek/deepseek-3.1-terminus"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.1-terminus-quick":
     metadata:
@@ -128,6 +146,8 @@ models:
       - model: "fireworks:deepseek/deepseek-3.1-terminus"
       - model: "novita:deepseek/deepseek-3.1-terminus"
       - model: "deepinfra:deepseek/deepseek-3.1-terminus"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.1-terminus-cheap?reasoning":
     metadata:
@@ -139,6 +159,8 @@ models:
       - model: "deepinfra:deepseek/deepseek-3.1-terminus?reasoning"
       - model: "novita:deepseek/deepseek-3.1-terminus"
       - model: "fireworks:deepseek/deepseek-3.1-terminus?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   "virtual:deepseek-v3.1-terminus-quick?reasoning":
     metadata:
@@ -150,6 +172,8 @@ models:
       - model: "fireworks:deepseek/deepseek-3.1-terminus?reasoning"
       - model: "novita:deepseek/deepseek-3.1-terminus"
       - model: "deepinfra:deepseek/deepseek-3.1-terminus?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model_reference, never reordered
 
   # OPENAI GPT-OSS 20B VARIANTS
   "virtual:gpt-oss-20b-cheap?reasoning=@[low,medium,high]":

@@ -733,24 +733,24 @@ class Elelem:
                     api_error = None
                 except asyncio.TimeoutError as e:
                     # Timeout is an infrastructure error - try next candidate
-                    raise InfrastructureError(f"Request timed out after {timeout}s")
+                    raise InfrastructureError(f"Request timed out after {timeout}s", provider=provider_name, model=model_name)
                 except ChunkTimeoutError as e:
                     # Chunk timeout (cold start or stream stall) - try next candidate
-                    raise InfrastructureError(f"Streaming chunk timeout: {str(e)}")
+                    raise InfrastructureError(f"Streaming chunk timeout: {str(e)}", provider=provider_name, model=model_name)
                 except RateLimitError:
                     # Let rate limit errors pass through to outer handler for proper retry logic
                     raise
                 except Exception as api_e:
                     # Classify the error
                     if self._is_infrastructure_error(api_e):
-                        raise InfrastructureError(f"API infrastructure error: {str(api_e)}")
+                        raise InfrastructureError(f"API infrastructure error: {str(api_e)}", provider=provider_name, model=model_name)
                     elif self._is_json_validation_api_error(api_e) and json_mode_requested:
                         # API-level JSON validation errors will be handled in JSON validation section
                         api_error = api_e
                         response = None
                     else:
                         # Other API errors are typically model errors (don't iterate)
-                        raise ModelError(f"API error: {str(api_e)}")
+                        raise ModelError(f"API error: {str(api_e)}", provider=provider_name, model=model_name)
                 
                 # Extract tokens from response
                 if response:
@@ -801,10 +801,10 @@ class Elelem:
                                 continue
                         
                         # All JSON retries exhausted - this is a model error, don't iterate candidates
+                        # Note: Don't finalize here - outer loop handles finalization to avoid duplicates
                         self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
                                                     provider=provider_name, model_id=model_name, original_model=original_model)
-                        request_tracker.finalize_failure(self._metrics_store, "JSONValidationFailed", str(e))
-                        raise ModelError(f"JSON validation failed after all retries: {e}")
+                        raise ModelError(f"JSON validation failed after all retries: {e}", provider=provider_name, model=model_name)
 
                 # YAML validation if requested
                 if yaml_mode_requested:
@@ -830,10 +830,10 @@ class Elelem:
                                     continue
 
                         # All YAML retries exhausted - this is a model error, don't iterate candidates
+                        # Note: Don't finalize here - outer loop handles finalization to avoid duplicates
                         self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
                                                     provider=provider_name, model_id=model_name, original_model=original_model)
-                        request_tracker.finalize_failure(self._metrics_store, "YAMLValidationFailed", str(e))
-                        raise ModelError(f"YAML validation failed after all retries: {e}")
+                        raise ModelError(f"YAML validation failed after all retries: {e}", provider=provider_name, model=model_name)
 
                 # Success! Calculate duration and return
                 duration = time.time() - start_time
@@ -925,17 +925,17 @@ class Elelem:
                     continue
                 else:
                     # Rate limit exhaustion is infrastructure issue - try next candidate
-                    raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}")
+                    raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}", provider=provider_name, model=model_name)
             except (AuthenticationError, PermissionDeniedError) as e:
                 # Authentication/permission errors are infrastructure issues - try next candidate
-                raise InfrastructureError(f"Authentication/permission error: {e}")
+                raise InfrastructureError(f"Authentication/permission error: {e}", provider=provider_name, model=model_name)
             except (InternalServerError, BadRequestError, NotFoundError) as e:
                 # Server errors, bad requests, and model not found are infrastructure issues
                 # (e.g., model might exist on another provider) - try next candidate
-                raise InfrastructureError(f"Server/request error: {e}")
+                raise InfrastructureError(f"Server/request error: {e}", provider=provider_name, model=model_name)
             except (ConflictError, UnprocessableEntityError) as e:
                 # These are request validation issues - don't retry candidate
-                raise ModelError(f"Request validation error: {e}")
+                raise ModelError(f"Request validation error: {e}", provider=provider_name, model=model_name)
             except Exception as e:
                 # Fallback for any other unexpected errors
                 # Check if it might be a rate limit that wasn't caught as RateLimitError
@@ -949,14 +949,14 @@ class Elelem:
                         await asyncio.sleep(wait_time)
                         continue
                     else:
-                        raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}")
+                        raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}", provider=provider_name, model=model_name)
 
                 # Other unexpected errors
-                raise ModelError(f"Unexpected error: {e}")
-        
+                raise ModelError(f"Unexpected error: {e}", provider=provider_name, model=model_name)
+
         # Should not reach here - if we do, something unexpected happened
         self.logger.error(f"[{request_id}] ⚠️ Unexpected: loop exhausted without resolution (attempt={attempt}, rate_limit_attempts={rate_limit_attempts})")
-        raise InfrastructureError("Exhausted all retry attempts for candidate (unexpected state)")
+        raise InfrastructureError("Exhausted all retry attempts for candidate (unexpected state)", provider=provider_name, model=model_name)
     
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""

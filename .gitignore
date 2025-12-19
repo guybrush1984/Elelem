@@ -172,3 +172,5 @@ cython_debug/
 *.token
 .env.local
 .env.production
+# Debug dumps from validation errors
+debug_dumps/

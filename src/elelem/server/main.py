@@ -22,8 +22,25 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+import sentry_sdk
+
 from elelem import Elelem
 from elelem import __version__
+
+# Initialize Sentry for error monitoring (must be before FastAPI app creation)
+sentry_dsn = os.getenv('SENTRY_DSN')
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv('SENTRY_ENVIRONMENT', 'development'),
+        release=f"elelem@{__version__}",
+        # Capture 10% of transactions for performance monitoring
+        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
+        # Enable profiling for sampled transactions
+        profile_session_sample_rate=float(os.getenv('SENTRY_PROFILE_SAMPLE_RATE', '0.1')),
+        # Send default PII (user IPs, etc.) - disable in production if needed
+        send_default_pii=False,
+    )
 from elelem._benchmark_store import get_benchmark_store
 from elelem.server.models import (
     ChatCompletionRequest,
@@ -92,6 +109,12 @@ async def startup_event():
     await benchmark_store.start_background_fetch()
     if benchmark_store.enabled:
         logger.info(f"📊 Benchmark routing enabled (source: {benchmark_store.source})")
+
+    # Log Sentry status
+    if sentry_dsn:
+        logger.info(f"🔍 Sentry error monitoring enabled (environment: {os.getenv('SENTRY_ENVIRONMENT', 'development')})")
+    else:
+        logger.info("🔍 Sentry disabled (set SENTRY_DSN to enable)")
 
 
 async def cache_cleanup_task():
@@ -283,9 +306,33 @@ async def chat_completions(request: ChatCompletionRequest):
             }
         )
     except Exception as e:
-        # Handle other errors
+        # Handle other errors with Sentry context
         logger.error(f"Error in chat completion: {e}")
         logger.error(traceback.format_exc())
+
+        # Extract provider from exception if available (ModelError/InfrastructureError may have it)
+        provider = getattr(e, 'provider', None)
+        request_tags = request_dict.get('tags', [])
+
+        # Add Sentry context for better debugging
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("model", model)
+            scope.set_tag("error_type", type(e).__name__)
+            if provider:
+                scope.set_tag("provider", provider)
+            if request_tags:
+                for tag in request_tags:
+                    scope.set_tag(f"request_tag:{tag}", "true")
+            scope.set_context("request", {
+                "model": model,
+                "provider": provider,
+                "tags": request_tags,
+                "message_count": len(messages_dict),
+                "first_message_role": messages_dict[0].get("role") if messages_dict else None,
+                "extra_params": list(request_dict.keys()),
+            })
+            sentry_sdk.capture_exception(e)
+
         raise HTTPException(
             status_code=500,
             detail={

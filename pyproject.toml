@@ -46,6 +46,7 @@ dependencies = [
     "streamlit>=1.28.0",
     "plotly>=5.17.0",
     "httpx>=0.28.1",
+    "sentry-sdk[fastapi]>=2.48.0",
 ]
 
 [project.optional-dependencies]

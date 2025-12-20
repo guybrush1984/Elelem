@@ -58,6 +58,15 @@ jobs:
         echo "📊 Running benchmark store tests..."
         uv run pytest tests/test_benchmark_store.py -v
 
+    - name: Log in to Docker Hardened Images (dhi.io)
+      # Required for Docker Compose integration tests
+      if: github.actor == 'guybrush1984' || github.repository_owner == 'guybrush1984'
+      uses: docker/login-action@v3
+      with:
+        registry: dhi.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
     - name: Run Docker Compose integration tests
       # Only run on pushes from repo owner to prevent unauthorized API usage
       if: github.actor == 'guybrush1984' || github.repository_owner == 'guybrush1984'

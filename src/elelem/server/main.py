@@ -77,11 +77,17 @@ async def startup_event():
     cache_ttl = int(os.getenv('ELELEM_CACHE_TTL', '300'))
     cache_max_size = int(os.getenv('ELELEM_CACHE_MAX_SIZE', '50000'))
 
+    # JSON fixer: LLM-based repair for schema validation failures (enabled by default)
+    json_fixer_enabled = os.getenv('ELELEM_JSON_FIXER_ENABLED', 'true').lower() == 'true'
+    json_fixer_model = os.getenv('ELELEM_JSON_FIXER_MODEL')  # Uses cerebras 120B by default
+
     # Initialize Elelem instance (auto-creates PostgreSQL tables if configured)
     elelem = Elelem(
         cache_enabled=cache_enabled,
         cache_ttl=cache_ttl,
-        cache_max_size=cache_max_size
+        cache_max_size=cache_max_size,
+        json_fixer_enabled=json_fixer_enabled,
+        json_fixer_model=json_fixer_model
     )
 
     # Log startup status using proper encapsulation

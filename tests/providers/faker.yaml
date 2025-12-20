@@ -296,3 +296,29 @@ models:
       input_cost_per_1m: 0.05
       output_cost_per_1m: 0.15
       currency: USD
+
+  # Model that always returns invalid JSON (for testing JSON fixer)
+  "faker:json-broken":
+    provider: faker
+    model_id: json-broken
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  # Model for testing JSON fixer (returns valid JSON)
+  "faker:json-fixer":
+    provider: faker
+    model_id: json-fixer
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.45
+      currency: USD

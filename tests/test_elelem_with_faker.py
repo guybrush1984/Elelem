@@ -1578,4 +1578,132 @@ class TestElelemWithFaker:
         print("✅ Benchmark routing correctly disabled without source")
         print(f"   Order preserved: {original_refs}")
 
+    @pytest.fixture(scope="function")
+    def elelem_with_json_fixer(self, faker_server, monkeypatch, tmp_path):
+        """Setup Elelem with faker environment and custom JSON fixer model."""
+        # Set environment variable for faker
+        monkeypatch.setenv("FAKER_API_KEY", "fake-key-123")
+
+        # Use a unique temporary SQLite database for each test
+        db_file = tmp_path / "test_metrics.db"
+        monkeypatch.setenv("ELELEM_DATABASE_URL", f"sqlite:///{db_file}")
+
+        # Update faker provider configuration
+        from elelem.config import Config
+        config = Config()
+        faker_provider = config.get_provider_config("faker")
+        faker_provider["endpoint"] = f"http://localhost:{faker_server.port}/v1"
+
+        # Create Elelem instance with JSON fixer configured to use faker
+        elelem = Elelem(
+            extra_provider_dirs=["tests/providers"],
+            json_fixer_enabled=True,
+            json_fixer_model="faker:json-fixer"
+        )
+        return elelem, faker_server
+
+    @pytest.mark.asyncio
+    async def test_json_fixer_repairs_invalid_schema(self, elelem_with_json_fixer):
+        """Test that the LLM-based JSON fixer repairs schema validation failures."""
+        elelem, faker = elelem_with_json_fixer
+
+        # Configure faker with JSON fixer scenario
+        faker.configure_scenario('elelem_json_fixer')
+        faker.reset_state()
+
+        # Define schema that requires 'status' field
+        schema = {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string"},
+                "message": {"type": "string"},
+                "data": {"type": "integer"}
+            },
+            "required": ["status", "message", "data"]
+        }
+
+        # Request to json-broken model which returns JSON missing 'status'
+        # The fixer (faker:json-fixer) should repair it
+        response = await elelem.create_chat_completion(
+            model="faker:json-broken",
+            messages=[{"role": "user", "content": "Return JSON data"}],
+            response_format={"type": "json_object"},
+            json_schema=schema,
+            temperature=0.1  # Low temp so retries don't help
+        )
+
+        # Should succeed thanks to the fixer
+        assert response
+        content = response.choices[0].message.content
+
+        # The fixed JSON should be valid and have all required fields
+        json_data = json.loads(content)
+        assert "status" in json_data, "Fixed JSON should have 'status' field"
+        assert json_data["status"] == "fixed", "Status should be 'fixed' from fixer"
+
+        # Verify the fixer was called (should be more than 1 request)
+        requests = faker.request_analyzer.get_captured_requests()
+        print(f"Number of requests made: {len(requests)}")
+
+        # Should have: 1+ retries to json-broken, then 1 call to json-fixer
+        assert len(requests) >= 2, "Should have multiple requests (original + fixer)"
+
+        # Check that json-fixer model was called
+        models_called = [r['body'].get('model', '') for r in requests]
+        print(f"Models called: {models_called}")
+        assert any('json-fixer' in m for m in models_called), "JSON fixer model should have been called"
+
+        print("✅ JSON fixer successfully repaired schema validation failure")
+
+    @pytest.mark.asyncio
+    async def test_json_fixer_disabled(self, faker_server, monkeypatch, tmp_path):
+        """Test that JSON fixer can be disabled."""
+        # Set environment variable for faker
+        monkeypatch.setenv("FAKER_API_KEY", "fake-key-123")
+
+        # Use a unique temporary SQLite database
+        db_file = tmp_path / "test_metrics.db"
+        monkeypatch.setenv("ELELEM_DATABASE_URL", f"sqlite:///{db_file}")
+
+        # Update faker provider configuration
+        from elelem.config import Config
+        config = Config()
+        faker_provider = config.get_provider_config("faker")
+        faker_provider["endpoint"] = f"http://localhost:{faker_server.port}/v1"
+
+        # Create Elelem with fixer DISABLED
+        elelem = Elelem(
+            extra_provider_dirs=["tests/providers"],
+            json_fixer_enabled=False
+        )
+
+        # Configure faker
+        faker_server.configure_scenario('elelem_json_fixer')
+        faker_server.reset_state()
+
+        # Define schema that requires 'status' field
+        schema = {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string"},
+                "message": {"type": "string"}
+            },
+            "required": ["status", "message"]
+        }
+
+        # Request should fail since fixer is disabled and model returns invalid JSON
+        from elelem._exceptions import ModelError
+        with pytest.raises(ModelError) as exc_info:
+            await elelem.create_chat_completion(
+                model="faker:json-broken",
+                messages=[{"role": "user", "content": "Return JSON data"}],
+                response_format={"type": "json_object"},
+                json_schema=schema,
+                temperature=0.1
+            )
+
+        # Verify the error mentions JSON validation failure
+        assert "JSON validation failed" in str(exc_info.value)
+        print("✅ JSON fixer correctly disabled - request failed as expected")
+
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

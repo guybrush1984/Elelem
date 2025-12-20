@@ -1,0 +1,41 @@
+scenario: "elelem_json_fixer"
+description: "Test Elelem's LLM-based JSON fixer for schema validation failures"
+type: "conditional"
+
+models:
+  # Primary model that always returns invalid JSON (missing required field)
+  "json-broken":
+    provider: faker
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+
+  # Fixer model that returns valid JSON
+  "json-fixer":
+    provider: faker
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+
+conditions:
+  # json-broken always returns JSON missing required 'status' field
+  - check: "model_contains"
+    value: "json-broken"
+    response:
+      type: "success"
+      json_data:
+        message: "This JSON is missing the required status field"
+        data: 123
+
+  # json-fixer returns valid JSON with all required fields
+  - check: "model_contains"
+    value: "json-fixer"
+    response:
+      type: "success"
+      content: '{"status": "fixed", "message": "Repaired by fixer", "data": 456}'
+
+default_response:
+  type: "success"
+  content: "Default response"

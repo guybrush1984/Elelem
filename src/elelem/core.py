@@ -28,13 +28,15 @@ from ._provider_management import create_provider_client, initialize_providers, 
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
 from ._benchmark_store import reorder_candidates_by_benchmark
+from ._json_fixer import call_json_fixer
 
 
 class Elelem:
     """Unified API wrapper with cost tracking, JSON validation, and retry logic."""
     
     def __init__(self, metrics_persist_file: Optional[str] = None, extra_provider_dirs: Optional[List[str]] = None,
-                 cache_enabled: bool = False, cache_ttl: int = 300, cache_max_size: int = 50000):
+                 cache_enabled: bool = False, cache_ttl: int = 300, cache_max_size: int = 50000,
+                 json_fixer_enabled: bool = True, json_fixer_model: Optional[str] = None):
         self.logger = logging.getLogger("elelem")
         self.config = Config(extra_provider_dirs)
         self._models = self._load_models()
@@ -44,6 +46,10 @@ class Elelem:
         self._probed_providers = set()  # Track which providers have been attempted
         self._failed_providers = {}  # provider_name -> (timestamp, retryable)
         self._provider_retry_interval = 300  # Retry failed providers after 5 minutes
+
+        # JSON fixer configuration
+        self._json_fixer_enabled = json_fixer_enabled
+        self._json_fixer_model = json_fixer_model
 
         # Initialize metrics system (unified SQLAlchemy backend)
         self._metrics_store = MetricsStore()
@@ -315,7 +321,8 @@ class Elelem:
                                 api_kwargs: Dict[str, Any], content: str, error: Exception,
                                 validation_type: str = "json",
                                 provider: str = None, model_id: str = None,
-                                original_model: str = None) -> Optional[str]:
+                                original_model: str = None,
+                                schema: Dict[str, Any] = None) -> Optional[str]:
         """Dump request/response for debugging validation failures.
 
         Only active when ELELEM_DEBUG_VALIDATION env var is set.
@@ -370,7 +377,8 @@ class Elelem:
                 },
                 "response": {
                     "content": content,
-                }
+                },
+                "schema": schema,
             }
 
             with open(filename, 'w', encoding='utf-8') as f:
@@ -789,9 +797,10 @@ class Elelem:
                                     self.logger.warning(f"[{request_id}] Validation error: {e}")
                                     self.logger.warning(f"[{request_id}] Failed content:\n{content}")
                                     self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
-                                                                provider=provider_name, model_id=model_name, original_model=original_model)
+                                                                provider=provider_name, model_id=model_name, original_model=original_model,
+                                                                schema=json_schema)
                                     continue
-                            
+
                             # Try removing response format
                             if 'response_format' in api_kwargs:
                                 api_kwargs.pop('response_format', None)
@@ -800,11 +809,33 @@ class Elelem:
                                 self.logger.warning(f"[{request_id}] Removing response_format and retrying")
                                 continue
                         
-                        # All JSON retries exhausted - this is a model error, don't iterate candidates
-                        # Note: Don't finalize here - outer loop handles finalization to avoid duplicates
+                        # All JSON retries exhausted - try the LLM fixer as last resort
                         self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model)
-                        raise ModelError(f"JSON validation failed after all retries: {e}", provider=provider_name, model=model_name)
+                                                    provider=provider_name, model_id=model_name, original_model=original_model,
+                                                    schema=json_schema)
+
+                        # Attempt JSON fix with LLM if enabled and schema is available
+                        if self._json_fixer_enabled and json_schema:
+                            fixed_content = await call_json_fixer(
+                                elelem_instance=self,
+                                invalid_json=content,
+                                error=str(e),
+                                messages=messages,
+                                schema=json_schema,
+                                request_id=request_id,
+                                fixer_model=self._json_fixer_model
+                            )
+                            if fixed_content:
+                                # Fixer succeeded - use the fixed content
+                                content = fixed_content
+                                request_tracker.record_retry("json_fixer")
+                                # Skip raising error and continue to success path
+                            else:
+                                # Fixer failed - raise the original error
+                                raise ModelError(f"JSON validation failed after all retries and fixer: {e}", provider=provider_name, model=model_name)
+                        else:
+                            # Fixer disabled or no schema available
+                            raise ModelError(f"JSON validation failed after all retries: {e}", provider=provider_name, model=model_name)
 
                 # YAML validation if requested
                 if yaml_mode_requested:
@@ -826,13 +857,15 @@ class Elelem:
                                     self.logger.warning(f"[{request_id}] Validation error: {e}")
                                     self.logger.warning(f"[{request_id}] Failed content:\n{content}")
                                     self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
-                                                                provider=provider_name, model_id=model_name, original_model=original_model)
+                                                                provider=provider_name, model_id=model_name, original_model=original_model,
+                                                                schema=yaml_schema)
                                     continue
 
                         # All YAML retries exhausted - this is a model error, don't iterate candidates
                         # Note: Don't finalize here - outer loop handles finalization to avoid duplicates
                         self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model)
+                                                    provider=provider_name, model_id=model_name, original_model=original_model,
+                                                    schema=yaml_schema)
                         raise ModelError(f"YAML validation failed after all retries: {e}", provider=provider_name, model=model_name)
 
                 # Success! Calculate duration and return

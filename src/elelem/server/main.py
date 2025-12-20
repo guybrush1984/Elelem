@@ -11,7 +11,6 @@ Usage:
 import logging
 import traceback
 import os
-import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -401,24 +400,22 @@ async def get_metrics_data(
     """Get raw unified metrics data as JSON array.
 
     Returns array of request records from unified metrics structure.
-    Works with both PostgreSQL and local pandas.
     """
     try:
         if format != "json":
             raise HTTPException(status_code=400, detail="Only 'json' format is currently supported")
 
         tag_list = tags.split(',') if tags else None
-        df = elelem.get_metrics_dataframe(start_time, end_time, tag_list)
+        data = elelem.get_metrics_data(start_time, end_time, tag_list)
 
-        # Convert DataFrame to JSON records
         # Handle datetime serialization
-        df_copy = df.copy()
-        if 'timestamp' in df_copy.columns and not df_copy.empty:
-            # Convert to datetime if not already
-            df_copy['timestamp'] = pd.to_datetime(df_copy['timestamp'])
-            df_copy['timestamp'] = df_copy['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
+        for row in data:
+            if 'timestamp' in row and row['timestamp']:
+                ts = row['timestamp']
+                if hasattr(ts, 'strftime'):
+                    row['timestamp'] = ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
-        return df_copy.to_dict(orient="records")
+        return data
     except Exception as e:
         logger.error(f"Error getting metrics data: {e}")
         raise HTTPException(status_code=500, detail=str(e))

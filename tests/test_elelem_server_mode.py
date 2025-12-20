@@ -9,7 +9,6 @@ import time
 import subprocess
 import sys
 import requests
-import pandas as pd
 from openai import OpenAI
 
 
@@ -154,8 +153,8 @@ def elelem_with_faker_env_server(faker_port=6666):
                 response = requests.get(f"{self.base_url}/v1/metrics/summary?tags={tag}")
                 return response.json()
 
-            def get_metrics_dataframe(self, start_time=None, end_time=None, tags=None):
-                """Get metrics dataframe via server API."""
+            def get_metrics_data(self, start_time=None, end_time=None, tags=None):
+                """Get metrics data via server API."""
                 params = {}
                 if start_time:
                     params['start_time'] = start_time.isoformat()
@@ -165,8 +164,7 @@ def elelem_with_faker_env_server(faker_port=6666):
                     params['tags'] = ','.join(tags) if isinstance(tags, list) else tags
 
                 response = requests.get(f"{self.base_url}/v1/metrics/data", params=params)
-                data = response.json()
-                return pd.DataFrame(data)
+                return response.json()
 
             def get_summary(self, start_time=None, end_time=None, tags=None):
                 """Get summary via server API."""

@@ -958,19 +958,20 @@ class TestElelemWithFaker:
         suite_stats = elelem.get_stats_by_tag("test-suite")
         assert suite_stats["requests"]["total"] == 1
 
-        # Test metrics dataframe
-        df = elelem.get_metrics_dataframe()
-        assert len(df) >= 3
-        assert "request_id" in df.columns
-        assert "actual_model" in df.columns
-        assert "actual_provider" in df.columns
-        assert "tags" in df.columns
-        assert "input_tokens" in df.columns
-        assert "output_tokens" in df.columns
-        assert "total_cost_usd" in df.columns
+        # Test metrics data
+        data = elelem.get_metrics_data()
+        assert len(data) >= 3
+        first_row = data[0]
+        assert "request_id" in first_row
+        assert "actual_model" in first_row
+        assert "actual_provider" in first_row
+        assert "tags" in first_row
+        assert "input_tokens" in first_row
+        assert "output_tokens" in first_row
+        assert "total_cost_usd" in first_row
 
         # Verify different models are recorded (check last 3 entries)
-        recent_models = df.tail(3)["requested_model"].tolist()
+        recent_models = [row["requested_model"] for row in data[-3:]]
         assert "faker:basic" in recent_models
         assert "faker:json-temp-test" in recent_models
         assert "faker:reasoning-test" in recent_models
@@ -1078,18 +1079,18 @@ class TestElelemWithFaker:
         )
 
         # Test filtering by tags
-        df_all = elelem.get_metrics_dataframe(tags=["dataframe-test"])
-        assert len(df_all) == 2
+        data_all = elelem.get_metrics_data(tags=["dataframe-test"])
+        assert len(data_all) == 2
 
-        df_filter1 = elelem.get_metrics_dataframe(tags=["filter-1"])
-        assert len(df_filter1) == 1
-        assert df_filter1.iloc[0]["requested_model"] == "faker:basic"
+        data_filter1 = elelem.get_metrics_data(tags=["filter-1"])
+        assert len(data_filter1) == 1
+        assert data_filter1[0]["requested_model"] == "faker:basic"
 
-        df_filter2 = elelem.get_metrics_dataframe(tags=["filter-2"])
-        assert len(df_filter2) == 1
-        assert df_filter2.iloc[0]["requested_model"] == "faker:reasoning-test"
+        data_filter2 = elelem.get_metrics_data(tags=["filter-2"])
+        assert len(data_filter2) == 1
+        assert data_filter2[0]["requested_model"] == "faker:reasoning-test"
 
-        print("✓ Dataframe filtering validated")
+        print("✓ Data filtering validated")
 
     @pytest.mark.asyncio
     async def test_virtual_model_stats_tracking(self, elelem_with_faker_env):
@@ -1113,11 +1114,11 @@ class TestElelemWithFaker:
         virtual_stats = elelem.get_stats_by_tag("virtual-model-test")
         assert virtual_stats["requests"]["total"] == 1
 
-        # Check dataframe shows virtual model
-        df = elelem.get_metrics_dataframe(tags=["virtual-model-test"])
-        assert len(df) == 1
+        # Check data shows virtual model
+        data = elelem.get_metrics_data(tags=["virtual-model-test"])
+        assert len(data) == 1
         # The actual provider used should be recorded, not the virtual model name
-        actual_model = df.iloc[0]["actual_model"]
+        actual_model = data[0]["actual_model"]
         # Should be one of the candidates that succeeded
         assert actual_model in ["faker:rate-limited", "faker:no-json", "faker:basic"]
 

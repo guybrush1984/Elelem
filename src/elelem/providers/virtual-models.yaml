@@ -13,7 +13,7 @@ models:
       model_reference: "deepseek_v32"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.2"
       - model: "gmi:deepseek/deepseek-3.2"
@@ -46,7 +46,7 @@ models:
       model_configuration: "reasoning"
     timeout: 300s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
       - model: "novita:deepseek/deepseek-3.2?reasoning"
@@ -72,7 +72,7 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "ollama:deepseek/deepseek-3.1"
         priority: always_first
@@ -102,7 +102,7 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "ollama:deepseek/deepseek-3.1?reasoning"
         priority: always_first
@@ -130,7 +130,7 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.1-terminus"
       - model: "novita:deepseek/deepseek-3.1-terminus"
@@ -156,7 +156,7 @@ models:
       model_reference: "deepseek_v31"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "deepinfra:deepseek/deepseek-3.1-terminus?reasoning"
       - model: "novita:deepseek/deepseek-3.1-terminus"
@@ -183,13 +183,15 @@ models:
       model_reference: "openai_gpt_oss_20b"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "gmi:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
       # Fireworks excluded: streaming bug with large JSON responses (GPT-OSS model issue)
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   "virtual:gpt-oss-20b-quick?reasoning=@[low,medium,high]":
     metadata:
@@ -203,6 +205,8 @@ models:
       - model: "gmi:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   # OPENAI GPT-OSS 120B VARIANTS
   "virtual:gpt-oss-120b-cheap?reasoning=@[low,medium,high]":
@@ -210,7 +214,7 @@ models:
       model_reference: "openai_gpt_oss_120b"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
         priority: always_first
@@ -224,6 +228,8 @@ models:
       - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   "virtual:gpt-oss-120b-quick?reasoning=@[low,medium,high]":
     metadata:
@@ -242,7 +248,9 @@ models:
       - model: "novita:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
-      - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"    
+      - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   # MISTRAL SMALL/MEDIUM VARIANTS
   "virtual:mistral-small-quick":
@@ -254,16 +262,20 @@ models:
     candidates:
       - model: "mistral:mistral/mistral-small"
       - model: "deepinfra:mistral/mistral-small"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   "virtual:mistral-small-cheap":
     metadata:
       model_reference: "mistral_small_32"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "deepinfra:mistral/mistral-small"
       - model: "mistral:mistral/mistral-small"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   # MISTRAL LARGE 3 VARIANTS
   "virtual:mistral-large-3":
@@ -274,6 +286,8 @@ models:
       - model: "mistral:mistral/mistral-large-3"
         priority: always_first
       - model: "virtual:deepseek-v3.2-cheap"  # Fallback: expands to all DeepSeek 3.2 candidates
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Ultimate fallback
 
   # KIMI K2 VARIANTS
   "virtual:kimi-k2-quick":
@@ -289,13 +303,15 @@ models:
       - model: "parasail:moonshotai/kimi-k2-instruct"
       - model: "deepinfra:moonshotai/kimi-k2-instruct"
       - model: "novita:moonshotai/kimi-k2-instruct"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered
 
   "virtual:kimi-k2-cheap":
     metadata:
       model_reference: "moonshot_kimi_k2"
     timeout: 120s
     routing:
-      speed_weight: 0.5  # Favor cost
+      speed_weight: 0.3  # Strongly favor cost (3x weight vs speed)
     candidates:
       - model: "ollama:moonshotai/kimi-k2-instruct"
         priority: always_first
@@ -304,3 +320,5 @@ models:
       - model: "novita:moonshotai/kimi-k2-instruct"
       - model: "fireworks:moonshotai/kimi-k2-instruct"
       - model: "groq:moonshotai/kimi-k2-instruct"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last  # Fallback: different model, never reordered

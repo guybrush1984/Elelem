@@ -15,7 +15,6 @@ from openai import (
     BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError,
     ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError,
 )
-import pandas as pd
 from .config import Config
 from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
@@ -1019,11 +1018,11 @@ class Elelem:
         """
         return self._metrics_store.get_stats(start_time, end_time, tags)
 
-    def get_metrics_dataframe(self,
-                              start_time: Optional[datetime] = None,
-                              end_time: Optional[datetime] = None,
-                              tags: Optional[List[str]] = None) -> pd.DataFrame:
-        """Get filtered DataFrame for custom metrics analysis.
+    def get_metrics_data(self,
+                         start_time: Optional[datetime] = None,
+                         end_time: Optional[datetime] = None,
+                         tags: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Get filtered metrics data for custom analysis.
 
         Args:
             start_time: Filter calls after this time (inclusive). None = no lower bound
@@ -1031,9 +1030,9 @@ class Elelem:
             tags: Filter by specific tags. None = all tags
 
         Returns:
-            Filtered pandas DataFrame with all metrics data
+            Filtered list of dicts with all metrics data
         """
-        return self._metrics_store.get_dataframe(start_time, end_time, tags)
+        return self._metrics_store.get_data(start_time, end_time, tags)
 
     def get_metrics_tags(self) -> List[str]:
         """Get all unique tags from metrics data.

@@ -232,15 +232,15 @@ print(stats)
 }
 ```
 
-**Access raw data as pandas DataFrame:**
+**Access raw data:**
 ```python
-df = elelem.get_metrics_dataframe(tags=["env:production"])
-# Returns pandas DataFrame with all request details
+data = elelem.get_metrics_data(tags=["env:production"])
+# Returns List[Dict] with all request details
 
 # Filter by time and tags
 from datetime import datetime, timedelta
 start = datetime.now() - timedelta(hours=24)
-df = elelem.get_metrics_dataframe(start_time=start, tags=["user:123"])
+data = elelem.get_metrics_data(start_time=start, tags=["user:123"])
 ```
 
 **Server mode metrics:**

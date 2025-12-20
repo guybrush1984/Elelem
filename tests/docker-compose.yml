@@ -21,6 +21,7 @@ services:
       - /var/lib/postgresql/data
 
   # Elelem server for integration tests
+  # Uses Docker Hardened Image (DHI) - Alpine-based, 147MB
   elelem-server:
     build:
       context: ../
@@ -44,7 +45,8 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # DHI has no curl - use Python for healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3

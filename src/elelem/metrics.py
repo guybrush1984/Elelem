@@ -5,7 +5,7 @@ This module provides a unified metrics storage system using SQLAlchemy for stora
 (SQLite for local, PostgreSQL for production) and pandas for readable analytics.
 """
 
-import pandas as pd
+from collections import defaultdict
 import time
 import os
 import uuid
@@ -532,7 +532,7 @@ class MetricsStore:
                 return
 
     def get_stats(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Get comprehensive statistics using pandas for readable analytics.
+        """Get comprehensive statistics.
 
         Args:
             start_time: Filter requests after this time (inclusive). None = no lower bound
@@ -542,33 +542,41 @@ class MetricsStore:
         Returns:
             Dict with aggregated metrics for tokens, costs, duration, and retry analytics
         """
-        # Load data from database using pandas
-        df = self._load_dataframe(start_time, end_time, tags)
+        rows = self._load_data(start_time, end_time, tags)
 
-        if df.empty:
+        if not rows:
             return self._empty_stats()
 
-        # Use pandas for readable analytics
-        successful = df[df['status'] == 'success']
-        failed = df[df['status'] == 'failed']
+        successful = [r for r in rows if r.get('status') == 'success']
+        failed = [r for r in rows if r.get('status') == 'failed']
 
-        # Helper to compute stats for a column
-        def compute_stats(data, column_name):
-            if data.empty or column_name not in data.columns:
+        # Helper to compute stats for a field
+        def compute_stats(data: List[Dict], field: str) -> Dict[str, float]:
+            values = [r.get(field, 0) or 0 for r in data]
+            if not values:
                 return {'total': 0.0, 'avg': 0.0, 'min': 0.0, 'max': 0.0}
             return {
-                'total': float(data[column_name].sum()),
-                'avg': float(data[column_name].mean()),
-                'min': float(data[column_name].min()),
-                'max': float(data[column_name].max())
+                'total': float(sum(values)),
+                'avg': float(sum(values) / len(values)),
+                'min': float(min(values)),
+                'max': float(max(values))
             }
+
+        # Group by provider/model
+        providers = defaultdict(float)
+        models = defaultdict(float)
+        for r in successful:
+            if r.get('actual_provider'):
+                providers[r['actual_provider']] += r.get('total_cost_usd', 0) or 0
+            if r.get('actual_model'):
+                models[r['actual_model']] += r.get('total_cost_usd', 0) or 0
 
         return {
             'requests': {
-                'total': len(df),
+                'total': len(rows),
                 'successful': len(successful),
                 'failed': len(failed),
-                'success_rate': float(len(successful) / len(df)) if len(df) > 0 else 0.0
+                'success_rate': float(len(successful) / len(rows)) if rows else 0.0
             },
             'tokens': {
                 'input': compute_stats(successful, 'input_tokens'),
@@ -576,18 +584,18 @@ class MetricsStore:
                 'reasoning': compute_stats(successful, 'reasoning_tokens')
             },
             'costs': compute_stats(successful, 'total_cost_usd'),
-            'duration': compute_stats(df, 'total_duration_seconds'),
-            'providers': successful.groupby('actual_provider')['total_cost_usd'].sum().to_dict() if not successful.empty else {},
-            'models': successful.groupby('actual_model')['total_cost_usd'].sum().to_dict() if not successful.empty else {},
+            'duration': compute_stats(rows, 'total_duration_seconds'),
+            'providers': dict(providers),
+            'models': dict(models),
             'retries': {
-                'json_parse_retries': int(df['json_parse_retries'].sum()) if 'json_parse_retries' in df.columns else 0,
-                'rate_limit_retries': int(df['rate_limit_retries'].sum()) if 'rate_limit_retries' in df.columns else 0,
-                'total_retry_attempts': int(df['total_retry_attempts'].sum()) if 'total_retry_attempts' in df.columns else 0
+                'json_parse_retries': sum(r.get('json_parse_retries', 0) or 0 for r in rows),
+                'rate_limit_retries': sum(r.get('rate_limit_retries', 0) or 0 for r in rows),
+                'total_retry_attempts': sum(r.get('total_retry_attempts', 0) or 0 for r in rows)
             }
         }
 
-    def _load_dataframe(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> pd.DataFrame:
-        """Load filtered data from database using pandas with JOIN for tags."""
+    def _load_data(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Load filtered data from database as list of dicts."""
         try:
             params = {}
 
@@ -595,7 +603,6 @@ class MetricsStore:
             if tags:
                 # When filtering by tags with AND logic (must have ALL tags)
                 # Use GROUP BY and HAVING COUNT to ensure all tags are present
-                tag_conditions = []
                 if len(tags) == 1:
                     tag_filter = f"rt.tag = '{tags[0]}'"
                 else:
@@ -643,39 +650,44 @@ class MetricsStore:
 
                 query += " ORDER BY rm.timestamp DESC"
 
-            # Load main dataframe
-            df = pd.read_sql(query, self.engine, params=params)
+            # Execute query and convert to list of dicts
+            with self.engine.connect() as conn:
+                result = conn.execute(text(query), params)
+                rows = [dict(row._mapping) for row in result]
 
-            # ALWAYS append tags column (fetch tags for all requests in result)
-            if not df.empty:
-                request_ids = df['request_id'].tolist()
-                if request_ids:
-                    # Build query to get tags for these requests
-                    # Handle single-item list to avoid trailing comma issue in SQL
-                    if len(request_ids) == 1:
-                        tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id = '{request_ids[0]}'"
-                    else:
-                        tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id IN {tuple(request_ids)}"
+            if not rows:
+                return []
 
-                    tags_df = pd.read_sql(tags_query, self.engine)
-
-                    # Group tags by request_id
-                    if not tags_df.empty:
-                        tags_by_request = tags_df.groupby('request_id')['tag'].apply(list).to_dict()
-                        df['tags'] = df['request_id'].map(lambda rid: tags_by_request.get(rid, []))
-                    else:
-                        df['tags'] = [[] for _ in range(len(df))]
+            # Fetch tags for all requests in result
+            request_ids = [row['request_id'] for row in rows]
+            if request_ids:
+                # Build query to get tags for these requests
+                if len(request_ids) == 1:
+                    tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id = '{request_ids[0]}'"
                 else:
-                    df['tags'] = [[] for _ in range(len(df))]
+                    tags_query = f"SELECT request_id, tag FROM request_tags WHERE request_id IN {tuple(request_ids)}"
 
-            return df
+                with self.engine.connect() as conn:
+                    tags_result = conn.execute(text(tags_query))
+                    tags_rows = list(tags_result)
+
+                # Group tags by request_id
+                tags_by_request = defaultdict(list)
+                for tag_row in tags_rows:
+                    tags_by_request[tag_row.request_id].append(tag_row.tag)
+
+                # Add tags to each row
+                for row in rows:
+                    row['tags'] = tags_by_request.get(row['request_id'], [])
+
+            return rows
 
         except Exception as e:
             self.logger.error(f"Failed to load data from database: {e}")
-            raise  # Re-raise the exception instead of silently returning empty DataFrame
+            raise
 
-    def get_dataframe(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> pd.DataFrame:
-        """Public method to get filtered metrics data as DataFrame.
+    def get_data(self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, tags: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Public method to get filtered metrics data as list of dicts.
 
         Args:
             start_time: Filter calls after this time (inclusive). None = no lower bound
@@ -683,9 +695,9 @@ class MetricsStore:
             tags: Filter by specific tags. None = all tags
 
         Returns:
-            Filtered pandas DataFrame with all metrics data
+            Filtered list of dicts with all metrics data
         """
-        return self._load_dataframe(start_time, end_time, tags)
+        return self._load_data(start_time, end_time, tags)
 
     def _empty_stats(self) -> Dict[str, Any]:
         """Return empty stats structure."""
@@ -706,11 +718,10 @@ class MetricsStore:
     def get_available_tags(self) -> List[str]:
         """Get all unique tags from the database."""
         try:
-            # Query the separate tags table for all unique tags
             query = "SELECT DISTINCT tag FROM request_tags ORDER BY tag"
-            df = pd.read_sql(query, self.engine)
-
-            return df['tag'].tolist() if not df.empty else []
+            with self.engine.connect() as conn:
+                result = conn.execute(text(query))
+                return [row.tag for row in result]
         except Exception as e:
             self.logger.error(f"Failed to get available tags: {e}")
             return []

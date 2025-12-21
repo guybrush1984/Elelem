@@ -41,7 +41,8 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 
 # Copy telelem test tools (used by external repos)
-COPY --from=builder /app/tests/telelem /app/tests/telelem
+# Make writable for non-root user in hardened image
+COPY --from=builder --chmod=777 /app/tests/telelem /app/tests/telelem
 
 # Set PATH to use venv
 ENV PATH="/opt/venv/bin:$PATH"

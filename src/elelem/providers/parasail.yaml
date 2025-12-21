@@ -46,7 +46,7 @@ models:
     model_id: deepseek-ai/DeepSeek-V3.2
     timeout: 300
     capabilities:
-      supports_json_mode: true
+      supports_json_mode: false  # JSON mode conflicts with thinking - returns empty content
       supports_temperature: true
       supports_system: true
     cost:

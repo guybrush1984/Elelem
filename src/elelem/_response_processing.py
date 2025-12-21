@@ -133,6 +133,14 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
         if chunk.choices and len(chunk.choices) > 0:
             choice = chunk.choices[0]
 
+            # Debug: log first chunk structure to understand provider format
+            if chunk_count == 1 and logger:
+                request_prefix = f"[{request_id}] " if request_id else ""
+                delta = getattr(choice, 'delta', None)
+                if delta:
+                    delta_fields = {k: type(v).__name__ for k, v in vars(delta).items() if not k.startswith('_') and v is not None}
+                    logger.debug(f"{request_prefix}🔍 First chunk delta fields: {delta_fields}")
+
             # Extract content from delta
             if hasattr(choice, 'delta') and choice.delta.content is not None:
                 content_parts.append(choice.delta.content)
@@ -157,6 +165,11 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
     # Reconstruct the complete content
     full_content = ''.join(content_parts) if content_parts else None
     full_reasoning_content = ''.join(reasoning_content_parts) if reasoning_content_parts else None
+
+    # Debug: log what we captured
+    if logger:
+        request_prefix = f"[{request_id}] " if request_id else ""
+        logger.debug(f"{request_prefix}📝 Streaming complete: content_parts={len(content_parts)}, reasoning_parts={len(reasoning_content_parts)}, content_len={len(full_content) if full_content else 0}, reasoning_len={len(full_reasoning_content) if full_reasoning_content else 0}")
 
 
     # Create a normal ChatCompletion response (not streaming)

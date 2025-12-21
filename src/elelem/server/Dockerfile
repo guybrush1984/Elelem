@@ -40,6 +40,9 @@ WORKDIR /app
 # Copy virtual env from builder
 COPY --from=builder /opt/venv /opt/venv
 
+# Copy telelem test tools (used by external repos)
+COPY --from=builder /app/tests/telelem /app/tests/telelem
+
 # Set PATH to use venv
 ENV PATH="/opt/venv/bin:$PATH"
 

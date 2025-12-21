@@ -676,8 +676,9 @@ class Elelem:
         provider_config = self.config.get_provider_config(provider_name)
 
         # Prepare API parameters with proper precedence
+        # Use stats_model_name (candidate's original_model_ref) for extra_body lookup
         api_kwargs = prepare_api_kwargs(kwargs, original_temperature, provider_config,
-                                      candidate, original_model, self.config, provider_name)
+                                      candidate, stats_model_name, self.config, provider_name)
         
         # Clean up unsupported parameters for this candidate model
         self.logger.debug(f"[{request_id}] Full candidate dict: {candidate}")

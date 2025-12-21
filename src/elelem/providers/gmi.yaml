@@ -6,7 +6,7 @@ provider:
     stream: true
 
 models:
-  # DeepSeek V3.2 - no reasoning support on GMI
+  # DeepSeek V3.2
   "gmi:deepseek/deepseek-3.2":
     metadata:
       model_reference: "deepseek_v32"
@@ -20,6 +20,25 @@ models:
       input_cost_per_1m: 0.28
       output_cost_per_1m: 0.40
       currency: USD
+
+  "gmi:deepseek/deepseek-3.2?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    provider: gmi
+    model_id: deepseek-ai/DeepSeek-V3.2
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.28
+      output_cost_per_1m: 0.40
+      currency: USD
+    extra_body:
+      reasoning:
+        enabled: true
 
   # DeepSeek V3.1 - no reasoning support on GMI
   "gmi:deepseek/deepseek-3.1":

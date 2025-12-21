@@ -37,6 +37,9 @@ models:
       model_reference: "deepseek_v32"
     default_params:
       stream: true
+    extra_body:
+      chat_template_kwargs:
+        thinking: false
 
   "parasail:deepseek/deepseek-3.2?reasoning":
     provider: parasail

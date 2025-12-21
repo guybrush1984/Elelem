@@ -200,6 +200,9 @@ models:
       currency: USD
     default_params:
       stream: true
+    extra_body:
+      reasoning:
+        enabled: false
 
   "deepinfra:deepseek/deepseek-3.2?reasoning":
     metadata:
@@ -218,7 +221,9 @@ models:
       currency: USD
     default_params:
       stream: true
-      reasoning_effort: medium
+    extra_body:
+      reasoning:
+        enabled: true
 
   "deepinfra:moonshotai/kimi-k2-instruct":
     metadata:

@@ -140,20 +140,7 @@ models:
       stream: true
       reasoning_effort: $reasoning
 
-  "fireworks:deepseek/deepseek-3.2":
-    metadata:
-      model_reference: "deepseek_v32"
-    provider: fireworks
-    model_id: accounts/fireworks/models/deepseek-v3p2
-    capabilities:
-      supports_json_mode: false
-      supports_temperature: true
-      supports_system: true
-    cost:
-      input_cost_per_1m: 0.56
-      output_cost_per_1m: 1.68
-      currency: USD
-
+  # DeepSeek V3.2 - always reasons on Fireworks, no non-reasoning variant available
   "fireworks:deepseek/deepseek-3.2?reasoning":
     metadata:
       model_reference: "deepseek_v32"
@@ -169,8 +156,6 @@ models:
       input_cost_per_1m: 0.56
       output_cost_per_1m: 1.68
       currency: USD
-    default_params:
-      reasoning_effort: medium
 
   "fireworks:moonshotai/kimi-k2-instruct":
     metadata:

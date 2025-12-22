@@ -59,9 +59,9 @@
   ],
   "prompts": [
     {
-      "name": "cake",
-      "system": "You are an assistant generating cake recipes. Generate recipes in 6 steps, about 50 words each. Answer with JSON: {\"step1\": \"...\", \"step2\": \"...\", \"step3\": \"...\", \"step4\": \"...\", \"step5\": \"...\", \"step6\": \"...\"}",
-      "user": "I want a chocolate cake for 8."
+      "name": "country",
+      "system": "Answer with JSON: {\"capital\": \"...\", \"population_millions\": <number>, \"currency\": \"...\"}",
+      "user": "Tell me about France."
     }
   ],
   "temperature": 0.1

@@ -14,6 +14,8 @@ services:
       - PARASAIL_API_KEY=${PARASAIL_API_KEY:-}
       - SCALEWAY_API_KEY=${SCALEWAY_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Google Vertex AI (for DeepSeek V3.2 MaaS)
+      - VERTEX_CREDENTIALS_JSON=${VERTEX_CREDENTIALS_JSON:-}
       # Add other provider keys as needed
     volumes:
       # Mount .env file if it exists (from project root)

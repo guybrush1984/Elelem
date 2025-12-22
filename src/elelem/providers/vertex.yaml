@@ -1,0 +1,80 @@
+# Google Vertex AI Model Garden provider
+# Uses VERTEX_CREDENTIALS_JSON env var for authentication
+# Set VERTEX_LOCATION=global (default) or specific region
+
+provider:
+  auth_type: google_vertex
+  default_params:
+    stream: true
+
+models:
+  # DeepSeek V3.2 - non-reasoning
+  "vertex:deepseek/deepseek-3.2":
+    metadata:
+      model_reference: "deepseek_v32"
+    provider: vertex
+    model_id: deepseek-ai/deepseek-v3.2-maas
+    capabilities:
+      supports_json_mode: true
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+
+  # DeepSeek V3.2 - reasoning enabled
+  "vertex:deepseek/deepseek-3.2?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    provider: vertex
+    model_id: deepseek-ai/deepseek-v3.2-maas
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.56
+      output_cost_per_1m: 1.68
+      currency: USD
+    extra_body:
+      reasoning:
+        enabled: true
+
+  # OpenAI GPT-OSS 120B with reasoning
+  "vertex:openai/gpt-oss-120b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_120b"
+      model_configuration: "reasoning=$reasoning"
+    provider: vertex
+    model_id: openai/gpt-oss-120b-maas
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.09
+      output_cost_per_1m: 0.36
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning
+
+  # OpenAI GPT-OSS 20B with reasoning
+  "vertex:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
+    metadata:
+      model_reference: "openai_gpt_oss_20b"
+      model_configuration: "reasoning=$reasoning"
+    provider: vertex
+    model_id: openai/gpt-oss-20b-maas
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.07
+      output_cost_per_1m: 0.25
+      currency: USD
+    default_params:
+      reasoning_effort: $reasoning

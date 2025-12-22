@@ -208,9 +208,10 @@ class TestConfigValidation:
         issues = []
 
         for provider_name, provider_config in providers.items():
-            # Each provider should have an endpoint (single) or endpoints (multiple)
-            if 'endpoint' not in provider_config and 'endpoints' not in provider_config:
-                issues.append(f"Provider '{provider_name}' missing 'endpoint' or 'endpoints' field")
+            # Each provider should have an endpoint (single), endpoints (multiple), or auth_type (cloud providers)
+            # Cloud providers with auth_type get their endpoint from the token provider
+            if 'endpoint' not in provider_config and 'endpoints' not in provider_config and 'auth_type' not in provider_config:
+                issues.append(f"Provider '{provider_name}' missing 'endpoint', 'endpoints', or 'auth_type' field")
 
             # Single endpoint should be a valid URL
             endpoint = provider_config.get('endpoint', '')

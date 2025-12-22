@@ -45,6 +45,7 @@ class Elelem:
         self._probed_providers = set()  # Track which providers have been attempted
         self._failed_providers = {}  # provider_name -> (timestamp, retryable)
         self._provider_retry_interval = 300  # Retry failed providers after 5 minutes
+        self._token_providers = {}  # provider_name -> TokenProvider (for cloud auth)
 
         # JSON fixer configuration
         self._json_fixer_enabled = json_fixer_enabled
@@ -117,28 +118,33 @@ class Elelem:
 
         # Import needed functions
         from ._provider_management import probe_endpoint, select_working_endpoint
+        from ._token_providers import create_token_provider
 
-        # Determine API key
-        base_provider = provider_config.get("base_provider")
-        if base_provider:
-            env_var = f"{base_provider.upper()}_API_KEY"
-        else:
-            env_var = f"{provider_name.upper()}_API_KEY"
-
-        api_key = os.getenv(env_var)
-
-        if not api_key:
-            self.logger.debug(f"[{provider_name}] No API key found (env var: {env_var})")
-            # No API key is a permanent failure
+        # Create token provider (handles both static keys and cloud auth)
+        token_provider = create_token_provider(provider_name, provider_config, self.logger)
+        if not token_provider:
             self._failed_providers[provider_name] = (time.time(), False)
             return False
 
-        # Determine endpoint (probe if needed)
-        endpoint = None
+        self._token_providers[provider_name] = token_provider
+        api_key = token_provider.get_token()
+
+        # Determine endpoint (token provider may provide one, e.g., cloud providers)
+        endpoint = token_provider.get_endpoint()
         retryable = True
         probe_timeout = provider_config.get("probe_timeout", 5.0)
 
-        if "endpoints" in provider_config:
+        if endpoint:
+            # Token provider specified endpoint - use its probe method
+            self.logger.info(f"[{provider_name}] Probing endpoint: {endpoint[:60]}...")
+            result = token_provider.probe(endpoint, probe_timeout, self.logger)
+            if not result.success:
+                self.logger.warning(f"[{provider_name}] ❌ Endpoint not accessible (retryable={result.retryable})")
+                self._failed_providers[provider_name] = (time.time(), result.retryable)
+                return False
+            self.logger.info(f"[{provider_name}] ✅ Endpoint accessible")
+
+        elif "endpoints" in provider_config:
             # Multiple endpoints - probe and select
             self.logger.info(f"[{provider_name}] Probing {len(provider_config['endpoints'])} endpoint(s)...")
             endpoint, retryable = select_working_endpoint(
@@ -663,6 +669,11 @@ class Elelem:
         model_name = candidate['model_id']
         provider_client = self._providers[provider_name]
         capabilities = candidate.get('capabilities', {})
+
+        # Refresh token if needed (for cloud providers with expiring tokens)
+        if provider_name in self._token_providers:
+            token = self._token_providers[provider_name].get_token()
+            provider_client.api_key = token
         
         # Use original model reference for statistics (cost lookup)
         # For virtual models: use the original model reference (e.g., "parasail:gpt-oss-120b")

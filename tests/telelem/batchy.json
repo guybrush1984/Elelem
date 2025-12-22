@@ -19,6 +19,8 @@
     "ollama:deepseek/deepseek-3.2?reasoning",
     "parasail:deepseek/deepseek-3.2",
     "parasail:deepseek/deepseek-3.2?reasoning",
+    "vertex:deepseek/deepseek-3.2",
+    "vertex:deepseek/deepseek-3.2?reasoning",
     "mistral:mistral/mistral-large-3",
     "baseten:openai/gpt-oss-120b?reasoning=low",
     "baseten:openai/gpt-oss-120b?reasoning=medium",
@@ -49,7 +51,11 @@
     "parasail:openai/gpt-oss-120b?reasoning=low",
     "parasail:openai/gpt-oss-120b?reasoning=medium",
     "scaleway:openai/gpt-oss-120b?reasoning=low",
-    "scaleway:openai/gpt-oss-120b?reasoning=medium"
+    "scaleway:openai/gpt-oss-120b?reasoning=medium",
+    "vertex:openai/gpt-oss-20b?reasoning=low",
+    "vertex:openai/gpt-oss-20b?reasoning=medium",
+    "vertex:openai/gpt-oss-120b?reasoning=low",
+    "vertex:openai/gpt-oss-120b?reasoning=medium"
   ],
   "prompts": [
     {

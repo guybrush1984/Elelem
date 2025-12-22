@@ -26,7 +26,8 @@ RUN python -m venv /opt/venv && \
         sqlalchemy \
         psycopg2-binary \
         json-repair \
-        requests
+        requests \
+        google-auth
 
 # Copy source code to site-packages
 # Fix permissions for non-root user in hardened image

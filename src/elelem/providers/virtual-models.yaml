@@ -21,6 +21,7 @@ models:
       - model: "novita:deepseek/deepseek-3.2"
       - model: "baseten:deepseek/deepseek-3.2"
       - model: "parasail:deepseek/deepseek-3.2"
+      - model: "vertex:deepseek/deepseek-3.2"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model_reference, never reordered
 
@@ -36,6 +37,7 @@ models:
       - model: "novita:deepseek/deepseek-3.2"
       - model: "deepinfra:deepseek/deepseek-3.2"
       - model: "parasail:deepseek/deepseek-3.2"
+      - model: "vertex:deepseek/deepseek-3.2"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model_reference, never reordered
 
@@ -56,6 +58,7 @@ models:
       - model: "baseten:deepseek/deepseek-3.2?reasoning"
       - model: "fireworks:deepseek/deepseek-3.2?reasoning"
       - model: "parasail:deepseek/deepseek-3.2?reasoning"
+      - model: "vertex:deepseek/deepseek-3.2?reasoning"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model_reference, never reordered
 
@@ -75,6 +78,7 @@ models:
       - model: "deepinfra:deepseek/deepseek-3.2?reasoning"
       - model: "baseten:deepseek/deepseek-3.2?reasoning"
       - model: "parasail:deepseek/deepseek-3.2?reasoning"
+      - model: "vertex:deepseek/deepseek-3.2?reasoning"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model_reference, never reordered
 
@@ -202,6 +206,7 @@ models:
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
       # Fireworks excluded: streaming bug with large JSON responses (GPT-OSS model issue)
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "vertex:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model, never reordered
 
@@ -217,6 +222,7 @@ models:
       - model: "gmi:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
+      - model: "vertex:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model, never reordered
 
@@ -240,6 +246,7 @@ models:
       - model: "cerebras:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "vertex:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model, never reordered
 
@@ -261,6 +268,7 @@ models:
       - model: "scaleway:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "parasail:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
+      - model: "vertex:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model, never reordered
 

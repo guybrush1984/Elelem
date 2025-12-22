@@ -46,6 +46,7 @@ dependencies = [
     "plotly>=5.17.0",
     "httpx>=0.28.1",
     "sentry-sdk[fastapi]>=2.48.0",
+    "google-auth>=2.45.0",
 ]
 
 [project.optional-dependencies]

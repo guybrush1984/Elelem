@@ -2,6 +2,7 @@
 # API docs: https://docs.baseten.co/
 provider:
   endpoint: https://inference.baseten.co/v1
+  max_tokens_default: 16384
   default_params:
     stream: true
 

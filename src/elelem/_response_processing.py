@@ -6,7 +6,7 @@ import re
 import logging
 from typing import Any, Tuple, Optional, List
 
-from ._exceptions import ModelError
+from ._exceptions import ModelError, InfrastructureError
 
 
 def extract_text_from_content_parts(content: list, logger: Optional[logging.Logger] = None) -> Tuple[Optional[str], Optional[str]]:
@@ -274,11 +274,13 @@ def process_response_content(response: Any, json_mode_requested: bool, yaml_mode
     finish_reason = getattr(response.choices[0], 'finish_reason', None)
     if finish_reason != 'stop':
         if finish_reason == 'length':
-            raise ModelError(f"Response was truncated due to max_tokens limit (finish_reason: {finish_reason})")
+            # Truncation is an infra issue - another provider with higher max_tokens may succeed
+            raise InfrastructureError(f"Response was truncated due to max_tokens limit (finish_reason: {finish_reason})")
         elif finish_reason == 'content_filter':
             raise ModelError(f"Response was filtered due to safety policies (finish_reason: {finish_reason})")
         elif finish_reason in ['function_call', 'tool_calls']:
-            raise ModelError(f"Unexpected function/tool call in non-function context (finish_reason: {finish_reason})")
+            # Tool calls in non-function context - try another provider
+            raise InfrastructureError(f"Unexpected function/tool call in non-function context (finish_reason: {finish_reason})")
         else:
             raise ModelError(f"Unexpected finish_reason: {finish_reason}")
 

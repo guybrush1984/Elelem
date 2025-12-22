@@ -34,13 +34,13 @@ def sentry_before_send(event, hint):
     Filter Sentry events to reduce noise from expected errors.
 
     DROP (expected, don't alert):
-    - InfrastructureError: timeouts, provider failures - handled by fallbacks
+    - InfrastructureError: timeouts, provider failures, max_tokens truncation - handled by fallbacks
     - RateLimitError (429): provider rate limits - expected under load
     - InternalServerError (503): provider unavailable - expected during outages
     - HTTPException: duplicates of above (Sentry auto-captures after we do)
 
     KEEP (real problems, alert):
-    - ModelError: max_tokens truncation, JSON validation failures
+    - ModelError: JSON validation failures, content filter, unexpected finish_reason
     - Other unexpected exceptions: bugs, config errors, etc.
     """
     if 'exc_info' not in hint:

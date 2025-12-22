@@ -1,6 +1,7 @@
 # Novita provider configuration and models
 provider:
   endpoint: https://api.novita.ai/openai
+  max_tokens_default: 16384
   default_params:
     stream: true
 

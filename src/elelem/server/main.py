@@ -22,9 +22,52 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import sentry_sdk
+from openai import RateLimitError, InternalServerError
 
 from elelem import Elelem
 from elelem import __version__
+from elelem._exceptions import InfrastructureError, ModelError
+
+
+def sentry_before_send(event, hint):
+    """
+    Filter Sentry events to reduce noise from expected errors.
+
+    DROP (expected, don't alert):
+    - InfrastructureError: timeouts, provider failures - handled by fallbacks
+    - RateLimitError (429): provider rate limits - expected under load
+    - InternalServerError (503): provider unavailable - expected during outages
+    - HTTPException: duplicates of above (Sentry auto-captures after we do)
+
+    KEEP (real problems, alert):
+    - ModelError: max_tokens truncation, JSON validation failures
+    - Other unexpected exceptions: bugs, config errors, etc.
+    """
+    if 'exc_info' not in hint:
+        return event
+
+    exc_type, exc_value, _ = hint['exc_info']
+
+    # Drop HTTPException - these are duplicates of errors we already capture
+    # (we capture the original exception, then raise HTTPException which Sentry auto-captures)
+    if exc_type.__name__ == 'HTTPException':
+        return None
+
+    # Drop InfrastructureError - provider timeouts/failures are expected
+    if exc_type is InfrastructureError:
+        return None
+
+    # Drop RateLimitError (429) - expected under load
+    if exc_type is RateLimitError:
+        return None
+
+    # Drop InternalServerError (503) - provider outages are expected
+    if exc_type is InternalServerError:
+        return None
+
+    # Keep everything else (ModelError, unexpected exceptions, bugs)
+    return event
+
 
 # Initialize Sentry for error monitoring (must be before FastAPI app creation)
 sentry_dsn = os.getenv('SENTRY_DSN')
@@ -39,6 +82,8 @@ if sentry_dsn:
         profile_session_sample_rate=float(os.getenv('SENTRY_PROFILE_SAMPLE_RATE', '0.1')),
         # Send default PII (user IPs, etc.) - disable in production if needed
         send_default_pii=False,
+        # Filter out expected errors to reduce noise
+        before_send=sentry_before_send,
     )
 from elelem._benchmark_store import get_benchmark_store
 from elelem.server.models import (

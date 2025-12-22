@@ -987,9 +987,9 @@ class Elelem:
                 # Other unexpected errors
                 raise ModelError(f"Unexpected error: {e}", provider=provider_name, model=model_name)
 
-        # Should not reach here - if we do, something unexpected happened
-        self.logger.error(f"[{request_id}] ⚠️ Unexpected: loop exhausted without resolution (attempt={attempt}, rate_limit_attempts={rate_limit_attempts})")
-        raise InfrastructureError("Exhausted all retry attempts for candidate (unexpected state)", provider=provider_name, model=model_name)
+        # Retry loop exhausted - move to next candidate
+        self.logger.warning(f"[{request_id}] 🔄 Retry loop exhausted (attempt={attempt}, rate_limit_attempts={rate_limit_attempts}), trying next candidate")
+        raise InfrastructureError("Exhausted all retry attempts for candidate", provider=provider_name, model=model_name)
     
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""

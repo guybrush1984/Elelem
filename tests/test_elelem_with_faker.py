@@ -63,18 +63,29 @@ class TestElelemWithFaker:
 
     @pytest.mark.asyncio
     async def test_json_temperature_reduction(self, elelem_with_faker_env):
-        """Test that Elelem reduces temperature when JSON parsing fails."""
+        """Test that Elelem reduces temperature when JSON schema validation fails."""
         elelem, faker = elelem_with_faker_env
 
         # Configure faker with JSON temperature reduction scenario
         faker.configure_scenario('elelem_json_temp_reduction')
         faker.reset_state()
 
-        # Make request with high temperature and JSON mode
+        # Schema that requires 'status' field - faker returns JSON missing this at high temp
+        schema = {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string"},
+                "message": {"type": "string"}
+            },
+            "required": ["status"]
+        }
+
+        # Make request with high temperature and JSON mode with schema
         response = await elelem.create_chat_completion(
             model="faker:json-temp-test",
             messages=[{"role": "user", "content": "Return JSON data"}],
             response_format={"type": "json_object"},
+            json_schema=schema,
             temperature=0.9
         )
 
@@ -1140,11 +1151,22 @@ class TestElelemWithFaker:
             ]
         }
 
-        # Make request with high temperature and JSON mode
+        # Schema that requires 'status' field - faker returns JSON missing this at high temp
+        schema = {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string"},
+                "message": {"type": "string"}
+            },
+            "required": ["status"]
+        }
+
+        # Make request with high temperature and JSON mode with schema
         response = await elelem.create_chat_completion(
             model=f"dynamic:{virtual_model_config}",
             messages=[{"role": "user", "content": "Return JSON data"}],
             response_format={"type": "json_object"},
+            json_schema=schema,
             temperature=0.9,
             tags=["virtual_json_test"]
         )
@@ -1703,8 +1725,8 @@ class TestElelemWithFaker:
                 temperature=0.1
             )
 
-        # Verify the error mentions JSON validation failure
-        assert "JSON validation failed" in str(exc_info.value)
+        # Verify the error mentions JSON schema validation failure
+        assert "JSON schema validation failed" in str(exc_info.value)
         print("✅ JSON fixer correctly disabled - request failed as expected")
 
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

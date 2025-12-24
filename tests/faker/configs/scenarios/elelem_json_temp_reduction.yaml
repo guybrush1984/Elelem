@@ -1,5 +1,5 @@
 scenario: "elelem_json_temp_reduction"
-description: "Test Elelem's JSON temperature reduction retry logic"
+description: "Test Elelem's JSON temperature reduction retry logic for schema validation errors"
 type: "conditional"
 
 models:
@@ -11,21 +11,28 @@ models:
       supports_system: true
 
 conditions:
-  # High temperature (>0.8) - return unrepairable JSON to trigger retry
+  # High temperature (>0.8) - return valid JSON but missing required field
+  # This triggers schema validation error (not parse error) allowing temperature reduction
   - check: "temperature_above"
     value: 0.8
     response:
-      type: "json_error"
-      error_type: "unrepairable"  # Cannot be fixed by json-repair
+      type: "success"
+      json_data:
+        # Missing "status" field that schema requires
+        message: "High temperature response"
+        partial: true
 
-  # Medium temperature (>0.6) - still return unrepairable JSON
+  # Medium temperature (>0.6) - still return invalid schema JSON
   - check: "temperature_above"
     value: 0.6
     response:
-      type: "json_error"
-      error_type: "unrepairable"  # Cannot be fixed by json-repair
+      type: "success"
+      json_data:
+        # Missing "status" field that schema requires
+        message: "Medium temperature response"
+        partial: true
 
-  # Low temperature (<=0.6) - return valid JSON
+  # Low temperature (<=0.6) - return valid JSON matching schema
   - check: "json_mode"
     response:
       type: "success"

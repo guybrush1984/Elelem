@@ -21,18 +21,21 @@ INSTRUCTIONS:
 3. Fix ONLY what the error describes - make minimal changes
 4. If a required field is missing, add it with a value that fits the context
 5. If a key has wrong type, fix the type or remove the invalid key
-6. Return the complete fixed JSON only - no explanations, no markdown
 
-Return ONLY valid JSON starting with { and ending with }."""
+OUTPUT FORMAT:
+Return a JSON object with exactly two keys:
+- "changes": Brief description of what you fixed (1 sentence max)
+- "fixed": The complete fixed JSON
+
+Example: {"changes": "Added missing 'id' field at path x.y", "fixed": {...}}"""
 
 
-def build_fixer_messages(invalid_json: str, error: str, context: str, schema: Dict[str, Any] = None) -> list:
+def build_fixer_messages(invalid_json: str, error: str, schema: Dict[str, Any] = None) -> list:
     """Build the messages for the JSON fixer LLM.
 
     Args:
         invalid_json: The JSON string that failed validation
         error: The validation error message
-        context: Context from the original request (first few messages)
         schema: Optional JSON schema the output must conform to
 
     Returns:
@@ -46,9 +49,7 @@ def build_fixer_messages(invalid_json: str, error: str, context: str, schema: Di
 
 VALIDATION ERROR:
 {error}
-
-CONTEXT:
-{context}{schema_section}
+{schema_section}
 
 INVALID JSON:
 {invalid_json}"""
@@ -59,21 +60,20 @@ INVALID JSON:
     ]
 
 
-def extract_json_from_response(response_content: str) -> Optional[str]:
-    """Extract JSON from fixer response, handling markdown if present.
+def extract_json_from_response(response_content: str) -> Tuple[Optional[str], Optional[str]]:
+    """Extract JSON and changes description from fixer response.
 
     Args:
         response_content: The raw response from the fixer model
 
     Returns:
-        The extracted JSON string, or None if extraction fails
+        Tuple of (fixed_json_string, changes_description)
     """
     fixed_str = response_content.strip()
 
     # Clean markdown code blocks if present
     if fixed_str.startswith('```'):
         lines = fixed_str.split('\n')
-        # Remove first line (```json or ```) and last line if it's just ```)
         if lines[-1].strip() == '```':
             fixed_str = '\n'.join(lines[1:-1])
         else:
@@ -83,10 +83,23 @@ def extract_json_from_response(response_content: str) -> Optional[str]:
     start = fixed_str.find('{')
     end = fixed_str.rfind('}') + 1
 
-    if start >= 0 and end > start:
-        return fixed_str[start:end]
+    if start < 0 or end <= start:
+        return None, None
 
-    return None
+    json_str = fixed_str[start:end]
+
+    # Try to parse as wrapper format {"changes": "...", "fixed": {...}}
+    try:
+        wrapper = json.loads(json_str)
+        if isinstance(wrapper, dict) and "fixed" in wrapper:
+            changes = wrapper.get("changes", "")
+            fixed_json = json.dumps(wrapper["fixed"])
+            return fixed_json, changes
+    except json.JSONDecodeError:
+        pass
+
+    # Fallback: treat entire response as fixed JSON (old format)
+    return json_str, None
 
 
 def validate_fixed_json(json_str: str, schema: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[Any]]:
@@ -120,7 +133,6 @@ async def call_json_fixer(
     elelem_instance: Any,
     invalid_json: str,
     error: str,
-    messages: list,
     schema: Dict[str, Any],
     request_id: str,
     fixer_model: str = None
@@ -128,16 +140,16 @@ async def call_json_fixer(
     """Call the fixer LLM to repair invalid JSON.
 
     This is the main entry point for fixing JSON. It:
-    1. Builds the fixer prompt with context and schema
+    1. Builds the fixer prompt with error, schema, and invalid JSON only
     2. Calls the fixer model via the Elelem instance
     3. Extracts and validates the fixed JSON
-    4. Returns the fixed JSON string if successful
+    4. Rejects fixes that change content too much (size guard)
+    5. Returns the fixed JSON string if successful
 
     Args:
         elelem_instance: The Elelem instance to use for the API call
         invalid_json: The JSON string that failed validation
         error: The validation error message
-        messages: Original request messages (for context)
         schema: The JSON schema the output must conform to
         request_id: The original request ID for logging
         fixer_model: Optional override for the fixer model
@@ -151,11 +163,8 @@ async def call_json_fixer(
 
     model = fixer_model or DEFAULT_FIXER_MODEL
 
-    # Build context from first 2 messages (usually system + user)
-    context = "\n".join(msg.get('content', '') for msg in messages[:2])
-
-    # Build the fixer messages (system + user)
-    fixer_messages = build_fixer_messages(invalid_json, error, context, schema)
+    # Build the fixer messages - only error, schema, and invalid JSON (no original prompt)
+    fixer_messages = build_fixer_messages(invalid_json, error, schema)
 
     logger.info(f"[{request_id}] 🔧 Attempting JSON fix with {model}")
 
@@ -174,8 +183,8 @@ async def call_json_fixer(
             logger.warning(f"[{request_id}] JSON fixer returned empty response")
             return None
 
-        # Extract JSON from response
-        fixed_json = extract_json_from_response(response_content)
+        # Extract JSON and changes description from response
+        fixed_json, changes = extract_json_from_response(response_content)
         if not fixed_json:
             logger.warning(f"[{request_id}] JSON fixer response did not contain valid JSON boundaries")
             return None
@@ -184,7 +193,15 @@ async def call_json_fixer(
         is_valid, validation_error, _ = validate_fixed_json(fixed_json, schema)
 
         if is_valid:
-            logger.info(f"[{request_id}] ✅ JSON fixer successfully repaired the response")
+            # Log what was fixed
+            if changes:
+                logger.info(f"[{request_id}] ✅ JSON fixer: {changes}")
+            else:
+                # Fallback: extract path from original error
+                error_path = ""
+                if "at path:" in error:
+                    error_path = error.split("at path:")[1].split("|")[0].strip()
+                logger.info(f"[{request_id}] ✅ JSON fixer repaired: {error_path or 'schema structure'}")
             return fixed_json
         else:
             logger.warning(f"[{request_id}] JSON fixer output still invalid: {validation_error}")

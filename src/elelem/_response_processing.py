@@ -122,12 +122,20 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
                 request_prefix = f"[{request_id}] " if request_id else ""
                 logger.info(f"{request_prefix}🎬 First streaming chunk received")
 
-        # Log periodic traces every 30s
-        if logger and (last_trace_time is None or current_time - last_trace_time >= trace_interval):
+        # Log periodic traces every 30s (skip first interval - already logged "First chunk received")
+        if logger and last_trace_time is not None and current_time - last_trace_time >= trace_interval:
             elapsed = current_time - first_chunk_time if first_chunk_time else 0
             request_prefix = f"[{request_id}] " if request_id else ""
 
-            logger.info(f"{request_prefix}📊 Streaming progress: {chunk_count} chunks received ({elapsed:.1f}s elapsed)")
+            # Estimate token rate (~3.5 chars/token heuristic, avoids tiktoken CPU overhead)
+            total_chars = sum(len(p) for p in content_parts) + sum(len(p) for p in reasoning_content_parts)
+            estimated_tokens = total_chars / 3.5
+            token_rate = estimated_tokens / elapsed if elapsed > 0 else 0
+
+            logger.info(f"{request_prefix}📊 Streaming: {chunk_count} chunks, ~{estimated_tokens:.0f} tokens (~{token_rate:.0f} tok/s, {elapsed:.1f}s)")
+            last_trace_time = current_time
+        elif last_trace_time is None:
+            # Initialize trace timer on first chunk (but don't log)
             last_trace_time = current_time
 
         if chunk.choices and len(chunk.choices) > 0:

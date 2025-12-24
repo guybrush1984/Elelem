@@ -14,7 +14,7 @@ models:
     provider: baseten
     model_id: deepseek-ai/DeepSeek-V3.2
     capabilities:
-      supports_json_mode: true
+      supports_json_mode: false  # Baseten DeepSeek returns empty content with response_format
       supports_temperature: true
       supports_system: true
     cost:
@@ -49,7 +49,7 @@ models:
     provider: baseten
     model_id: openai/gpt-oss-120b
     capabilities:
-      supports_json_mode: true
+      supports_json_mode: false
       supports_temperature: true
       supports_system: true
     cost:

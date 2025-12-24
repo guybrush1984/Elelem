@@ -18,7 +18,7 @@ from openai import (
 from .config import Config
 from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
-from ._exceptions import InfrastructureError, ModelError
+from ._exceptions import InfrastructureError, ModelError, JsonSchemaError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
 from ._response_processing import collect_streaming_response, ChunkTimeoutError, remove_think_tags, extract_json_from_markdown, extract_yaml_from_markdown, process_response_content
 from ._json_validation import validate_json_schema, is_json_validation_api_error, add_json_instructions_to_messages, validate_json_response
@@ -794,44 +794,28 @@ class Elelem:
                         # Validation may repair malformed JSON, update content with repaired version
                         content = self._validate_json_response(content, json_schema, api_error, request_id)
                     except json.JSONDecodeError as e:
-                        if attempt < max_retries:
-                            # Try temperature reduction
-                            if temperature_reductions and len(temperature_reductions) > 0:
-                                reduction_idx = min(attempt, len(temperature_reductions) - 1)
-                                reduction = temperature_reductions[reduction_idx]
-                                new_temp = max(current_temp - reduction, min_temp)
-
-                                if new_temp < current_temp:
-                                    api_kwargs['temperature'] = new_temp
-                                    request_tracker.record_retry("temperature_reductions")
-                                    self.logger.warning(f"[{request_id}] JSON validation failed, reducing temperature to {new_temp}")
-                                    self.logger.warning(f"[{request_id}] Validation error: {e}")
-                                    self.logger.warning(f"[{request_id}] Failed content:\n{content}")
-                                    self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
-                                                                provider=provider_name, model_id=model_name, original_model=original_model,
-                                                                schema=json_schema)
-                                    continue
-
-                            # Try removing response format
-                            if 'response_format' in api_kwargs:
-                                api_kwargs.pop('response_format', None)
-                                api_kwargs['temperature'] = original_temperature
-                                request_tracker.record_retry("response_format_removals")
-                                self.logger.warning(f"[{request_id}] Removing response_format and retrying")
-                                continue
-                        
-                        # All JSON retries exhausted - try the LLM fixer as last resort
+                        # JSON parsing failed completely - this is an infrastructure issue
+                        # (empty response, truncated, garbled) - failover to next provider
                         self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
                                                     provider=provider_name, model_id=model_name, original_model=original_model,
                                                     schema=json_schema)
+                        raise InfrastructureError(
+                            f"JSON parse failed: {str(e)[:100]}",
+                            provider=provider_name, model=model_name
+                        )
+                    except JsonSchemaError as e:
+                        # JSON parsed OK but doesn't match schema - try to fix it
+                        self._dump_validation_debug(request_id, messages, api_kwargs, e.content or content, e, "json",
+                                                    provider=provider_name, model_id=model_name, original_model=original_model,
+                                                    schema=json_schema)
 
-                        # Attempt JSON fix with LLM if enabled and schema is available
+                        # Try JSON fixer for schema validation errors (JSON exists but has wrong structure)
+                        fixer_succeeded = False
                         if self._json_fixer_enabled and json_schema:
                             fixed_content = await call_json_fixer(
                                 elelem_instance=self,
-                                invalid_json=content,
+                                invalid_json=e.content or content,
                                 error=str(e),
-                                messages=messages,
                                 schema=json_schema,
                                 request_id=request_id,
                                 fixer_model=self._json_fixer_model
@@ -840,13 +824,34 @@ class Elelem:
                                 # Fixer succeeded - use the fixed content
                                 content = fixed_content
                                 request_tracker.record_retry("json_fixer")
-                                # Skip raising error and continue to success path
-                            else:
-                                # Fixer failed - raise the original error
-                                raise ModelError(f"JSON validation failed after all retries and fixer: {e}", provider=provider_name, model=model_name)
-                        else:
-                            # Fixer disabled or no schema available
-                            raise ModelError(f"JSON validation failed after all retries: {e}", provider=provider_name, model=model_name)
+                                fixer_succeeded = True
+
+                        if not fixer_succeeded:
+                            # Fixer failed or disabled - try temperature reduction if we have retries left
+                            if attempt < max_retries:
+                                # Try temperature reduction
+                                if temperature_reductions and len(temperature_reductions) > 0:
+                                    reduction_idx = min(attempt, len(temperature_reductions) - 1)
+                                    reduction = temperature_reductions[reduction_idx]
+                                    new_temp = max(current_temp - reduction, min_temp)
+
+                                    if new_temp < current_temp:
+                                        api_kwargs['temperature'] = new_temp
+                                        request_tracker.record_retry("temperature_reductions")
+                                        self.logger.warning(f"[{request_id}] JSON schema validation failed (fixer didn't help), reducing temperature to {new_temp}")
+                                        self.logger.warning(f"[{request_id}] Validation error: {e}")
+                                        continue
+
+                                # Try removing response format
+                                if 'response_format' in api_kwargs:
+                                    api_kwargs.pop('response_format', None)
+                                    api_kwargs['temperature'] = original_temperature
+                                    request_tracker.record_retry("response_format_removals")
+                                    self.logger.warning(f"[{request_id}] Removing response_format and retrying")
+                                    continue
+
+                            # All retries exhausted and fixer couldn't help
+                            raise ModelError(f"JSON schema validation failed after all retries and fixer: {e}", provider=provider_name, model=model_name)
 
                 # YAML validation if requested
                 if yaml_mode_requested:

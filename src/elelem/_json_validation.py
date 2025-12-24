@@ -164,20 +164,27 @@ def validate_json_response(content: str, json_schema: Optional[Any], api_error: 
 
     Returns:
         The content string (possibly repaired if json-repair was needed)
+
+    Raises:
+        json.JSONDecodeError: If JSON parsing fails (unfixable - should failover)
+        JsonSchemaError: If JSON parses but fails schema validation (fixable by LLM)
     """
+    from ._exceptions import JsonSchemaError
+
     if api_error:
         # Force JSON validation to fail so it triggers retry logic
         raise json.JSONDecodeError(f"API JSON validation failed: {str(api_error)}", "", 0)
     else:
         # First parse the JSON (with repair if needed)
+        # This raises json.JSONDecodeError if parsing fails completely
         parsed_json, repaired_content, was_repaired = parse_json_with_repair(content, request_id)
 
         # Then validate against schema if provided
         if json_schema:
             is_valid, schema_error = validate_json_schema(parsed_json, json_schema)
             if not is_valid:
-                # Treat schema validation failure like JSON parse failure
-                raise json.JSONDecodeError(f"JSON schema validation failed: {schema_error}", "", 0)
+                # JSON parsed OK but doesn't match schema - this is fixable
+                raise JsonSchemaError(schema_error, content=repaired_content)
 
         # Return the (possibly repaired) content
         return repaired_content

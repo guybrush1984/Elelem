@@ -135,7 +135,8 @@ async def call_json_fixer(
     error: str,
     schema: Dict[str, Any],
     request_id: str,
-    fixer_model: str = None
+    fixer_model: str = None,
+    max_iterations: int = 2
 ) -> Optional[str]:
     """Call the fixer LLM to repair invalid JSON.
 
@@ -143,7 +144,7 @@ async def call_json_fixer(
     1. Builds the fixer prompt with error, schema, and invalid JSON only
     2. Calls the fixer model via the Elelem instance
     3. Extracts and validates the fixed JSON
-    4. Rejects fixes that change content too much (size guard)
+    4. If still invalid, loops with new error (up to max_iterations)
     5. Returns the fixed JSON string if successful
 
     Args:
@@ -153,6 +154,7 @@ async def call_json_fixer(
         schema: The JSON schema the output must conform to
         request_id: The original request ID for logging
         fixer_model: Optional override for the fixer model
+        max_iterations: Maximum fixer attempts (default 2)
 
     Returns:
         The fixed JSON string if successful, None otherwise
@@ -162,51 +164,62 @@ async def call_json_fixer(
         return None
 
     model = fixer_model or DEFAULT_FIXER_MODEL
+    current_json = invalid_json
+    current_error = error
 
-    # Build the fixer messages - only error, schema, and invalid JSON (no original prompt)
-    fixer_messages = build_fixer_messages(invalid_json, error, schema)
+    for iteration in range(max_iterations):
+        iter_label = f" (attempt {iteration + 1}/{max_iterations})" if max_iterations > 1 else ""
+        logger.info(f"[{request_id}] 🔧 Attempting JSON fix with {model}{iter_label}")
 
-    logger.info(f"[{request_id}] 🔧 Attempting JSON fix with {model}")
+        try:
+            # Build the fixer messages - only error, schema, and invalid JSON (no original prompt)
+            fixer_messages = build_fixer_messages(current_json, current_error, schema)
 
-    try:
-        # Call the fixer model - use low temperature for consistency
-        response = await elelem_instance.create_chat_completion(
-            model=model,
-            messages=fixer_messages,
-            temperature=0.2,
-            # Don't use JSON mode - we want raw text
-            # Don't pass schema validation to avoid infinite recursion
-        )
+            # Call the fixer model - use low temperature for consistency
+            response = await elelem_instance.create_chat_completion(
+                model=model,
+                messages=fixer_messages,
+                temperature=0.2,
+                # Don't use JSON mode - we want raw text
+                # Don't pass schema validation to avoid infinite recursion
+            )
 
-        response_content = response.choices[0].message.content
-        if not response_content:
-            logger.warning(f"[{request_id}] JSON fixer returned empty response")
-            return None
+            response_content = response.choices[0].message.content
+            if not response_content:
+                logger.warning(f"[{request_id}] JSON fixer returned empty response")
+                return None
 
-        # Extract JSON and changes description from response
-        fixed_json, changes = extract_json_from_response(response_content)
-        if not fixed_json:
-            logger.warning(f"[{request_id}] JSON fixer response did not contain valid JSON boundaries")
-            return None
+            # Extract JSON and changes description from response
+            fixed_json, changes = extract_json_from_response(response_content)
+            if not fixed_json:
+                logger.warning(f"[{request_id}] JSON fixer response did not contain valid JSON boundaries")
+                return None
 
-        # Validate the fixed JSON against the schema
-        is_valid, validation_error, _ = validate_fixed_json(fixed_json, schema)
+            # Validate the fixed JSON against the schema
+            is_valid, validation_error, _ = validate_fixed_json(fixed_json, schema)
 
-        if is_valid:
-            # Log what was fixed
-            if changes:
-                logger.info(f"[{request_id}] ✅ JSON fixer: {changes}")
+            if is_valid:
+                # Log what was fixed
+                if changes:
+                    logger.info(f"[{request_id}] ✅ JSON fixer: {changes}")
+                else:
+                    # Fallback: extract path from original error
+                    error_path = ""
+                    if "at path:" in current_error:
+                        error_path = current_error.split("at path:")[1].split("|")[0].strip()
+                    logger.info(f"[{request_id}] ✅ JSON fixer repaired: {error_path or 'schema structure'}")
+                return fixed_json
             else:
-                # Fallback: extract path from original error
-                error_path = ""
-                if "at path:" in error:
-                    error_path = error.split("at path:")[1].split("|")[0].strip()
-                logger.info(f"[{request_id}] ✅ JSON fixer repaired: {error_path or 'schema structure'}")
-            return fixed_json
-        else:
-            logger.warning(f"[{request_id}] JSON fixer output still invalid: {validation_error}")
+                # Still invalid - prepare for next iteration
+                if changes:
+                    logger.info(f"[{request_id}] 🔧 JSON fixer partial: {changes}")
+                logger.warning(f"[{request_id}] JSON fixer output still invalid: {validation_error}")
+                current_json = fixed_json
+                current_error = validation_error
+
+        except Exception as e:
+            logger.warning(f"[{request_id}] JSON fixer failed with error: {e}")
             return None
 
-    except Exception as e:
-        logger.warning(f"[{request_id}] JSON fixer failed with error: {e}")
-        return None
+    logger.warning(f"[{request_id}] JSON fixer exhausted {max_iterations} iterations")
+    return None

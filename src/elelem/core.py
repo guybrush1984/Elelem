@@ -20,14 +20,12 @@ from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
 from ._exceptions import InfrastructureError, ModelError, JsonSchemaError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
-from ._response_processing import collect_streaming_response, ChunkTimeoutError, remove_think_tags, extract_json_from_markdown, extract_yaml_from_markdown, process_response_content
-from ._json_validation import validate_json_schema, is_json_validation_api_error, add_json_instructions_to_messages, validate_json_response
-from ._yaml_validation import validate_yaml_schema, add_yaml_instructions_to_messages, validate_yaml_response
+from ._response_processing import collect_streaming_response, ChunkTimeoutError, process_response_content
+from ._json_validation import is_json_validation_api_error  # Still needed for API error detection
 from ._provider_management import create_provider_client, initialize_providers, get_model_config
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
 from ._benchmark_store import reorder_candidates_by_benchmark
-from ._json_fixer import call_json_fixer
 from ._output_formats import FormatRegistry, FormatParseError, FormatSchemaError, OutputFormat
 from ._format_fixer import call_format_fixer
 
@@ -214,65 +212,17 @@ class Elelem:
         """
         return await collect_streaming_response(stream, logger=self.logger, request_id=request_id, chunk_timeout=chunk_timeout)
         
-    def _remove_think_tags(self, content: str) -> str:
-        """Remove <think>...</think> tags from content."""
-        return remove_think_tags(content, self.logger)
-        
-    def _extract_json_from_markdown(self, content: str) -> str:
-        """Extract JSON from markdown code blocks."""
-        return extract_json_from_markdown(content, self.logger)
-        
-    def _validate_json_schema(self, json_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Validate a JSON object against a JSON Schema."""
-        return validate_json_schema(json_obj, schema)
-        
     def _is_json_validation_api_error(self, error: Exception) -> bool:
         """Check if the error is a json_validate_failed API error."""
         return is_json_validation_api_error(error)
-        
-    def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict, json_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
-        """Add JSON formatting instructions to messages when response_format is JSON."""
-        supports_system = capabilities.get("supports_system", True)
-        return add_json_instructions_to_messages(messages, supports_system, json_schema, enforce_schema_in_prompt)
-
-    def _extract_yaml_from_markdown(self, content: str) -> str:
-        """Extract YAML from markdown code blocks."""
-        return extract_yaml_from_markdown(content, self.logger)
-
-    def _validate_yaml_schema(self, yaml_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Validate a YAML object against a JSON Schema."""
-        return validate_yaml_schema(yaml_obj, schema)
-
-    def _add_yaml_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict, yaml_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
-        """Add YAML formatting instructions to messages when YAML mode is requested."""
-        supports_system = capabilities.get("supports_system", True)
-        return add_yaml_instructions_to_messages(messages, supports_system, yaml_schema, enforce_schema_in_prompt)
-
-    def _validate_yaml_response(self, content: str, yaml_schema: Any) -> None:
-        """Validate YAML response content and schema."""
-        validate_yaml_response(content, yaml_schema)
 
     def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None, candidate_cost_config: Dict = None) -> Dict[str, float]:
         """Calculate costs based on model pricing or runtime data from provider."""
         return calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs, candidate_cost_config, self.logger)
-    
+
     def _extract_runtime_costs(self, response, cost_config: str) -> Dict[str, Any]:
         """Extract runtime cost information from response when cost config is 'runtime'."""
         return extract_runtime_costs(response, cost_config, self.logger)
-        
-    
-    
-    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, yaml_mode_requested: bool, capabilities: Dict, json_schema: Optional[Dict] = None, yaml_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
-        """Preprocess messages for the request."""
-        if json_mode_requested:
-            # Always add JSON instructions when JSON is requested
-            # Include schema in instructions only if enforce_schema_in_prompt is True
-            return self._add_json_instructions_to_messages(messages, capabilities, json_schema, enforce_schema_in_prompt)
-        elif yaml_mode_requested:
-            # Always add YAML instructions when YAML is requested (client-side only)
-            # Include schema in instructions only if enforce_schema_in_prompt is True
-            return self._add_yaml_instructions_to_messages(messages, capabilities, yaml_schema, enforce_schema_in_prompt)
-        return messages
     
     def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
         """Remove unsupported parameters from api_kwargs."""
@@ -321,10 +271,6 @@ class Elelem:
     def _process_response_content(self, response: Any, format_handler: OutputFormat = None) -> str:
         """Process and clean response content."""
         return process_response_content(response, self.logger, format_handler)
-    
-    def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception, request_id: str = None) -> str:
-        """Validate JSON response content and schema. Returns possibly repaired content."""
-        return validate_json_response(content, json_schema, api_error, request_id)
 
     def _dump_validation_debug(self, request_id: str, messages: List[Dict[str, str]],
                                 api_kwargs: Dict[str, Any], content: str, error: Exception,

@@ -28,6 +28,8 @@ from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastr
 from ._request_execution import prepare_api_kwargs
 from ._benchmark_store import reorder_candidates_by_benchmark
 from ._json_fixer import call_json_fixer
+from ._output_formats import FormatRegistry, FormatParseError, FormatSchemaError, OutputFormat
+from ._format_fixer import call_format_fixer
 
 
 class Elelem:
@@ -311,12 +313,14 @@ class Elelem:
             api_kwargs.pop("enforce_schema_in_prompt")
         if "yaml_schema" in api_kwargs:
             api_kwargs.pop("yaml_schema")
+        if "csv_schema" in api_kwargs:
+            api_kwargs.pop("csv_schema")
 
         self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
 
-    def _process_response_content(self, response: Any, json_mode_requested: bool, yaml_mode_requested: bool) -> str:
+    def _process_response_content(self, response: Any, format_handler: OutputFormat = None) -> str:
         """Process and clean response content."""
-        return process_response_content(response, json_mode_requested, yaml_mode_requested, self.logger)
+        return process_response_content(response, self.logger, format_handler)
     
     def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception, request_id: str = None) -> str:
         """Validate JSON response content and schema. Returns possibly repaired content."""
@@ -570,12 +574,31 @@ class Elelem:
         yaml_schema = kwargs.get("yaml_schema")
         yaml_mode_requested = yaml_schema is not None
 
-        # Validate mutual exclusivity between JSON and YAML
-        if json_mode_requested and yaml_mode_requested:
+        # Detect CSV mode request (Elelem-specific, client-side only)
+        csv_schema = kwargs.get("csv_schema")
+        csv_mode_requested = csv_schema is not None
+
+        # Validate mutual exclusivity between JSON, YAML, and CSV
+        active_formats = sum([json_mode_requested, yaml_mode_requested, csv_mode_requested])
+        if active_formats > 1:
             raise ValueError(
-                "Cannot use both JSON and YAML modes simultaneously. "
-                "Provide either response_format with json_object/json_schema OR yaml_schema, not both."
+                "Cannot use multiple output formats simultaneously. "
+                "Provide only one of: response_format (json_object/json_schema), yaml_schema, or csv_schema."
             )
+
+        # Resolve format handler for new abstraction layer
+        format_handler: Optional[OutputFormat] = None
+        format_schema = None
+        if json_mode_requested:
+            format_handler = FormatRegistry.get("json")
+            format_schema = json_schema
+        elif yaml_mode_requested:
+            format_handler = FormatRegistry.get("yaml")
+            format_schema = yaml_schema
+        elif csv_mode_requested:
+            format_handler = FormatRegistry.get("csv")
+            format_schema = csv_schema
+            self.logger.debug(f"[{request_id}] CSV format requested (client-side validation)")
 
         # Get original temperature
         original_temperature = kwargs.get("temperature", 1.0)
@@ -585,6 +608,8 @@ class Elelem:
             kwargs.pop("json_schema")
         if "yaml_schema" in kwargs:
             kwargs.pop("yaml_schema")
+        if "csv_schema" in kwargs:
+            kwargs.pop("csv_schema")
 
         # Warn if json_schema provided without JSON response format
         if json_schema and not json_mode_requested:
@@ -606,6 +631,8 @@ class Elelem:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
         if yaml_mode_requested:
             self.logger.debug(f"[{request_id}] 📄 YAML mode requested")
+        if csv_mode_requested:
+            self.logger.debug(f"[{request_id}] 📊 CSV mode requested")
         
         # Iterate through candidates
         # Track failed model_references to skip candidates with the same underlying model
@@ -623,7 +650,7 @@ class Elelem:
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
-                    json_mode_requested, json_schema, yaml_mode_requested, yaml_schema,
+                    format_handler, format_schema,
                     original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs
                 )
             except InfrastructureError as e:
@@ -657,13 +684,17 @@ class Elelem:
     
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
                                 messages, original_model, model_config, request_id,
-                                json_mode_requested, json_schema, yaml_mode_requested, yaml_schema,
+                                format_handler: Optional[OutputFormat], format_schema: Optional[Dict],
                                 original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs):
-        """Attempt to complete request with a specific candidate."""
-        
+        """Attempt to complete request with a specific candidate.
+
+        Args:
+            format_handler: OutputFormat handler (json, yaml, csv) or None if no format requested
+            format_schema: Schema for validation, or None
+        """
         # Get timeout for this candidate
         timeout = self.config.get_candidate_timeout(candidate, model_config)
-        
+
         # Setup provider and model for this candidate
         provider_name = candidate['provider']
         model_name = candidate['model_id']
@@ -700,10 +731,19 @@ class Elelem:
         self._cleanup_api_kwargs(api_kwargs, candidate_key, {'capabilities': capabilities})
         self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
 
-        # Preprocess messages for JSON/YAML mode if needed
+        # Preprocess messages for structured output formats
+        # Use format handler to add instructions to messages
         # Only inject schema into prompt if enforce_schema_in_prompt=True (default False to save tokens)
         enforce_schema_in_prompt = kwargs.get('enforce_schema_in_prompt', False)
-        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, yaml_mode_requested, capabilities, json_schema, yaml_schema, enforce_schema_in_prompt)
+        if format_handler:
+            supports_system = capabilities.get("supports_system", True)
+            # Pass schema only if enforce_schema_in_prompt=True, otherwise just add format instructions
+            schema_for_prompt = format_schema if enforce_schema_in_prompt else None
+            modified_messages = format_handler.add_instructions_to_messages(
+                messages, schema_for_prompt, supports_system
+            )
+        else:
+            modified_messages = messages
 
         # Retry logic for this candidate (temperature reduction, JSON validation)
         max_retries = self.config.retry_settings["max_json_retries"]
@@ -763,7 +803,7 @@ class Elelem:
                     # Classify the error
                     if self._is_infrastructure_error(api_e):
                         raise InfrastructureError(f"API infrastructure error: {str(api_e)}", provider=provider_name, model=model_name)
-                    elif self._is_json_validation_api_error(api_e) and json_mode_requested:
+                    elif self._is_json_validation_api_error(api_e) and format_handler and format_handler.name == "json":
                         # API-level JSON validation errors will be handled in JSON validation section
                         api_error = api_e
                         response = None
@@ -783,53 +823,67 @@ class Elelem:
                     total_output_tokens += output_tokens
                     total_reasoning_tokens += reasoning_tokens
 
-                    content = self._process_response_content(response, json_mode_requested, yaml_mode_requested)
+                    content = process_response_content(response, self.logger, format_handler)
                 else:
                     content = ""
                     reasoning_content = None
                 
-                # JSON validation if requested
-                if json_mode_requested:
+                # Format validation (JSON, YAML, CSV) using unified format handler
+                if format_handler:
                     try:
-                        # Validation may repair malformed JSON, update content with repaired version
-                        content = self._validate_json_response(content, json_schema, api_error, request_id)
-                    except json.JSONDecodeError as e:
-                        # JSON parsing failed completely - this is an infrastructure issue
-                        # (empty response, truncated, garbled) - failover to next provider
-                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
+                        # Parse and validate content (format handler does extraction, repair, validation)
+                        parse_result = format_handler.parse(content)
+                        if not parse_result.success:
+                            raise FormatParseError(parse_result.error, format_type=format_handler.name)
+
+                        # Schema validation if schema provided
+                        if format_schema:
+                            validation = format_handler.validate_schema(parse_result.data, format_schema)
+                            if not validation.is_valid:
+                                error_msg = validation.error
+                                if validation.error_path:
+                                    error_msg += f" at path: {validation.error_path}"
+                                raise FormatSchemaError(error_msg, content=parse_result.content, format_type=format_handler.name)
+
+                        # Update content with possibly repaired version
+                        content = parse_result.content
+
+                    except FormatParseError as e:
+                        # Parse failed completely - infrastructure issue, failover to next provider
+                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, format_handler.name,
                                                     provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=json_schema)
+                                                    schema=format_schema)
                         raise InfrastructureError(
-                            f"JSON parse failed: {str(e)[:100]}",
+                            f"{format_handler.name.upper()} parse failed: {str(e)[:100]}",
                             provider=provider_name, model=model_name
                         )
-                    except JsonSchemaError as e:
-                        # JSON parsed OK but doesn't match schema - try to fix it
-                        self._dump_validation_debug(request_id, messages, api_kwargs, e.content or content, e, "json",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=json_schema)
 
-                        # Try JSON fixer for schema validation errors (JSON exists but has wrong structure)
+                    except FormatSchemaError as e:
+                        # Parsed OK but schema validation failed - try fixer
+                        self._dump_validation_debug(request_id, messages, api_kwargs, e.content or content, e, format_handler.name,
+                                                    provider=provider_name, model_id=model_name, original_model=original_model,
+                                                    schema=format_schema)
+
+                        # Try format fixer for schema validation errors
                         fixer_succeeded = False
-                        if self._json_fixer_enabled and json_schema:
-                            fixed_content = await call_json_fixer(
+                        if self._json_fixer_enabled and format_schema:
+                            fixed_content = await call_format_fixer(
                                 elelem_instance=self,
-                                invalid_json=e.content or content,
+                                format_handler=format_handler,
+                                invalid_content=e.content or content,
                                 error=str(e),
-                                schema=json_schema,
+                                schema=format_schema,
                                 request_id=request_id,
                                 fixer_model=self._json_fixer_model
                             )
                             if fixed_content:
-                                # Fixer succeeded - use the fixed content
                                 content = fixed_content
-                                request_tracker.record_retry("json_fixer")
+                                request_tracker.record_retry("format_fixer")
                                 fixer_succeeded = True
 
                         if not fixer_succeeded:
-                            # Fixer failed or disabled - try temperature reduction if we have retries left
+                            # Fixer failed or disabled - try temperature reduction
                             if attempt < max_retries:
-                                # Try temperature reduction
                                 if temperature_reductions and len(temperature_reductions) > 0:
                                     reduction_idx = min(attempt, len(temperature_reductions) - 1)
                                     reduction = temperature_reductions[reduction_idx]
@@ -838,51 +892,23 @@ class Elelem:
                                     if new_temp < current_temp:
                                         api_kwargs['temperature'] = new_temp
                                         request_tracker.record_retry("temperature_reductions")
-                                        self.logger.warning(f"[{request_id}] JSON schema validation failed (fixer didn't help), reducing temperature to {new_temp}")
+                                        self.logger.warning(f"[{request_id}] {format_handler.name.upper()} schema validation failed, reducing temperature to {new_temp}")
                                         self.logger.warning(f"[{request_id}] Validation error: {e}")
                                         continue
 
-                                # Try removing response format
-                                if 'response_format' in api_kwargs:
+                                # Try removing response format (JSON only)
+                                if format_handler.name == "json" and 'response_format' in api_kwargs:
                                     api_kwargs.pop('response_format', None)
                                     api_kwargs['temperature'] = original_temperature
                                     request_tracker.record_retry("response_format_removals")
                                     self.logger.warning(f"[{request_id}] Removing response_format and retrying")
                                     continue
 
-                            # All retries exhausted and fixer couldn't help
-                            raise ModelError(f"JSON schema validation failed after all retries and fixer: {e}", provider=provider_name, model=model_name)
-
-                # YAML validation if requested
-                if yaml_mode_requested:
-                    try:
-                        self._validate_yaml_response(content, yaml_schema)
-                    except json.JSONDecodeError as e:
-                        # YAML validation reuses JSONDecodeError for retry compatibility
-                        if attempt < max_retries:
-                            # Try temperature reduction
-                            if temperature_reductions and len(temperature_reductions) > 0:
-                                reduction_idx = min(attempt, len(temperature_reductions) - 1)
-                                reduction = temperature_reductions[reduction_idx]
-                                new_temp = max(current_temp - reduction, min_temp)
-
-                                if new_temp < current_temp:
-                                    api_kwargs['temperature'] = new_temp
-                                    request_tracker.record_retry("temperature_reductions")
-                                    self.logger.warning(f"[{request_id}] YAML validation failed, reducing temperature to {new_temp}")
-                                    self.logger.warning(f"[{request_id}] Validation error: {e}")
-                                    self.logger.warning(f"[{request_id}] Failed content:\n{content}")
-                                    self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
-                                                                provider=provider_name, model_id=model_name, original_model=original_model,
-                                                                schema=yaml_schema)
-                                    continue
-
-                        # All YAML retries exhausted - this is a model error, don't iterate candidates
-                        # Note: Don't finalize here - outer loop handles finalization to avoid duplicates
-                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=yaml_schema)
-                        raise ModelError(f"YAML validation failed after all retries: {e}", provider=provider_name, model=model_name)
+                            # All retries exhausted
+                            raise ModelError(
+                                f"{format_handler.name.upper()} schema validation failed after all retries: {e}",
+                                provider=provider_name, model=model_name
+                            )
 
                 # Success! Calculate duration and return
                 duration = time.time() - start_time

@@ -125,7 +125,7 @@ class YamlFormat(OutputFormat):
 
     def get_response_instructions(self, schema: Dict[str, Any] = None) -> str:
         """Generate YAML response instructions."""
-        return (
+        instructions = (
             "\n\nCRITICAL: You must respond with ONLY clean YAML - "
             "no markdown, no code blocks, no extra text. "
             "Do not wrap the YAML in ```yaml``` or ```yml``` blocks. "
@@ -133,6 +133,24 @@ class YamlFormat(OutputFormat):
             "Use proper YAML syntax with correct indentation (2 spaces per level). "
             "Any non-YAML content will cause a parsing error."
         )
+
+        # Include schema details if provided
+        if schema:
+            schema_str = yaml.dump(schema, default_flow_style=False, sort_keys=False)
+            instructions += (
+                "\n\n=== REQUIRED OUTPUT FORMAT ===\n"
+                "Your response MUST conform to this exact schema:\n\n"
+                f"{schema_str}\n"
+                "Follow the schema precisely:\n"
+                "- Include all required fields\n"
+                "- Use correct data types (string, number, boolean, array/list, object/mapping)\n"
+                "- Do not add extra fields unless allowed by the schema\n"
+                "- Respect any constraints (enums, patterns, min/max values)\n"
+                "- Use proper YAML syntax with correct indentation (2 spaces per level)\n"
+                "=== END REQUIRED FORMAT ==="
+            )
+
+        return instructions
 
     def get_fixer_messages(
         self, invalid_content: str, error: str, schema: Dict[str, Any]

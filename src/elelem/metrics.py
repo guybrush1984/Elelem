@@ -37,7 +37,7 @@ class RequestTracker:
         'rate_limit_retries',
         'temperature_reductions',
         'response_format_removals',
-        'json_fixer',  # LLM-based JSON repair attempts
+        'format_fixer',  # LLM-based format repair attempts (JSON/YAML/CSV)
         'candidate_iterations',
         'final_failures'
     ]

@@ -101,7 +101,7 @@ class JsonFormat(OutputFormat):
 
     def get_response_instructions(self, schema: Dict[str, Any] = None) -> str:
         """Generate JSON response instructions."""
-        return (
+        instructions = (
             "\n\nCRITICAL: You must respond with ONLY a clean JSON object - "
             "no markdown, no code blocks, no extra text. "
             "Do not wrap the JSON in ```json``` blocks or any other formatting. "
@@ -109,6 +109,23 @@ class JsonFormat(OutputFormat):
             "Start your response with { and end with }. "
             "Any non-JSON content will cause a parsing error."
         )
+
+        # Include schema details if provided
+        if schema:
+            schema_str = json.dumps(schema, indent=2)
+            instructions += (
+                "\n\n=== REQUIRED OUTPUT FORMAT ===\n"
+                "Your response MUST conform to this exact JSON schema:\n\n"
+                f"{schema_str}\n\n"
+                "Follow the schema precisely:\n"
+                "- Include all required fields\n"
+                "- Use correct data types (string, number, boolean, array, object)\n"
+                "- Do not add extra fields unless allowed by the schema\n"
+                "- Respect any constraints (enums, patterns, min/max values)\n"
+                "=== END REQUIRED FORMAT ==="
+            )
+
+        return instructions
 
     def get_fixer_messages(
         self, invalid_content: str, error: str, schema: Dict[str, Any]

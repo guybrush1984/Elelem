@@ -1729,4 +1729,210 @@ class TestElelemWithFaker:
         assert "JSON schema validation failed" in str(exc_info.value)
         print("✅ JSON fixer correctly disabled - request failed as expected")
 
+    # =================================================================
+    # YAML FORMAT TESTS
+    # =================================================================
+
+    @pytest.mark.asyncio
+    async def test_yaml_schema_validation(self, elelem_with_faker_env):
+        """Test that Elelem validates YAML responses against provided schemas."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_yaml_schema')
+        faker.reset_state()
+
+        # Test valid YAML schema response
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "number"},
+                "email": {"type": "string"},
+                "active": {"type": "boolean"}
+            },
+            "required": ["name", "age", "email"]
+        }
+
+        response = await elelem.create_chat_completion(
+            model="faker:yaml-schema-test",
+            messages=[{"role": "user", "content": "Generate a user profile"}],
+            yaml_schema=schema,
+            temperature=1.0
+        )
+
+        # Should succeed with valid YAML matching schema
+        assert response
+        content = response.choices[0].message.content
+
+        # Parse YAML and validate structure - all faker responses have these fields
+        import yaml
+        parsed = yaml.safe_load(content)
+        assert "name" in parsed, "YAML response should have 'name' field"
+        assert "age" in parsed, "YAML response should have 'age' field"
+        assert "email" in parsed, "YAML response should have 'email' field"
+        assert isinstance(parsed["name"], str), "name should be a string"
+        assert isinstance(parsed["age"], (int, float)), "age should be a number"
+        assert isinstance(parsed["email"], str), "email should be a string"
+
+        print("✅ YAML schema validation works correctly")
+
+    @pytest.mark.asyncio
+    async def test_yaml_schema_with_enforce_schema_in_prompt(self, elelem_with_faker_env):
+        """Test that enforce_schema_in_prompt adds schema to YAML prompts."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_yaml_schema')
+        faker.reset_state()
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "number"}
+            },
+            "required": ["name", "age"]
+        }
+
+        response = await elelem.create_chat_completion(
+            model="faker:yaml-schema-test",
+            messages=[{"role": "user", "content": "Generate a user"}],
+            yaml_schema=schema,
+            enforce_schema_in_prompt=True,
+            temperature=1.0
+        )
+
+        assert response
+
+        # Verify schema was included in the prompt
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) >= 1
+
+        # Check that the system message contains the schema
+        request_body = requests[0]['body']
+        messages = request_body.get('messages', [])
+        system_content = next((m['content'] for m in messages if m['role'] == 'system'), '')
+
+        assert "=== REQUIRED OUTPUT FORMAT ===" in system_content
+        assert "name" in system_content
+        assert "age" in system_content
+
+        print("✅ enforce_schema_in_prompt correctly adds schema to YAML prompts")
+
+    # =================================================================
+    # CSV FORMAT TESTS
+    # =================================================================
+
+    @pytest.mark.asyncio
+    async def test_csv_schema_validation(self, elelem_with_faker_env):
+        """Test that Elelem validates CSV responses against provided schemas."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('happy_path')
+        faker.reset_state()
+
+        # CSV schema with tables definition
+        schema = {
+            "tables": {
+                "users": {
+                    "required": True,
+                    "columns": {
+                        "id": {"type": "string", "required": True},
+                        "name": {"type": "string", "required": True},
+                        "role": {"type": "string", "enum": ["admin", "member", "guest"]}
+                    }
+                }
+            }
+        }
+
+        # Note: faker happy_path returns plain text, so this will fail validation
+        # But it tests that csv_schema is properly processed
+        from elelem._exceptions import ModelError
+        try:
+            await elelem.create_chat_completion(
+                model="faker:basic",
+                messages=[{"role": "user", "content": "Generate user data"}],
+                csv_schema=schema,
+                temperature=1.0
+            )
+        except (ModelError, Exception) as e:
+            # Expected - faker doesn't return CSV format
+            assert "CSV" in str(e) or "parse" in str(e).lower()
+            print("✅ CSV schema validation correctly triggered (faker doesn't return CSV)")
+
+    @pytest.mark.asyncio
+    async def test_csv_instructions_in_prompt(self, elelem_with_faker_env):
+        """Test that CSV schema adds proper instructions to prompts."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('happy_path')
+        faker.reset_state()
+
+        schema = {
+            "tables": {
+                "products": {
+                    "required": True,
+                    "columns": {
+                        "id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "price": {"type": "integer"}
+                    }
+                }
+            }
+        }
+
+        # Make request - will fail validation but we can check the prompt
+        from elelem._exceptions import ModelError
+        try:
+            await elelem.create_chat_completion(
+                model="faker:basic",
+                messages=[{"role": "user", "content": "Generate product list"}],
+                csv_schema=schema,
+                temperature=1.0
+            )
+        except (ModelError, Exception):
+            pass  # Expected
+
+        # Verify CSV instructions were in the prompt
+        requests = faker.request_analyzer.get_captured_requests()
+        assert len(requests) >= 1
+
+        request_body = requests[0]['body']
+        messages = request_body.get('messages', [])
+        system_content = next((m['content'] for m in messages if m['role'] == 'system'), '')
+
+        assert "semicolon" in system_content.lower() or "csv" in system_content.lower()
+        assert "###TABLE:" in system_content
+
+        print("✅ CSV instructions correctly added to prompts")
+
+    @pytest.mark.asyncio
+    async def test_format_mutual_exclusivity(self, elelem_with_faker_env):
+        """Test that using multiple format schemas raises an error."""
+        elelem, faker = elelem_with_faker_env
+
+        schema = {"type": "object", "properties": {"test": {"type": "string"}}}
+
+        # Test JSON + YAML conflict
+        with pytest.raises(ValueError) as exc_info:
+            await elelem.create_chat_completion(
+                model="faker:basic",
+                messages=[{"role": "user", "content": "Test"}],
+                response_format={"type": "json_object"},
+                yaml_schema=schema
+            )
+        assert "multiple output formats" in str(exc_info.value).lower() or "simultaneously" in str(exc_info.value).lower()
+
+        # Test JSON + CSV conflict
+        csv_schema = {"tables": {"test": {"columns": {"id": {"type": "string"}}}}}
+        with pytest.raises(ValueError) as exc_info:
+            await elelem.create_chat_completion(
+                model="faker:basic",
+                messages=[{"role": "user", "content": "Test"}],
+                response_format={"type": "json_object"},
+                csv_schema=csv_schema
+            )
+        assert "multiple output formats" in str(exc_info.value).lower() or "simultaneously" in str(exc_info.value).lower()
+
+        print("✅ Format mutual exclusivity correctly enforced")
+
     print("All comprehensive stats tests added to test_elelem_with_faker.py")

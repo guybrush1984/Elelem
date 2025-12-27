@@ -107,8 +107,8 @@ class CsvFormat(OutputFormat):
             if not rows:
                 continue
             first_row = rows[0]
-            # Check that we have multiple columns
-            if len(first_row) < 2:
+            # Check that we have at least one column
+            if len(first_row) < 1:
                 return False
             # Check column names aren't suspiciously long
             for col in first_row.keys():
@@ -217,20 +217,51 @@ class CsvFormat(OutputFormat):
     def get_response_instructions(self, schema: Dict[str, Any] = None) -> str:
         """Generate CSV response instructions."""
         tables_info = ""
+        multi_value_info = ""
+        multi_value_cols = []
+
         if schema and "tables" in schema:
             tables_info = "\n\nRequired tables:\n"
-            for name, spec in schema["tables"].items():
+            for table_name, spec in schema["tables"].items():
                 cols = list(spec.get("columns", {}).keys())
                 req = " (required)" if spec.get("required") else ""
-                tables_info += f"- ###TABLE:{name}{req}\n  Columns: {', '.join(cols)}\n"
+                tables_info += f"- ###TABLE:{table_name}{req}\n  Columns: {', '.join(cols)}\n"
+
+                # Collect multi-value columns
+                for col_name, col_spec in spec.get("columns", {}).items():
+                    if col_spec.get("multi_value"):
+                        fmt = col_spec.get("multi_value_format", "")
+                        example = col_spec.get("multi_value_example", "")
+                        multi_value_cols.append((table_name, col_name, fmt, example))
+
+        if multi_value_cols:
+            multi_value_info = "\n\nFor columns with multiple values, use pipe (|) as separator:\n"
+            for table_name, col_name, fmt, example in multi_value_cols:
+                if example:
+                    multi_value_info += f"- {table_name}.{col_name}: {example}\n"
+                elif fmt == "id:name":
+                    multi_value_info += f"- {table_name}.{col_name}: pipe-separated id:name pairs (e.g., id1:Name1|id2:Name2)\n"
+                else:
+                    multi_value_info += f"- {table_name}.{col_name}: pipe-separated values (e.g., val1|val2|val3)\n"
+
+        # Always add general multi-value guidance
+        general_mv_note = ""
+        if not multi_value_cols:
+            general_mv_note = (
+                "\n\nIf a cell needs multiple values, use pipe (|) as separator "
+                "(e.g., val1|val2|val3). Never use semicolon for lists within a cell."
+            )
 
         return (
             f"\n\nCRITICAL: Respond with CSV tables using semicolon (;) as delimiter. "
             f"Each table starts with ###TABLE:tablename on its own line, "
             f"followed by a header row, then data rows. "
+            f"For empty/null values, leave the cell empty (do not use '-' or 'N/A'). "
             f"Do not use quotes around values unless they contain semicolons. "
             f"Do not wrap in markdown code blocks."
             f"{tables_info}"
+            f"{multi_value_info}"
+            f"{general_mv_note}"
         )
 
     def get_fixer_messages(

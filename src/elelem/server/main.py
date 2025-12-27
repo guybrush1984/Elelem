@@ -409,12 +409,18 @@ async def get_metrics_summary(
     - Duration statistics
     - Retry analytics
     """
+    import time
+    request_start = time.time()
+    logger.info(f"📊 /v1/metrics/summary called - tags={tags}, start_time={start_time}, end_time={end_time}")
     try:
         tag_list = tags.split(',') if tags else None
         summary = elelem.get_summary(start_time, end_time, tag_list)
+        duration = time.time() - request_start
+        logger.info(f"📊 /v1/metrics/summary completed in {duration:.3f}s")
         return summary
     except Exception as e:
-        logger.error(f"Error getting metrics summary: {e}")
+        duration = time.time() - request_start
+        logger.error(f"📊 /v1/metrics/summary failed after {duration:.3f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -427,11 +433,17 @@ async def get_metrics_tags():
     - provider:groq
     - Any user-defined tags
     """
+    import time
+    request_start = time.time()
+    logger.info("📊 /v1/metrics/tags called")
     try:
         tags = elelem.get_metrics_tags()
+        duration = time.time() - request_start
+        logger.info(f"📊 /v1/metrics/tags completed in {duration:.3f}s - {len(tags)} tags")
         return {"tags": tags}
     except Exception as e:
-        logger.error(f"Error getting metrics tags: {e}")
+        duration = time.time() - request_start
+        logger.error(f"📊 /v1/metrics/tags failed after {duration:.3f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -446,6 +458,9 @@ async def get_metrics_data(
 
     Returns array of request records from unified metrics structure.
     """
+    import time
+    request_start = time.time()
+    logger.info(f"📊 /v1/metrics/data called - tags={tags}, start_time={start_time}, end_time={end_time}")
     try:
         if format != "json":
             raise HTTPException(status_code=400, detail="Only 'json' format is currently supported")
@@ -460,9 +475,12 @@ async def get_metrics_data(
                 if hasattr(ts, 'strftime'):
                     row['timestamp'] = ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
+        duration = time.time() - request_start
+        logger.info(f"📊 /v1/metrics/data completed in {duration:.3f}s - {len(data)} rows")
         return data
     except Exception as e:
-        logger.error(f"Error getting metrics data: {e}")
+        duration = time.time() - request_start
+        logger.error(f"📊 /v1/metrics/data failed after {duration:.3f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

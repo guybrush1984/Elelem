@@ -8,7 +8,7 @@
 
 models:
   # DEEPSEEK 3.2 VARIANTS
-  # Non-reasoning: baseten, gmi, novita, deepinfra, parasail (fireworks/ollama always reason)
+  # Non-reasoning: baseten, gmi, novita, deepinfra, parasail, fireworks (ollama always reasons)
   "virtual:deepseek-v3.2-cheap":
     metadata:
       model_reference: "deepseek_v32"
@@ -21,6 +21,7 @@ models:
       - model: "novita:deepseek/deepseek-3.2"
       - model: "baseten:deepseek/deepseek-3.2"
       - model: "parasail:deepseek/deepseek-3.2"
+      - model: "fireworks:deepseek/deepseek-3.2"
       - model: "vertex:deepseek/deepseek-3.2"
       - model: "openai:openai/gpt-4.1"
         priority: always_last  # Fallback: different model_reference, never reordered
@@ -33,6 +34,7 @@ models:
       speed_weight: 2.0  # Favor speed
     candidates:
       - model: "gmi:deepseek/deepseek-3.2"
+      - model: "fireworks:deepseek/deepseek-3.2"
       - model: "baseten:deepseek/deepseek-3.2"
       - model: "novita:deepseek/deepseek-3.2"
       - model: "deepinfra:deepseek/deepseek-3.2"

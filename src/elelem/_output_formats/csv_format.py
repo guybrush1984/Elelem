@@ -88,6 +88,8 @@ class CsvFormat(OutputFormat):
                         # Pad row to match header length (repair missing columns)
                         while len(values) < len(headers):
                             values.append("")
+                        # Convert tilde (~) to empty string (null value marker)
+                        values = ["" if v == "~" else v for v in values]
                         row = dict(zip(headers, values[: len(headers)]))
                         tables[current_table].append(row)
 
@@ -205,7 +207,8 @@ class CsvFormat(OutputFormat):
                 headers = list(rows[0].keys())
                 lines.append(self.delimiter.join(headers))
                 for row in rows:
-                    values = [str(row.get(h, "")) for h in headers]
+                    # Use tilde (~) for null/empty values
+                    values = [str(row.get(h, "")) or "~" for h in headers]
                     lines.append(self.delimiter.join(values))
             lines.append("")  # Empty line between tables
         return "\n".join(lines).strip()
@@ -256,7 +259,7 @@ class CsvFormat(OutputFormat):
             f"\n\nCRITICAL: Respond with CSV tables using semicolon (;) as delimiter. "
             f"Each table starts with ###TABLE:tablename on its own line, "
             f"followed by a header row, then data rows. "
-            f"For empty/null values, leave the cell empty (do not use '-' or 'N/A'). "
+            f"For null/empty values, use a tilde (~) instead of leaving cells empty. "
             f"Do not use quotes around values unless they contain semicolons. "
             f"Do not wrap in markdown code blocks."
             f"{tables_info}"
@@ -274,7 +277,8 @@ INSTRUCTIONS:
 1. Read the validation error carefully
 2. Fix ONLY what the error describes - make minimal changes
 3. Use semicolon (;) as delimiter
-4. Ensure all required columns are present
+4. Use tilde (~) for null/empty values
+5. Ensure all required columns are present
 
 OUTPUT FORMAT:
 Return corrected CSV tables starting with:
@@ -285,7 +289,7 @@ description of what you fixed
 Then all the corrected tables:
 ###TABLE:table_name
 column1;column2;...
-value1;value2;..."""
+value1;~;..."""
 
         user = f"""Fix these CSV tables that failed validation.
 

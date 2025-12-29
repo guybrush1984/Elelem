@@ -136,9 +136,25 @@ models:
 ```
 
 ```python
-# Automatically tries Groq → Fireworks → DeepInfra
+# Automatically tries providers in optimal order (see Smart Routing below)
 model="virtual:gpt-oss-120b-reliable"
 ```
+
+**Smart Routing:** Virtual models automatically reorder candidates based on performance and cost:
+
+1. **Gist benchmarks** (`gist.yaml`): Static tokens/sec measurements per provider
+2. **Dynamic observations**: Real performance from recent requests (30-min window)
+3. **Blending**: Combines gist (1 sample) with dynamic stats using weighted average
+4. **Value score**: `speed^1.5 / cost` balances performance vs cost
+5. **Exploration**: 10% of requests randomly shuffle order to discover faster providers
+
+Example log showing routing decision:
+```
+🚀 virtual:gpt-oss-120b → [groq(4x, 156t/s, 1040v), fireworks(2x, 89t/s, 445v), deepinfra(1x, 72t/s, 360v)]
+```
+- `4x` = 4 samples (1 gist + 3 dynamic observations)
+- `156t/s` = blended tokens/sec
+- `1040v` = value score (higher = better speed/cost ratio)
 
 **Dynamic models:** Runtime failover definition
 ```python
@@ -161,9 +177,11 @@ model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout:
 - Response truncation due to max_tokens (finish_reason: length)
 - All candidates exhausted
 
-### 2. JSON Mode & Schema Validation
+### 2. Output Formats: JSON, YAML, CSV
 
-Elelem provides robust JSON handling with automatic retry strategies:
+Elelem supports three structured output formats with schema validation, auto-repair, and LLM-based error correction.
+
+#### JSON Format
 
 ```python
 response = await elelem.create_chat_completion(
@@ -172,26 +190,63 @@ response = await elelem.create_chat_completion(
     response_format={"type": "json_object"},
     json_schema={
         "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "integer"}
-        },
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
         "required": ["name", "age"]
-    },
-    temperature=1.0
+    }
 )
 ```
 
-**Retry strategy on JSON errors:**
-1. **Parse error:** Reduce temperature by 0.2, retry (up to 3 times)
-2. **Still failing:** Remove `response_format`, retry
-3. **Still failing:** Try next candidate
+#### YAML Format
 
-**JSON processing:**
-- Strips markdown code blocks (```json ... ```)
-- Fixes common errors (trailing commas, single quotes)
-- Validates against schema if provided
-- Works even with models that don't support native JSON mode
+```python
+response = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Generate a story outline"}],
+    yaml_schema={
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "chapters": {"type": "array", "items": {"type": "object"}}
+        }
+    }
+)
+```
+
+#### CSV Format (Multi-Table)
+
+```python
+response = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Extract characters and locations"}],
+    csv_schema={
+        "tables": {
+            "characters": {
+                "required": True,
+                "columns": {
+                    "id": {"type": "string", "required": True},
+                    "name": {"type": "string"},
+                    "role": {"type": "string", "enum": ["hero", "villain"]}
+                }
+            }
+        }
+    }
+)
+# Output: ###TABLE:characters\nid;name;role\nc1;Aragorn;hero
+```
+
+**Error handling strategy:**
+
+| Error Type | Action |
+|------------|--------|
+| **Parse error** (invalid syntax) | → Failover to next provider (infrastructure error) |
+| **Schema validation error** | → Try LLM fixer → Temperature reduction → Remove response_format (JSON only) → Failover |
+| **Rate limit** | → Exponential backoff retry on same provider |
+
+**Auto-repair features:**
+- Strips markdown code blocks (` ```json ... ``` `)
+- Fixes trailing commas, single quotes, unquoted keys
+- CSV uses tilde (`~`) for null/empty values
+- LLM fixer calls a secondary model to correct schema errors
 
 ### 3. Metrics & Cost Tracking
 
@@ -393,6 +448,15 @@ export SCALEWAY_SECRET_KEY="your-secret-key"
 export OPENROUTER_API_KEY="your-key"
 export DEEPSEEK_API_KEY="your-key"
 ```
+
+**Smart Routing configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ELELEM_EXPLORATION_EPSILON` | `0.1` | Probability of random shuffle for exploration. At 10%, 1 in 10 requests will try providers in random order instead of optimal order. This helps discover if a previously slow provider has improved. Set to `0` to always use optimal order. |
+| `ELELEM_DYNAMIC_ROUTING_ENABLED` | `true` | When enabled, Elelem learns from real request performance and blends it with static benchmarks. Disable to use only gist benchmarks (or YAML order if no gist). |
+| `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` | `30` | How long (seconds) to cache aggregated performance stats before re-querying the database. Lower = more responsive to changes, higher = less DB load. |
+| `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` | `30` | Time window for performance stats. Only requests from the last N minutes are considered. Shorter windows react faster to provider issues but have less data. |
 
 ### Docker Deployment
 

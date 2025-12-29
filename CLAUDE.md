@@ -43,8 +43,48 @@ Elelem's core logic has been refactored into focused modules for better maintain
 - `src/elelem/_retry_logic.py` - Retry strategies, error classification, and analytics tracking
 - `src/elelem/_request_execution.py` - API parameter preparation for requests
 - `src/elelem/_reasoning_tokens.py` - Token extraction and normalization across providers
+- `src/elelem/_dynamic_routing.py` - Dynamic routing store (caches observed performance stats)
+- `src/elelem/_benchmark_store.py` - Gist benchmarks + dynamic blending + epsilon-greedy exploration
+- `src/elelem/_request_id.py` - Human-readable request ID generation (e.g., "blue-4829")
 
 All `_*.py` files are internal modules with flat function signatures (no nested attributes as parameters).
+
+# Dynamic Routing (Virtual Models)
+
+Virtual models support smart provider selection based on performance and cost:
+
+1. **Gist benchmarks**: Static tokens/sec data in `gist.yaml` (counts as 1 sample)
+2. **Dynamic observations**: Real performance stats from recent requests (cached 30s, 30min window)
+3. **Blending**: `blended_tps = (gist_tps * 1 + dynamic_tps * N) / (1 + N)` where N = dynamic sample count
+4. **Value score**: `value = blended_tps^speed_weight / cost_per_1m` (speed_weight default: 1.5)
+5. **Epsilon-greedy**: 10% of requests randomly shuffle candidates for exploration
+
+Environment variables:
+- `ELELEM_EXPLORATION_EPSILON` - Random shuffle probability (default: 0.1 = 10%)
+- `ELELEM_DYNAMIC_ROUTING_ENABLED` - Enable/disable dynamic routing (default: true)
+- `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` - Stats cache TTL in seconds (default: 30)
+- `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` - Time window for stats (default: 30)
+
+# Output Formats (JSON, YAML, CSV)
+
+Elelem supports three structured output formats in `src/elelem/_output_formats/`:
+- `json_format.py` - JSON with JSON Schema validation
+- `yaml_format.py` - YAML with JSON Schema validation
+- `csv_format.py` - Multi-table CSV with custom schema format
+
+**Usage:** Pass schema via `json_schema=`, `yaml_schema=`, or `csv_schema=` parameter.
+
+**CSV format specifics:**
+- Tables marked with `###TABLE:name` header
+- Semicolon (`;`) delimiter (avoids comma issues in content)
+- Tilde (`~`) for null/empty values
+- Schema uses `tables.{name}.columns.{col}` structure
+
+**Error handling flow (in core.py `_attempt_candidate`):**
+1. `FormatParseError` (syntax error) → `InfrastructureError` → failover to next provider
+2. `FormatSchemaError` (valid syntax, invalid schema) → LLM fixer → temperature reduction → remove response_format → `ModelError` → failover
+
+**LLM fixer:** On schema validation failure, calls a secondary model to fix the output. Each format has `get_fixer_messages()` and `extract_fixer_result()` methods.
 
 # Testing
 - When making edits to the model definitions, launching tests/test_config_validation.py is recommended (uv run pytest tests/test_config_validation.py -v)

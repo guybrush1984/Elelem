@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import time
-import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any
 import openai
@@ -26,8 +25,10 @@ from ._provider_management import create_provider_client, initialize_providers, 
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
 from ._benchmark_store import reorder_candidates_by_benchmark
+from ._dynamic_routing import DynamicRoutingStore
 from ._output_formats import FormatRegistry, FormatParseError, FormatSchemaError, OutputFormat
 from ._format_fixer import call_format_fixer
+from ._request_id import generate_request_id
 
 
 class Elelem:
@@ -53,6 +54,11 @@ class Elelem:
 
         # Initialize metrics system (unified SQLAlchemy backend)
         self._metrics_store = MetricsStore()
+
+        # Initialize dynamic routing store (for performance-based provider selection)
+        self._dynamic_routing_store = DynamicRoutingStore(
+            metrics_store=self._metrics_store
+        )
 
         # Initialize cache if enabled (shares database with metrics)
         if cache_enabled:
@@ -367,8 +373,8 @@ class Elelem:
         Returns:
             OpenAI-compatible response dictionary
         """
-        # Generate unique request ID for tracking
-        request_id = str(uuid.uuid4())[:8]
+        # Generate human-readable request ID for tracking
+        request_id = generate_request_id()
         start_time = time.time()
 
         # Normalize tags
@@ -471,11 +477,17 @@ class Elelem:
             if routing:
                 speed_weight = routing.get('speed_weight', 1.0)
                 min_tokens_per_sec = routing.get('min_tokens_per_sec', 0.0)
+
+                # Get dynamic stats for blending with gist benchmarks
+                dynamic_stats = self._dynamic_routing_store.get_dynamic_stats()
+
                 candidates = reorder_candidates_by_benchmark(
                     candidates,
                     speed_weight=speed_weight,
                     min_tokens_per_sec=min_tokens_per_sec,
-                    logger=self.logger
+                    dynamic_stats=dynamic_stats,
+                    logger=self.logger,
+                    request_id=request_id
                 )
 
         except ValueError as e:
@@ -564,15 +576,36 @@ class Elelem:
                 "Schema validation will be skipped."
             )
         
-        # Build list of candidate providers for logging (with benchmark scores if available)
+        # Build list of candidate providers for logging (with routing info)
+        # Format: provider(Nx, XXXt/s, YYYv) where N = samples, v = value score (speed^weight/cost)
         def format_candidate(c):
             provider = c.get('provider')
-            score = c.get('_benchmark_score')
-            if score is not None:
-                return f"{provider}({score:.1f})"
+            blended_tps = c.get('_blended_tps')
+            value_score = c.get('_benchmark_score')
+            dynamic_sample_count = c.get('_sample_count', 0)
+            gist_tps = c.get('_gist_tps')
+
+            # Calculate total samples: gist counts as 1, plus dynamic samples
+            if gist_tps is not None:
+                total_samples = 1 + dynamic_sample_count
+            elif dynamic_sample_count > 0:
+                total_samples = dynamic_sample_count
+            else:
+                total_samples = 0
+
+            if blended_tps is not None and value_score is not None and value_score > 0:
+                # Show both speed and value score (value = speed^weight / cost)
+                return f"{provider}({total_samples}x, {blended_tps:.0f}t/s, {value_score:.0f}v)"
+            elif blended_tps is not None and blended_tps > 0:
+                return f"{provider}({total_samples}x, {blended_tps:.0f}t/s)"
+            elif total_samples > 0:
+                return f"{provider}({total_samples}x)"
             return provider
-        candidate_info = [format_candidate(c) for c in candidates]
-        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_info)} (temp={original_temperature})")
+
+        candidate_info = [format_candidate(c) for c in candidates[:5]]
+        if len(candidates) > 5:
+            candidate_info.append(f"+{len(candidates)-5}")
+        self.logger.info(f"[{request_id}] 🚀 {model} → [{', '.join(candidate_info)}] (temp={original_temperature})")
         if json_mode_requested:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
         if yaml_mode_requested:
@@ -712,6 +745,7 @@ class Elelem:
                 # Make API call with timeout
                 try:
                     chunk_count = None  # Track streaming chunks
+                    request_tracker.mark_llm_start()  # Track LLM call start for accurate tokens/sec
                     if api_kwargs.get("stream", False):
                         # Handle streaming response
                         # Use timeout for initial connection, then chunk_timeout for streaming
@@ -736,6 +770,7 @@ class Elelem:
                             timeout=timeout
                         )
                     api_error = None
+                    request_tracker.mark_llm_end()  # Track LLM call end for accurate tokens/sec
                 except asyncio.TimeoutError as e:
                     # Timeout is an infrastructure error - try next candidate
                     raise InfrastructureError(f"Request timed out after {timeout}s", provider=provider_name, model=model_name)
@@ -889,9 +924,10 @@ class Elelem:
                 self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s | {token_info}{cost_info}{chunk_info}")
 
                 # Finalize request tracking with candidate details and store
+                # Use original_model_ref for selected_candidate to match virtual model candidate keys
                 request_tracker.finalize_with_candidate(
                     self._metrics_store,
-                    selected_candidate=f"{provider_name}:{candidate_model_name}",
+                    selected_candidate=stats_model_name,
                     actual_model=stats_model_name,
                     actual_provider=runtime_costs.get("actual_provider") if runtime_costs else provider_name,
                     status="success",
@@ -1117,9 +1153,23 @@ class Elelem:
         """Get health status of Elelem and its subsystems.
 
         Returns:
-            Dictionary with health status including metrics backends
+            Dictionary with health status including metrics backends and dynamic routing
         """
-        return self._metrics_store.get_health_status()
+        health = self._metrics_store.get_health_status()
+
+        # Add dynamic routing status
+        health["dynamic_routing"] = {
+            "enabled": self._dynamic_routing_store.enabled,
+            "cache_ttl": self._dynamic_routing_store._cache_ttl,
+            "cached_models": len(self._dynamic_routing_store._cache),
+        }
+
+        # Add routing statistics from benchmark store
+        from ._benchmark_store import get_benchmark_store
+        benchmark_store = get_benchmark_store()
+        health["routing_stats"] = benchmark_store.get_routing_stats()
+
+        return health
 
 
     def close(self):

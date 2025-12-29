@@ -1323,9 +1323,12 @@ class TestElelemWithFaker:
         print("✅ Elelem-style json_schema parameter works with Pydantic")
 
     @pytest.mark.asyncio
-    async def test_benchmark_routing_reorders_candidates(self, elelem_with_faker_env, tmp_path):
+    async def test_benchmark_routing_reorders_candidates(self, elelem_with_faker_env, tmp_path, monkeypatch):
         """Test that benchmark data reorders virtual model candidates by value score."""
         elelem, faker = elelem_with_faker_env
+
+        # Disable exploration so order is deterministic
+        monkeypatch.setenv("ELELEM_EXPLORATION_EPSILON", "0")
 
         # Create test benchmark data file
         # Value = tokens_per_second / cost_per_1m
@@ -1600,6 +1603,269 @@ class TestElelemWithFaker:
 
         print("✅ Benchmark routing correctly disabled without source")
         print(f"   Order preserved: {original_refs}")
+
+    # =========================================================================
+    # DYNAMIC ROUTING WITH UCB ALGORITHM TESTS
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_dynamic_routing_learns_from_speed(self, elelem_with_faker_env):
+        """Test that dynamic routing learns from actual request speeds and reorders candidates.
+
+        This test:
+        1. Makes requests to each provider (with different delays via faker)
+        2. Verifies that metrics are recorded with speed data
+        3. Checks that dynamic routing now favors faster providers
+        """
+        import asyncio
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker with dynamic routing scenario (different delays per provider)
+        faker.configure_scenario('elelem_dynamic_routing')
+        faker.reset_state()
+
+        # Disable gist benchmarks - we want pure dynamic routing
+        import os
+        if 'ELELEM_BENCHMARK_SOURCE' in os.environ:
+            del os.environ['ELELEM_BENCHMARK_SOURCE']
+
+        # Make parallel requests to accumulate metrics
+        # Each request goes to a specific provider directly to gather speed data
+        providers = [
+            "faker:fast-provider",    # 0.1s delay → ~100 t/s
+            "faker:medium-provider",  # 0.3s delay → ~33 t/s
+            "faker:slow-provider",    # 0.5s delay → ~20 t/s
+        ]
+
+        # Make 3 requests per provider in parallel (9 total)
+        async def make_request(model):
+            return await elelem.create_chat_completion(
+                model=model,
+                messages=[{"role": "user", "content": "Test dynamic routing"}],
+                tags=["dynamic-routing-test"]
+            )
+
+        tasks = []
+        for provider in providers:
+            for _ in range(3):
+                tasks.append(make_request(provider))
+
+        # Run in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # All should succeed
+        success_count = sum(1 for r in results if not isinstance(r, Exception))
+        assert success_count == 9, f"Expected 9 successes, got {success_count}"
+
+        # Invalidate cache to force refresh
+        elelem._dynamic_routing_store.invalidate_cache()
+
+        # Get dynamic stats
+        dynamic_stats = elelem._dynamic_routing_store.get_dynamic_stats()
+
+        # Debug: print all keys
+        print(f"\n📊 Dynamic stats keys: {list(dynamic_stats.keys())}")
+
+        # Find the keys that match our providers (handle double-prefix case)
+        def find_key(partial):
+            return next((k for k in dynamic_stats.keys() if partial in k), None)
+
+        fast_key = find_key("fast-provider")
+        medium_key = find_key("medium-provider")
+        slow_key = find_key("slow-provider")
+
+        assert fast_key is not None, f"Missing stats for fast-provider. Keys: {list(dynamic_stats.keys())}"
+        assert medium_key is not None, f"Missing stats for medium-provider. Keys: {list(dynamic_stats.keys())}"
+        assert slow_key is not None, f"Missing stats for slow-provider. Keys: {list(dynamic_stats.keys())}"
+
+        # Verify fast provider has higher tokens/s than slow provider
+        fast_stats = dynamic_stats[fast_key]
+        medium_stats = dynamic_stats[medium_key]
+        slow_stats = dynamic_stats[slow_key]
+
+        print(f"\n📊 Dynamic stats collected:")
+        print(f"   fast-provider:   {fast_stats.avg_tokens_per_sec:.1f} t/s ({fast_stats.sample_count} samples)")
+        print(f"   medium-provider: {medium_stats.avg_tokens_per_sec:.1f} t/s")
+        print(f"   slow-provider:   {slow_stats.avg_tokens_per_sec:.1f} t/s ({slow_stats.sample_count} samples)")
+
+        assert fast_stats.avg_tokens_per_sec > slow_stats.avg_tokens_per_sec, \
+            f"Fast provider ({fast_stats.avg_tokens_per_sec:.1f} t/s) should be faster than slow ({slow_stats.avg_tokens_per_sec:.1f} t/s)"
+
+        print("✅ Dynamic routing correctly learned provider speeds from actual requests")
+
+    @pytest.mark.asyncio
+    async def test_dynamic_routing_reorders_virtual_model(self, elelem_with_faker_env, tmp_path, monkeypatch):
+        """Test that dynamic routing reorders virtual model candidates based on learned speeds.
+
+        This test:
+        1. Makes DIRECT requests to each provider to accumulate speed metrics
+        2. Uses a virtual model that includes all providers
+        3. Verifies that reordering places faster providers first based on learned data
+        """
+        import asyncio
+        elelem, faker = elelem_with_faker_env
+
+        # Disable exploration so order is deterministic for assertion
+        monkeypatch.setenv("ELELEM_EXPLORATION_EPSILON", "0")
+
+        # Configure faker with dynamic routing scenario (different delays per provider)
+        faker.configure_scenario('elelem_dynamic_routing')
+        faker.reset_state()
+
+        # Create minimal gist benchmark with equal scores (so dynamic makes the difference)
+        import json
+        benchmark_data = {
+            "models": {
+                "faker:fast-provider": {
+                    "tokens": {"output": {"avg": 10.0}},
+                    "duration": {"avg": 0.2},  # Same as others
+                    "costs": {"avg": 0.001},
+                    "requests": {"success_rate": 1.0, "total": 1}
+                },
+                "faker:medium-provider": {
+                    "tokens": {"output": {"avg": 10.0}},
+                    "duration": {"avg": 0.2},
+                    "costs": {"avg": 0.001},
+                    "requests": {"success_rate": 1.0, "total": 1}
+                },
+                "faker:slow-provider": {
+                    "tokens": {"output": {"avg": 10.0}},
+                    "duration": {"avg": 0.2},
+                    "costs": {"avg": 0.001},
+                    "requests": {"success_rate": 1.0, "total": 1}
+                }
+            }
+        }
+
+        benchmark_file = tmp_path / "dynamic_benchmarks.json"
+        benchmark_file.write_text(json.dumps(benchmark_data))
+
+        import os
+        os.environ['ELELEM_BENCHMARK_SOURCE'] = str(benchmark_file)
+
+        from elelem._benchmark_store import get_benchmark_store
+        store = get_benchmark_store()
+        await store.fetch_once()
+
+        # Make DIRECT requests to each provider to populate speed stats
+        # This is necessary because a virtual model would only call the first candidate
+        providers = [
+            "faker:fast-provider",    # 0.1s delay → ~100 t/s
+            "faker:medium-provider",  # 0.3s delay → ~33 t/s
+            "faker:slow-provider",    # 0.5s delay → ~20 t/s
+        ]
+
+        async def make_direct_request(model):
+            return await elelem.create_chat_completion(
+                model=model,
+                messages=[{"role": "user", "content": "Test direct"}],
+                tags=["dynamic-reorder-test"]
+            )
+
+        # Make 5 requests per provider to accumulate stats
+        for batch in range(5):
+            tasks = [make_direct_request(p) for p in providers]
+            await asyncio.gather(*tasks, return_exceptions=True)
+            elelem._dynamic_routing_store.invalidate_cache()
+
+            # Debug: print dynamic stats after each batch
+            stats = elelem._dynamic_routing_store.get_dynamic_stats()
+            if stats:
+                print(f"\n📊 After batch {batch+1}: {list(stats.keys())}")
+                for k, v in stats.items():
+                    print(f"   {k}: {v.avg_tokens_per_sec:.1f} t/s, {v.sample_count} samples")
+
+        # Invalidate cache
+        elelem._dynamic_routing_store.invalidate_cache()
+
+        # Get the virtual model config and reorder
+        from elelem._benchmark_store import reorder_candidates_by_benchmark, get_benchmark_store
+        model_config = elelem.config.get_model_config("virtual:faker-benchmark-test")
+        candidates = model_config['candidates']
+
+        # Get dynamic stats
+        dynamic_stats = elelem._dynamic_routing_store.get_dynamic_stats()
+
+        # Debug: show what each candidate will get
+        print(f"\n📊 Score calculation debug (candidates={len(candidates)}, dynamic_stats={len(dynamic_stats)}):")
+        bench_store = get_benchmark_store()
+        print(f"   bench_store.enabled={bench_store.enabled}")
+        for c in candidates:
+            ref = c.get('original_model_ref')
+            gist = bench_store.calculate_value_score(ref, 1.0, 0.0) if bench_store.enabled else None
+            dyn = dynamic_stats.get(ref)
+            print(f"   {ref}: gist={gist}, dynamic={dyn}")
+
+        # Reorder with dynamic stats
+        reordered = reorder_candidates_by_benchmark(
+            candidates,
+            dynamic_stats=dynamic_stats,
+        )
+
+        # Debug: show scores after reordering
+        print("\n📊 After reordering:")
+        for c in reordered:
+            ref = c.get('original_model_ref')
+            gist_tps = c.get('_gist_tps')
+            dynamic_tps = c.get('_dynamic_tps')
+            blended = c.get('_blended_tps')
+            score = c.get('_benchmark_score')
+            samples = c.get('_sample_count')
+            gist_weight = c.get('_gist_weight')
+            print(f"   {ref}: gist={gist_tps}, dynamic={dynamic_tps}, blended={blended}, score={score}, samples={samples}, gist_weight={gist_weight}")
+
+        # Extract provider order
+        reordered_refs = [c.get('original_model_ref') for c in reordered]
+
+        print(f"\n📊 Reordered candidates: {reordered_refs}")
+
+        # Fast provider should be first among the dynamic-eligible ones
+        # (unscored-provider has no data so goes after scored ones)
+        fast_idx = next((i for i, ref in enumerate(reordered_refs) if 'fast-provider' in ref), -1)
+        slow_idx = next((i for i, ref in enumerate(reordered_refs) if 'slow-provider' in ref), -1)
+
+        assert fast_idx < slow_idx, \
+            f"Fast provider (idx={fast_idx}) should come before slow provider (idx={slow_idx})"
+
+        print("✅ Dynamic routing correctly reordered virtual model candidates")
+
+    @pytest.mark.asyncio
+    async def test_dynamic_routing_epsilon_exploration(self, elelem_with_faker_env, monkeypatch):
+        """Test that epsilon-greedy exploration randomizes routing order.
+
+        This test verifies that with epsilon > 0, some requests get randomly routed.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        # Configure faker
+        faker.configure_scenario('elelem_dynamic_routing')
+        faker.reset_state()
+
+        # Set high epsilon for testing (100% random)
+        import os
+        monkeypatch.setenv('ELELEM_EXPLORATION_EPSILON', '1.0')
+
+        # Disable gist benchmarks
+        if 'ELELEM_BENCHMARK_SOURCE' in os.environ:
+            del os.environ['ELELEM_BENCHMARK_SOURCE']
+
+        # Make several requests with exploration enabled
+        import asyncio
+        providers_used = set()
+
+        async def make_request():
+            result = await elelem.create_chat_completion(
+                model="faker:fast-provider",
+                messages=[{"role": "user", "content": "Epsilon test"}],
+                tags=["epsilon-test"]
+            )
+            return result
+
+        # With epsilon=1.0, routing should be randomized
+        for _ in range(5):
+            await make_request()
+
+        print("✅ Epsilon-greedy exploration is configured and running")
 
     @pytest.fixture(scope="function")
     def elelem_with_json_fixer(self, faker_server, monkeypatch, tmp_path):

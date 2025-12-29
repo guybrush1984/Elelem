@@ -68,6 +68,8 @@ class RequestTracker:
         # Performance metrics
         self.first_byte_time: Optional[float] = None
         self.completion_time: Optional[float] = None
+        self.llm_start_time: Optional[float] = None  # When LLM API call started
+        self.llm_end_time: Optional[float] = None  # When LLM API call completed
 
         # Token & cost metrics
         self.input_tokens: int = 0
@@ -135,6 +137,14 @@ class RequestTracker:
     def mark_first_byte(self):
         """Mark when first byte was received."""
         self.first_byte_time = time.time()
+
+    def mark_llm_start(self):
+        """Mark when LLM API call starts."""
+        self.llm_start_time = time.time()
+
+    def mark_llm_end(self):
+        """Mark when LLM API call completes successfully."""
+        self.llm_end_time = time.time()
 
     def finalize(self, status: str = 'success', **kwargs):
         """Finalize the request with outcome data.
@@ -216,13 +226,18 @@ class RequestTracker:
         if self.completion_time and self.first_byte_time:
             completion_ms = int((self.completion_time - self.first_byte_time) * 1000)
             record['completion_latency_ms'] = completion_ms
-            if self.output_tokens > 0 and completion_ms > 0:
-                record['tokens_per_second'] = self.output_tokens / (completion_ms / 1000)
+
+        # Calculate LLM call duration (excludes provider init, benchmark reordering, retries)
+        # Used for accurate tokens/sec calculation but not stored separately
+        llm_duration = None
+        if self.llm_start_time and self.llm_end_time:
+            llm_duration = self.llm_end_time - self.llm_start_time
 
         total_tokens = self.input_tokens + self.output_tokens
 
-        # Always include these fields, even if 0
-        record['total_tokens_per_second'] = total_tokens / total_duration if total_duration > 0 and total_tokens > 0 else 0.0
+        # Use LLM duration for accurate tokens/sec (falls back to total_duration if not available)
+        effective_duration = llm_duration if llm_duration else total_duration
+        record['total_tokens_per_second'] = total_tokens / effective_duration if effective_duration > 0 and total_tokens > 0 else 0.0
         record['cost_per_token'] = self.total_cost_usd / total_tokens if total_tokens > 0 and self.total_cost_usd > 0 else 0.0
 
         # Add all retry counts

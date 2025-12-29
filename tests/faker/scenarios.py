@@ -1,6 +1,7 @@
 """Scenario management for the faker system."""
 
 import os
+import time
 import yaml
 from typing import Dict, Any, Optional
 from .response_generator import ResponseGenerator
@@ -134,7 +135,14 @@ class ScenarioManager:
         response_config: Dict[str, Any],
         request_data: Dict[str, Any]
     ):
-        """Generate response based on configuration."""
+        """Generate response based on configuration.
+
+        Supports optional 'delay_seconds' field to simulate slow providers.
+        """
+        # Apply delay if configured (for testing dynamic routing based on speed)
+        delay = response_config.get('delay_seconds', 0)
+        if delay > 0:
+            time.sleep(delay)
 
         response_type = response_config.get('type', 'success')
         body = request_data.get('body', {})

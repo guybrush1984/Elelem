@@ -30,6 +30,10 @@ class BenchmarkStore:
         self._fetch_error: Optional[str] = None
         self._task: Optional[asyncio.Task] = None
 
+        # Routing statistics (for monitoring epsilon-greedy exploration)
+        self._routing_total: int = 0
+        self._routing_explorations: int = 0
+
         # Configuration from environment
         self._source = os.getenv('ELELEM_BENCHMARK_SOURCE')  # File path or URL
         self._interval = max(60, int(os.getenv('ELELEM_BENCHMARK_FETCH_INTERVAL', '3600')))
@@ -64,6 +68,36 @@ class BenchmarkStore:
         """Get all benchmark data (thread-safe copy)."""
         with self._lock:
             return dict(self._data)
+
+    def record_routing_decision(self, is_exploration: bool):
+        """Record a routing decision for statistics.
+
+        Args:
+            is_exploration: True if this was an exploration (random shuffle)
+        """
+        self._routing_total += 1
+        if is_exploration:
+            self._routing_explorations += 1
+
+    def get_routing_stats(self) -> Dict[str, Any]:
+        """Get routing statistics for monitoring.
+
+        Returns:
+            Dict with total, explorations, and exploration_rate
+        """
+        total = self._routing_total
+        explorations = self._routing_explorations
+        rate = explorations / total if total > 0 else 0.0
+        return {
+            "total": total,
+            "explorations": explorations,
+            "exploration_rate": round(rate, 4),
+        }
+
+    def reset_routing_stats(self):
+        """Reset routing statistics (for testing)."""
+        self._routing_total = 0
+        self._routing_explorations = 0
 
     def calculate_value_score(
         self,
@@ -331,14 +365,19 @@ def reorder_candidates_by_benchmark(
     candidates: List[Dict[str, Any]],
     speed_weight: float = 1.0,
     min_tokens_per_sec: float = 0.0,
-    logger: Optional[logging.Logger] = None
+    dynamic_stats: Optional[Dict[str, Any]] = None,
+    logger: Optional[logging.Logger] = None,
+    request_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
-    """Reorder candidates by value score from benchmark data.
+    """Reorder candidates by value score from benchmark data, blended with dynamic stats.
+
+    Scoring: gist is treated as 1 synthetic sample, blended with real observations.
+    As more real samples come in, gist influence naturally shrinks (1/(1+N)).
 
     Candidates are grouped by priority:
     1. always_first - Always tried first, in YAML order among themselves
-    2. scored - Have benchmark data, sorted by value score (descending)
-    3. unscored - No benchmark data, in YAML order among themselves
+    2. scored - Have benchmark or dynamic data, sorted by blended score (descending)
+    3. unscored - No data at all, in YAML order among themselves
     4. always_last - Always tried last (fallbacks), in YAML order among themselves
 
     The 'priority' field on candidates controls ordering:
@@ -349,10 +388,14 @@ def reorder_candidates_by_benchmark(
     If min_tokens_per_sec filter would exclude ALL routable candidates,
     falls back to original YAML order (no filtering applied).
 
+    Exploration: With probability epsilon (default 10%), candidates are shuffled
+    randomly to discover faster providers.
+
     Args:
         candidates: List of resolved candidate dicts (must have 'original_model_ref')
         speed_weight: Exponent for speed in value calculation (default 1.0)
         min_tokens_per_sec: Minimum speed threshold, 0 = no filter
+        dynamic_stats: Optional dict of model_ref -> DynamicStats for blending
         logger: Optional logger for debug output
 
     Returns:
@@ -360,10 +403,26 @@ def reorder_candidates_by_benchmark(
     """
     store = get_benchmark_store()
 
-    if not store.enabled or not candidates:
+    # Can proceed if either gist or dynamic data is available
+    has_gist = store.enabled
+    has_dynamic = bool(dynamic_stats)
+
+    if not (has_gist or has_dynamic) or not candidates:
         return candidates
 
     log = logger or logging.getLogger("elelem.benchmark")
+
+    # Epsilon-greedy exploration: with probability epsilon, randomize order
+    # Epsilon-greedy works well in serverless (stateless)
+    import random
+    epsilon = float(os.environ.get('ELELEM_EXPLORATION_EPSILON', '0.1'))
+    explore_this_request = random.random() < epsilon
+
+    # Record routing decision for statistics
+    store.record_routing_decision(explore_this_request)
+
+    if explore_this_request:
+        log.info(f"🎲 Exploration mode (ε={epsilon:.0%}): randomizing candidate order")
 
     # Group candidates by priority and score
     always_first = []  # priority: always_first
@@ -392,27 +451,58 @@ def reorder_candidates_by_benchmark(
             unscored.append((idx, candidate))
             continue
 
-        benchmark = store.get_benchmark(model_ref)
+        # Get gist benchmark data (raw tokens_per_second and cost)
+        benchmark = store.get_benchmark(model_ref) if has_gist else None
+        gist_tps = None  # tokens per second from gist
+        cost_per_1m = None
+        if benchmark:
+            gist_tps = benchmark.get('tokens_per_second', 0)
+            cost_per_1m = benchmark.get('cost_per_1m_output', 0)
+            # Check minimum speed threshold (applies to gist data)
+            if min_tokens_per_sec > 0 and gist_tps < min_tokens_per_sec:
+                filtered_out.append((idx, candidate, model_ref))
+                continue
 
-        if not benchmark:
-            # No benchmark data, keep in unscored
-            unscored.append((idx, candidate))
-            continue
+        # Get dynamic stats (observed tokens/s from recent requests)
+        dynamic_tps = None
+        sample_count = 0
 
-        tokens_per_sec = benchmark.get('tokens_per_second', 0)
+        if has_dynamic and model_ref in dynamic_stats:
+            stats = dynamic_stats[model_ref]
+            sample_count = stats.sample_count
+            dynamic_tps = stats.avg_tokens_per_sec
 
-        # Check minimum speed threshold
-        if min_tokens_per_sec > 0 and tokens_per_sec < min_tokens_per_sec:
-            filtered_out.append((idx, candidate, model_ref))
-            continue
+        # Blend speeds (gist as 1 sample + dynamic samples), then apply cost
+        if gist_tps is not None or dynamic_tps is not None:
+            from elelem._dynamic_routing import blend_scores
+            # Blend: gist counts as 1 sample, dynamic_tps is avg of sample_count samples
+            blended_tps, gist_weight = blend_scores(gist_tps, dynamic_tps, sample_count)
 
-        # Calculate value score
-        score = store.calculate_value_score(model_ref, speed_weight, min_tokens_per_sec)
+            if blended_tps is not None and blended_tps > 0:
+                # Apply cost to get final value score: speed^weight / cost
+                if cost_per_1m and cost_per_1m > 0:
+                    final_score = (blended_tps ** speed_weight) / cost_per_1m
+                else:
+                    # No cost data, use raw speed as score
+                    final_score = blended_tps ** speed_weight
 
-        if score is not None:
-            # Store score in candidate for logging purposes
-            candidate['_benchmark_score'] = score
-            scored.append((score, idx, candidate))
+                # Store scores in candidate for logging/debugging
+                candidate['_benchmark_score'] = final_score
+                candidate['_gist_tps'] = gist_tps
+                candidate['_dynamic_tps'] = dynamic_tps
+                candidate['_blended_tps'] = blended_tps
+                candidate['_gist_weight'] = gist_weight
+                candidate['_sample_count'] = sample_count
+                scored.append((final_score, sample_count, idx, candidate))
+
+                # Debug log for score blending
+                if log.isEnabledFor(logging.DEBUG) and (gist_tps is not None and dynamic_tps is not None):
+                    log.debug(
+                        f"Model {model_ref}: gist={gist_tps:.1f}, dynamic={dynamic_tps:.1f}, "
+                        f"blended={blended_tps:.1f}, gist_weight={gist_weight:.0%}, final={final_score:.2f}"
+                    )
+            else:
+                unscored.append((idx, candidate))
         else:
             unscored.append((idx, candidate))
 
@@ -440,19 +530,24 @@ def reorder_candidates_by_benchmark(
     # Sort scored candidates by value score (descending - higher is better)
     scored.sort(key=lambda x: x[0], reverse=True)
 
+    # Epsilon-greedy exploration: randomly shuffle if in exploration mode
+    if explore_this_request and scored:
+        random.shuffle(scored)
+
     # Build result: always_first, then scored, then unscored, then always_last
     result = [c for (_, c) in always_first]
-    result.extend([c for (_, _, c) in scored])
+    result.extend([c for (_, _, _, c) in scored])
     result.extend([c for (_, c) in unscored])
     result.extend([c for (_, c) in always_last])
 
-    # Log reordering
+
+    # Debug-level details
     if log.isEnabledFor(logging.DEBUG):
         if always_first:
             first_refs = [c.get('original_model_ref', 'unknown') for (_, c) in always_first]
             log.debug(f"Priority always_first: {first_refs}")
         if scored:
-            order_info = [(c.get('original_model_ref'), round(s, 2)) for s, _, c in scored]
+            order_info = [(c.get('original_model_ref'), round(s, 2), n) for s, n, _, c in scored]
             log.debug(f"Benchmark reorder (speed_weight={speed_weight}): {order_info}")
         if always_last:
             last_refs = [c.get('original_model_ref', 'unknown') for (_, c) in always_last]

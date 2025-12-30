@@ -29,6 +29,8 @@ from ._dynamic_routing import DynamicRoutingStore
 from ._output_formats import FormatRegistry, FormatParseError, FormatSchemaError, OutputFormat
 from ._format_fixer import call_format_fixer
 from ._request_id import generate_request_id
+from ._request_state import RequestState, RequestContext
+from ._request_handlers import RequestStateMachine
 
 
 class Elelem:
@@ -612,6 +614,7 @@ class Elelem:
         # Track failed model_references to skip candidates with the same underlying model
         failed_model_refs = set()
         last_error = None
+        cumulative_path = []  # Track full journey across all candidates
 
         for candidate_idx, candidate in enumerate(candidates):
             # Skip candidates whose model_reference has already failed with ModelError
@@ -625,10 +628,12 @@ class Elelem:
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
                     format_handler, format_schema,
-                    original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs
+                    original_temperature, tags, cache, cache_key, start_time, request_tracker,
+                    cumulative_path=cumulative_path, **kwargs
                 )
             except InfrastructureError as e:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (infra): {e}")
+                cumulative_path.append("NEXT_CANDIDATE")
                 request_tracker.record_retry("candidate_iterations")
                 last_error = e
                 # Mark candidate as failed for cooldown (only for virtual models with routing)
@@ -641,6 +646,7 @@ class Elelem:
                 if candidate_model_ref:
                     failed_model_refs.add(candidate_model_ref)
                     self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (model): {e} - skipping model_reference '{candidate_model_ref}'")
+                    cumulative_path.append("SKIP_MODEL")
                     request_tracker.record_retry("candidate_iterations")
                     last_error = e
                     # Continue to find a candidate with a different model_reference
@@ -662,15 +668,30 @@ class Elelem:
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
                                 messages, original_model, model_config, request_id,
                                 format_handler: Optional[OutputFormat], format_schema: Optional[Dict],
-                                original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs):
+                                original_temperature, tags, cache, cache_key, start_time, request_tracker,
+                                cumulative_path: list = None, **kwargs):
         """Attempt to complete request with a specific candidate.
+
+        Uses the RequestStateMachine to process the request through explicit states:
+            CALL_API → EXTRACT_TOKENS → VALIDATE_FORMAT → TRY_FIXER → REDUCE_TEMPERATURE
+
+        Terminal states:
+            SUCCESS → return response
+            NEXT_CANDIDATE → raise InfrastructureError (try next provider)
+            SKIP_MODEL → raise ModelError (skip same model_reference)
 
         Args:
             format_handler: OutputFormat handler (json, yaml, csv) or None if no format requested
             format_schema: Schema for validation, or None
+            cumulative_path: List to accumulate state path across all candidate attempts
         """
+        if cumulative_path is None:
+            cumulative_path = []
+        # === Setup phase (unchanged) ===
+
         # Get timeout for this candidate
         timeout = self.config.get_candidate_timeout(candidate, model_config)
+        chunk_timeout = self.config.get_candidate_chunk_timeout(candidate, model_config)
 
         # Setup provider and model for this candidate
         provider_name = candidate['provider']
@@ -682,26 +703,23 @@ class Elelem:
         if provider_name in self._token_providers:
             token = self._token_providers[provider_name].get_token()
             provider_client.api_key = token
-        
+
         # Use original model reference for statistics (cost lookup)
-        # For virtual models: use the original model reference (e.g., "parasail:gpt-oss-120b")
-        # For regular models: use the original requested model name (e.g., "fireworks:deepseek-v3p1")
         stats_model_name = candidate.get('original_model_ref', original_model)
         candidate_model_name = f"{provider_name}:{model_name}"
-        
+
         self.logger.info(f"[{request_id}] 🎯 Candidate {candidate_idx}/{total_candidates}: {candidate_model_name} (timeout={timeout}s)")
-        
+
         # Get provider configuration for defaults
         provider_config = self.config.get_provider_config(provider_name)
 
         # Prepare API parameters with proper precedence
-        # Use stats_model_name (candidate's original_model_ref) for extra_body lookup
         api_kwargs = prepare_api_kwargs(kwargs, original_temperature, provider_config,
                                       candidate, stats_model_name, self.config, provider_name)
-        
+
         # Clean up unsupported parameters for this candidate model
         self.logger.debug(f"[{request_id}] Full candidate dict: {candidate}")
-        candidate_key = candidate.get('model', f"{provider_name}:{model_name}")  # Fallback to constructed name
+        candidate_key = candidate.get('model', f"{provider_name}:{model_name}")
         self.logger.debug(f"[{request_id}] Candidate key: {candidate_key}")
         self.logger.debug(f"[{request_id}] Capabilities passed to cleanup: {capabilities}")
         self.logger.debug(f"[{request_id}] Before cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
@@ -709,12 +727,9 @@ class Elelem:
         self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
 
         # Preprocess messages for structured output formats
-        # Use format handler to add instructions to messages
-        # Only inject schema into prompt if enforce_schema_in_prompt=True (default False to save tokens)
         enforce_schema_in_prompt = kwargs.get('enforce_schema_in_prompt', False)
         if format_handler:
             supports_system = capabilities.get("supports_system", True)
-            # Pass schema only if enforce_schema_in_prompt=True, otherwise just add format instructions
             schema_for_prompt = format_schema if enforce_schema_in_prompt else None
             modified_messages = format_handler.add_instructions_to_messages(
                 messages, schema_for_prompt, supports_system
@@ -722,305 +737,165 @@ class Elelem:
         else:
             modified_messages = messages
 
-        # Retry logic for this candidate (temperature reduction, JSON validation)
-        max_retries = self.config.retry_settings["max_json_retries"]
-        max_rate_limit_retries = self.config.retry_settings["max_rate_limit_retries"]
-        temperature_reductions = self.config.retry_settings["temperature_reductions"]
-        min_temp = self.config.retry_settings["min_temp"]
+        # === Build request context for state machine ===
+        ctx = RequestContext(
+            # Request info
+            request_id=request_id,
+            messages=modified_messages,
+            original_model=original_model,
+            format_handler=format_handler,
+            format_schema=format_schema,
+            original_temperature=original_temperature,
 
-        total_input_tokens = 0
-        total_output_tokens = 0
-        total_reasoning_tokens = 0
-        rate_limit_attempts = 0  # Separate counter for rate limit retries
+            # Candidate info
+            provider_name=provider_name,
+            model_name=model_name,
+            candidate=candidate,
+            timeout=timeout,
+            chunk_timeout=chunk_timeout,
+            capabilities=capabilities,
+            api_kwargs=api_kwargs,
+            provider_client=provider_client,
+            stats_model_name=stats_model_name,
 
-        # Use max of JSON retries and rate limit retries to ensure both can complete
-        max_loop_iterations = max(max_retries, max_rate_limit_retries) + 1
-        for attempt in range(max_loop_iterations):
-            try:
-                current_temp = api_kwargs.get('temperature', original_temperature)
-                self.logger.debug(f"[{request_id}] 🔄 Attempt {attempt + 1}/{max_retries + 1} - temp={current_temp}")
-                
-                # Make API call with timeout
-                try:
-                    chunk_count = None  # Track streaming chunks
-                    request_tracker.mark_llm_start()  # Track LLM call start for accurate tokens/sec
-                    if api_kwargs.get("stream", False):
-                        # Handle streaming response
-                        # Use timeout for initial connection, then chunk_timeout for streaming
-                        chunk_timeout = self.config.get_candidate_chunk_timeout(candidate, model_config)
-                        stream = await asyncio.wait_for(
-                            provider_client.chat.completions.create(
-                                messages=modified_messages,
-                                model=model_name,
-                                **api_kwargs
-                            ),
-                            timeout=timeout
-                        )
-                        response, chunk_count = await self._collect_streaming_response(stream, request_id, chunk_timeout=chunk_timeout)
-                    else:
-                        # Handle non-streaming response
-                        response = await asyncio.wait_for(
-                            provider_client.chat.completions.create(
-                                messages=modified_messages,
-                                model=model_name,
-                                **api_kwargs
-                            ),
-                            timeout=timeout
-                        )
-                    api_error = None
-                    request_tracker.mark_llm_end()  # Track LLM call end for accurate tokens/sec
-                except asyncio.TimeoutError as e:
-                    # Timeout is an infrastructure error - try next candidate
-                    raise InfrastructureError(f"Request timed out after {timeout}s", provider=provider_name, model=model_name)
-                except ChunkTimeoutError as e:
-                    # Chunk timeout (cold start or stream stall) - try next candidate
-                    raise InfrastructureError(f"Streaming chunk timeout: {str(e)}", provider=provider_name, model=model_name)
-                except RateLimitError:
-                    # Let rate limit errors pass through to outer handler for proper retry logic
-                    raise
-                except Exception as api_e:
-                    # Classify the error
-                    if self._is_infrastructure_error(api_e):
-                        raise InfrastructureError(f"API infrastructure error: {str(api_e)}", provider=provider_name, model=model_name)
-                    elif self._is_json_validation_api_error(api_e) and format_handler and format_handler.name == "json":
-                        # API-level JSON validation errors will be handled in JSON validation section
-                        api_error = api_e
-                        response = None
-                    else:
-                        # Other API errors are typically model errors (don't iterate)
-                        raise ModelError(f"API error: {str(api_e)}", provider=provider_name, model=model_name)
-                
-                # Extract tokens from response
-                if response:
-                    # Extract normalized token counts
-                    input_tokens, output_tokens, reasoning_tokens, total_tokens = extract_token_counts(response, self.logger)
+            # Mutable state
+            current_temperature=api_kwargs.get('temperature', original_temperature),
 
-                    # Extract reasoning content
-                    reasoning_content = extract_reasoning_content(response, self.logger)
+            # Configuration
+            max_retries=self.config.retry_settings["max_json_retries"],
+            max_rate_limit_retries=self.config.retry_settings["max_rate_limit_retries"],
+            temperature_reductions=self.config.retry_settings["temperature_reductions"],
+            min_temp=self.config.retry_settings["min_temp"],
+            rate_limit_backoff=self.config.retry_settings["rate_limit_backoff"],
 
-                    total_input_tokens += input_tokens
-                    total_output_tokens += output_tokens
-                    total_reasoning_tokens += reasoning_tokens
+            # Tracking
+            request_tracker=request_tracker,
+        )
 
-                    content = process_response_content(response, self.logger, format_handler)
-                else:
-                    content = ""
-                    reasoning_content = None
-                
-                # Format validation (JSON, YAML, CSV) using unified format handler
-                if format_handler:
-                    try:
-                        # Parse and validate content (format handler does extraction, repair, validation)
-                        parse_result = format_handler.parse(content)
-                        if not parse_result.success:
-                            raise FormatParseError(parse_result.error, format_type=format_handler.name)
+        # === Run state machine ===
+        state_machine = RequestStateMachine(self)
+        result = await state_machine.run(ctx)
 
-                        # Schema validation if schema provided
-                        if format_schema:
-                            validation = format_handler.validate_schema(parse_result.data, format_schema)
-                            if not validation.is_valid:
-                                error_msg = validation.error
-                                if validation.error_path:
-                                    error_msg += f" at path: {validation.error_path}"
-                                raise FormatSchemaError(error_msg, content=parse_result.content, format_type=format_handler.name)
+        # Extend cumulative path with this candidate's journey (excluding terminal state for non-success)
+        if result.path:
+            # For SUCCESS, include full path; for errors, exclude terminal state (will be added by caller)
+            if result.next_state == RequestState.SUCCESS:
+                cumulative_path.extend(result.path)
+            else:
+                cumulative_path.extend(result.path[:-1])  # Exclude NEXT_CANDIDATE/SKIP_MODEL
 
-                        # Update content with possibly repaired version
-                        content = parse_result.content
+        # === Handle terminal states ===
+        if result.next_state == RequestState.SUCCESS:
+            return self._build_success_response(
+                ctx, start_time, cache, cache_key, original_model, candidate_model_name,
+                state_path=cumulative_path
+            )
+        elif result.next_state == RequestState.NEXT_CANDIDATE:
+            raise result.error
+        elif result.next_state == RequestState.SKIP_MODEL:
+            raise result.error
+        else:
+            # Should never happen
+            raise RuntimeError(f"Unexpected terminal state: {result.next_state}")
 
-                    except FormatParseError as e:
-                        # Parse failed completely - infrastructure issue, failover to next provider
-                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, format_handler.name,
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=format_schema)
-                        raise InfrastructureError(
-                            f"{format_handler.name.upper()} parse failed: {str(e)[:100]}",
-                            provider=provider_name, model=model_name
-                        )
+    def _build_success_response(self, ctx: RequestContext, start_time: float,
+                                cache: bool, cache_key: str, original_model: str,
+                                candidate_model_name: str, state_path: list = None):
+        """Build the success response from context after state machine completes.
 
-                    except FormatSchemaError as e:
-                        # Parsed OK but schema validation failed - try fixer
-                        self._dump_validation_debug(request_id, messages, api_kwargs, e.content or content, e, format_handler.name,
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=format_schema)
+        This handles:
+        - Cost calculation
+        - Logging
+        - Metrics finalization
+        - Response augmentation
+        - Caching
+        """
+        duration = time.time() - start_time
+        response = ctx.response
 
-                        # Try format fixer for schema validation errors
-                        fixer_succeeded = False
-                        if self._json_fixer_enabled and format_schema:
-                            fixer_output = await call_format_fixer(
-                                elelem_instance=self,
-                                format_handler=format_handler,
-                                invalid_content=e.content or content,
-                                error=str(e),
-                                schema=format_schema,
-                                request_id=request_id,
-                                fixer_model=self._json_fixer_model
-                            )
+        # Get cost configuration for this candidate
+        candidate_cost_config = ctx.candidate.get('cost', {})
 
-                            # Check if content was unfixable (truncated/empty)
-                            # This triggers immediate failover to next provider
-                            if not fixer_output.is_fixable:
-                                raise InfrastructureError(
-                                    f"{format_handler.name.upper()} response unfixable (truncated/empty)",
-                                    provider=provider_name, model=model_name
-                                )
+        # Extract runtime costs if model is configured for runtime pricing
+        runtime_costs = self._extract_runtime_costs(response, candidate_cost_config)
+        costs = self._calculate_costs(
+            ctx.stats_model_name,
+            ctx.total_input_tokens,
+            ctx.total_output_tokens,
+            ctx.total_reasoning_tokens,
+            runtime_costs,
+            candidate_cost_config
+        )
 
-                            if fixer_output.content:
-                                content = fixer_output.content
-                                request_tracker.record_retry("format_fixer")
-                                fixer_succeeded = True
+        # Log success with provider info, tokens, and cost
+        provider_info = ""
+        if hasattr(response, 'provider') and response.provider:
+            provider_info = f" via {response.provider}"
 
-                        if not fixer_succeeded:
-                            # Fixer failed (but content was fixable) - try temperature reduction
-                            if attempt < max_retries:
-                                if temperature_reductions and len(temperature_reductions) > 0:
-                                    reduction_idx = min(attempt, len(temperature_reductions) - 1)
-                                    reduction = temperature_reductions[reduction_idx]
-                                    new_temp = max(current_temp - reduction, min_temp)
+        token_info = f"tokens: {ctx.total_input_tokens}→{ctx.total_output_tokens}"
+        if ctx.total_reasoning_tokens > 0:
+            token_info += f" (reasoning: {ctx.total_reasoning_tokens})"
 
-                                    if new_temp < current_temp:
-                                        api_kwargs['temperature'] = new_temp
-                                        request_tracker.record_retry("temperature_reductions")
-                                        self.logger.warning(f"[{request_id}] {format_handler.name.upper()} schema validation failed, reducing temperature to {new_temp}")
-                                        self.logger.warning(f"[{request_id}] Validation error: {e}")
-                                        continue
+        cost_info = ""
+        if costs and costs.get('total_cost_usd', 0) > 0:
+            cost_info = f", cost: ${costs['total_cost_usd']:.6f}"
 
-                                # Try removing response format (JSON only)
-                                if format_handler.name == "json" and 'response_format' in api_kwargs:
-                                    api_kwargs.pop('response_format', None)
-                                    api_kwargs['temperature'] = original_temperature
-                                    request_tracker.record_retry("response_format_removals")
-                                    self.logger.warning(f"[{request_id}] Removing response_format and retrying")
-                                    continue
+        chunk_info = ""
+        if ctx.chunk_count is not None:
+            chunk_info = f", chunks: {ctx.chunk_count}"
 
-                            # All retries exhausted
-                            raise ModelError(
-                                f"{format_handler.name.upper()} schema validation failed after all retries: {e}",
-                                provider=provider_name, model=model_name
-                            )
+        # Format state path (compact: only show non-happy-path or abbreviated)
+        path_info = ""
+        if state_path:
+            path_str = "→".join(state_path)
+            path_info = f" [{path_str}]"
 
-                # Success! Calculate duration and return
-                duration = time.time() - start_time
+        self.logger.info(
+            f"[{ctx.request_id}] ✅ SUCCESS{path_info} - {candidate_model_name}{provider_info} "
+            f"in {duration:.2f}s | {token_info}{cost_info}{chunk_info}"
+        )
 
-                # Get cost configuration for this candidate
-                candidate_cost_config = candidate.get('cost', {})
+        # Finalize request tracking
+        ctx.request_tracker.finalize_with_candidate(
+            self._metrics_store,
+            selected_candidate=ctx.stats_model_name,
+            actual_model=ctx.stats_model_name,
+            actual_provider=runtime_costs.get("actual_provider") if runtime_costs else ctx.provider_name,
+            status="success",
+            input_tokens=ctx.total_input_tokens,
+            output_tokens=ctx.total_output_tokens,
+            reasoning_tokens=ctx.total_reasoning_tokens,
+            total_cost_usd=costs.get('total_cost_usd', 0.0)
+        )
 
-                # Extract runtime costs if model is configured for runtime pricing
-                runtime_costs = self._extract_runtime_costs(response, candidate_cost_config)
-                costs = self._calculate_costs(stats_model_name, total_input_tokens, total_output_tokens,
-                                            total_reasoning_tokens, runtime_costs, candidate_cost_config)
+        # Update response content
+        response.choices[0].message.content = ctx.content
 
-                # Log success with provider info, tokens, and cost
-                provider_info = ""
-                if hasattr(response, 'provider') and response.provider:
-                    provider_info = f" via {response.provider}"
+        # Add Elelem-specific metrics to the response object
+        response.elelem_metrics = {
+            "request_duration_seconds": duration,
+            "provider_used": ctx.provider_name,
+            "model_used": ctx.stats_model_name,
+            "tokens": {
+                "input": ctx.total_input_tokens,
+                "output": ctx.total_output_tokens,
+                "reasoning": ctx.total_reasoning_tokens,
+                "total": ctx.total_input_tokens + ctx.total_output_tokens
+            },
+            "costs_usd": costs,
+            "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
+        }
 
-                # Build token/cost info string
-                token_info = f"tokens: {total_input_tokens}→{total_output_tokens}"
-                if total_reasoning_tokens > 0:
-                    token_info += f" (reasoning: {total_reasoning_tokens})"
+        # Add reasoning content if present
+        if ctx.reasoning_content:
+            response.elelem_metrics["reasoning_content"] = ctx.reasoning_content
+            response.choices[0].message.reasoning = ctx.reasoning_content
 
-                cost_info = ""
-                if costs and costs.get('total_cost_usd', 0) > 0:
-                    cost_info = f", cost: ${costs['total_cost_usd']:.6f}"
+        # Cache the successful response
+        if self.cache and cache and cache_key:
+            self.cache.set(cache_key, original_model, response)
 
-                # Add chunk count for streaming responses
-                chunk_info = ""
-                if chunk_count is not None:
-                    chunk_info = f", chunks: {chunk_count}"
-
-                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s | {token_info}{cost_info}{chunk_info}")
-
-                # Finalize request tracking with candidate details and store
-                # Use original_model_ref for selected_candidate to match virtual model candidate keys
-                request_tracker.finalize_with_candidate(
-                    self._metrics_store,
-                    selected_candidate=stats_model_name,
-                    actual_model=stats_model_name,
-                    actual_provider=runtime_costs.get("actual_provider") if runtime_costs else provider_name,
-                    status="success",
-                    input_tokens=total_input_tokens,
-                    output_tokens=total_output_tokens,
-                    reasoning_tokens=total_reasoning_tokens,
-                    total_cost_usd=costs.get('total_cost_usd', 0.0)
-                )
-
-                # Update response content
-                response.choices[0].message.content = content
-
-                # Add Elelem-specific metrics to the response object
-                response.elelem_metrics = {
-                    "request_duration_seconds": duration,
-                    "provider_used": provider_name,
-                    "model_used": stats_model_name,
-                    "tokens": {
-                        "input": total_input_tokens,
-                        "output": total_output_tokens,
-                        "reasoning": total_reasoning_tokens,
-                        "total": total_input_tokens + total_output_tokens
-                    },
-                    "costs_usd": costs,
-                    "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
-                }
-
-                # Add reasoning content if present
-                if reasoning_content:
-                    response.elelem_metrics["reasoning_content"] = reasoning_content
-                    response.choices[0].message.reasoning = reasoning_content
-
-                # Cache the successful response using the key computed at the start
-                # (before any message preprocessing or kwargs modifications)
-                if self.cache and cache and cache_key:
-                    self.cache.set(cache_key, original_model, response)
-
-                return response
-                
-            except (InfrastructureError, ModelError):
-                # Re-raise classification errors as-is
-                raise
-            except RateLimitError as e:
-                # Handle OpenAI rate limit errors with dedicated retry logic
-                if rate_limit_attempts < max_rate_limit_retries:
-                    backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                    wait_time = backoff_times[min(rate_limit_attempts, len(backoff_times) - 1)]
-                    rate_limit_attempts += 1
-                    request_tracker.record_retry("rate_limit_retries")
-                    self.logger.warning(f"[{request_id}] Rate limit hit, waiting {wait_time}s (attempt {rate_limit_attempts}/{max_rate_limit_retries})")
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    # Rate limit exhaustion is infrastructure issue - try next candidate
-                    raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}", provider=provider_name, model=model_name)
-            except (AuthenticationError, PermissionDeniedError) as e:
-                # Authentication/permission errors are infrastructure issues - try next candidate
-                raise InfrastructureError(f"Authentication/permission error: {e}", provider=provider_name, model=model_name)
-            except (InternalServerError, BadRequestError, NotFoundError) as e:
-                # Server errors, bad requests, and model not found are infrastructure issues
-                # (e.g., model might exist on another provider) - try next candidate
-                raise InfrastructureError(f"Server/request error: {e}", provider=provider_name, model=model_name)
-            except (ConflictError, UnprocessableEntityError) as e:
-                # These are request validation issues - don't retry candidate
-                raise ModelError(f"Request validation error: {e}", provider=provider_name, model=model_name)
-            except Exception as e:
-                # Fallback for any other unexpected errors
-                # Check if it might be a rate limit that wasn't caught as RateLimitError
-                if "429" in str(e) or "rate limit" in str(e).lower():
-                    if rate_limit_attempts < max_rate_limit_retries:
-                        backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                        wait_time = backoff_times[min(rate_limit_attempts, len(backoff_times) - 1)]
-                        rate_limit_attempts += 1
-                        request_tracker.record_retry("rate_limit_retries")
-                        self.logger.warning(f"[{request_id}] Rate limit (fallback), waiting {wait_time}s (attempt {rate_limit_attempts}/{max_rate_limit_retries})")
-                        await asyncio.sleep(wait_time)
-                        continue
-                    else:
-                        raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}", provider=provider_name, model=model_name)
-
-                # Other unexpected errors
-                raise ModelError(f"Unexpected error: {e}", provider=provider_name, model=model_name)
-
-        # Retry loop exhausted - move to next candidate
-        self.logger.warning(f"[{request_id}] 🔄 Retry loop exhausted (attempt={attempt}, rate_limit_attempts={rate_limit_attempts}), trying next candidate")
-        raise InfrastructureError("Exhausted all retry attempts for candidate", provider=provider_name, model=model_name)
+        return response
     
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""

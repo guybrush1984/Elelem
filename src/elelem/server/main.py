@@ -97,6 +97,10 @@ log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
+# Suppress verbose httpx request logging (default WARNING to reduce noise)
+httpx_log_level = os.getenv('HTTPX_LOG_LEVEL', 'WARNING').upper()
+logging.getLogger('httpx').setLevel(getattr(logging, httpx_log_level, logging.WARNING))
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Elelem OpenAI API Server",

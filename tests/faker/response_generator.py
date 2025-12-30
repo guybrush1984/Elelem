@@ -153,12 +153,16 @@ class ResponseGenerator:
 
         This simulates errors like content policy violations, context length exceeded,
         or other model-specific errors that shouldn't be retried on the same model.
+
+        Uses 422 Unprocessable Entity because:
+        - 400 Bad Request is treated as infrastructure error (provider quirks)
+        - 422 is explicitly a model-level error (request is valid but model can't process)
         """
         return self.generate_error_response(
             error_type="invalid_request_error",
             message=message or "This model cannot process the request: content policy violation",
             code="content_policy_violation",
-            status_code=400
+            status_code=422
         )
 
     def generate_json_schema_response(self, schema: Dict[str, Any], valid: bool = True):

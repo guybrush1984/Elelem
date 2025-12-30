@@ -87,6 +87,7 @@ def reorder_candidates_by_benchmark(
         return candidates
 
     log = logger or logging.getLogger("elelem.routing")
+    log_prefix = f"[{request_id}] " if request_id else ""
     has_dynamic = bool(dynamic_stats)
 
     # Filter out failed candidates in cooldown
@@ -98,10 +99,10 @@ def reorder_candidates_by_benchmark(
         ]
         excluded_count = original_count - len(candidates)
         if excluded_count > 0:
-            log.info(f"🚫 Excluded {excluded_count} candidate(s) in cooldown: {sorted(failed_candidates)}")
+            log.info(f"{log_prefix}🚫 Excluded {excluded_count} candidate(s) in cooldown: {sorted(failed_candidates)}")
 
         if not candidates:
-            log.warning("All candidates are in cooldown!")
+            log.warning(f"{log_prefix}All candidates are in cooldown!")
             return []
 
     # Adaptive epsilon-greedy exploration
@@ -134,7 +135,7 @@ def reorder_candidates_by_benchmark(
     if explore_this_request:
         _routing_explorations += 1
         coverage_pct = (1 - unexplored_ratio) * 100
-        log.info(f"🎲 Exploration mode (ε={epsilon:.0%}, coverage={coverage_pct:.0f}%): randomizing candidate order")
+        log.info(f"{log_prefix}🎲 Exploration mode (ε={epsilon:.0%}, coverage={coverage_pct:.0f}%): randomizing candidate order")
 
     # Group candidates by priority and score
     always_first = []  # priority: always_first
@@ -201,7 +202,7 @@ def reorder_candidates_by_benchmark(
     # Check if ALL routable candidates were filtered out - fallback to YAML order
     if filtered_out and not scored and not unscored:
         log.warning(
-            f"All {len(filtered_out)} routable candidates below {min_tokens_per_sec} t/s threshold, "
+            f"{log_prefix}All {len(filtered_out)} routable candidates below {min_tokens_per_sec} t/s threshold, "
             f"falling back to YAML order for non-priority candidates"
         )
         result = [c for (_, c) in always_first]
@@ -215,7 +216,7 @@ def reorder_candidates_by_benchmark(
     # Log filtering (only if some were filtered but not all)
     if filtered_out:
         filtered_refs = [ref for (_, _, ref) in filtered_out]
-        log.debug(f"Filtered out {len(filtered_out)} candidates below {min_tokens_per_sec} t/s: {filtered_refs}")
+        log.debug(f"{log_prefix}Filtered out {len(filtered_out)} candidates below {min_tokens_per_sec} t/s: {filtered_refs}")
 
     # Sort scored candidates by value score (descending - higher is better)
     scored.sort(key=lambda x: x[0], reverse=True)
@@ -242,7 +243,7 @@ def reorder_candidates_by_benchmark(
         if unscored_explore or low_sample:
             unknown_refs = [c.get('original_model_ref', '?') for c in unscored_explore]
             learning_refs = [f"{c.get('original_model_ref', '?')}({c.get('_sample_count', 0)})" for c in low_sample]
-            log.debug(f"Exploration prioritizing unknowns: {unknown_refs}, learning: {learning_refs}")
+            log.debug(f"{log_prefix}Exploration prioritizing unknowns: {unknown_refs}, learning: {learning_refs}")
 
     # Build result: always_first → routable (scored+unscored) → always_last
     result = [c for (_, c) in always_first]
@@ -253,12 +254,12 @@ def reorder_candidates_by_benchmark(
     if log.isEnabledFor(logging.DEBUG):
         if always_first:
             first_refs = [c.get('original_model_ref', 'unknown') for (_, c) in always_first]
-            log.debug(f"Priority always_first: {first_refs}")
+            log.debug(f"{log_prefix}Priority always_first: {first_refs}")
         if scored:
             order_info = [(c.get('original_model_ref'), round(s, 2), n) for s, n, _, c in scored]
-            log.debug(f"Routing reorder (speed_weight={speed_weight}): {order_info}")
+            log.debug(f"{log_prefix}Routing reorder (speed_weight={speed_weight}): {order_info}")
         if always_last:
             last_refs = [c.get('original_model_ref', 'unknown') for (_, c) in always_last]
-            log.debug(f"Priority always_last (fallbacks): {last_refs}")
+            log.debug(f"{log_prefix}Priority always_last (fallbacks): {last_refs}")
 
     return result

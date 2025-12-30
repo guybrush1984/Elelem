@@ -85,7 +85,7 @@ if sentry_dsn:
         # Filter out expected errors to reduce noise
         before_send=sentry_before_send,
     )
-from elelem._benchmark_store import get_benchmark_store
+from elelem._benchmark_store import get_routing_stats as get_exploration_stats
 from elelem.server.models import (
     ChatCompletionRequest,
     ErrorResponse,
@@ -154,12 +154,6 @@ async def startup_event():
     else:
         logger.info("📦 Response cache disabled")
 
-    # Start benchmark fetching if configured
-    benchmark_store = get_benchmark_store()
-    await benchmark_store.start_background_fetch()
-    if benchmark_store.enabled:
-        logger.info(f"📊 Benchmark routing enabled (source: {benchmark_store.source})")
-
     # Log Sentry status
     if sentry_dsn:
         logger.info(f"🔍 Sentry error monitoring enabled (environment: {os.getenv('SENTRY_ENVIRONMENT', 'development')})")
@@ -201,10 +195,6 @@ async def shutdown_event():
     """Clean up on server shutdown."""
     global elelem
     logger.info("🛑 Shutting down Elelem server...")
-
-    # Stop benchmark fetching
-    benchmark_store = get_benchmark_store()
-    benchmark_store.stop()
 
     # Clean up using proper encapsulation
     if elelem:
@@ -279,37 +269,70 @@ async def list_models():
         )
 
 
-@app.get("/v1/benchmark/status")
-async def get_benchmark_status():
-    """Get benchmark routing status and current data.
+@app.get("/v1/routing/stats")
+async def get_routing_stats():
+    """Get detailed dynamic routing statistics.
 
     Returns:
-        - enabled: Whether benchmark routing is configured
-        - source: The configured benchmark source (file path or URL)
-        - interval_seconds: How often benchmarks are refreshed
-        - last_fetch: Timestamp of last successful fetch
-        - last_error: Error message from last failed fetch (if any)
-        - entries_count: Number of models with benchmark data
+        - config: Current routing configuration (window, cooldown, samples, epsilon)
+        - dynamic_stats: Per-model speed stats from recent requests
+        - failed_candidates: Models currently in cooldown after failures
+        - exploration: Current exploration state (epsilon, coverage, stats)
     """
-    store = get_benchmark_store()
-    return store.get_status()
+    import os
+    from datetime import datetime
 
+    # Get dynamic routing store from elelem instance
+    routing_store = elelem._dynamic_routing_store
 
-@app.get("/v1/benchmark/data")
-async def get_benchmark_data():
-    """Get all current benchmark data.
+    # Get dynamic stats
+    dynamic_stats = routing_store.get_dynamic_stats()
+    dynamic_data = {
+        model_ref: {
+            "avg_tokens_per_sec": round(stats.avg_tokens_per_sec, 1),
+            "sample_count": stats.sample_count,
+            "last_updated": stats.last_updated.isoformat() if stats.last_updated else None
+        }
+        for model_ref, stats in dynamic_stats.items()
+    }
 
-    Returns a dict mapping model references to their benchmark metrics:
-    - tokens_per_second: Average output tokens per second
-    - cost_per_1m_output: Cost per 1M output tokens (extrapolated)
-    - avg_duration: Average request duration in seconds
-    - success_rate: Request success rate (0.0 to 1.0)
-    - sample_count: Number of benchmark samples
-    """
-    store = get_benchmark_store()
+    # Get failed candidates in cooldown
+    failed = routing_store.get_failed_candidates()
+    failed_with_time = {}
+    for candidate, failure_time in routing_store._failed.items():
+        remaining = routing_store._cooldown_minutes * 60 - (datetime.utcnow() - failure_time).total_seconds()
+        if remaining > 0:
+            failed_with_time[candidate] = {
+                "failed_at": failure_time.isoformat(),
+                "remaining_seconds": round(remaining)
+            }
+
+    # Calculate exploration state
+    explored_count = len(dynamic_data)
+
+    min_epsilon = float(os.environ.get('ELELEM_EXPLORATION_EPSILON', '0.1'))
+    max_epsilon = float(os.environ.get('ELELEM_EXPLORATION_EPSILON_MAX', '1.0'))
+
+    # Get exploration stats from routing module
+    exploration_stats = get_exploration_stats()
+
     return {
-        "enabled": store.enabled,
-        "data": store.get_all_benchmarks()
+        "config": {
+            "window_minutes": routing_store._window_minutes,
+            "cooldown_minutes": routing_store._cooldown_minutes,
+            "max_samples": routing_store._max_samples,
+            "cache_ttl_seconds": routing_store._cache_ttl,
+            "min_epsilon": min_epsilon,
+            "max_epsilon": max_epsilon,
+        },
+        "exploration": {
+            "total_routing_decisions": exploration_stats["total"],
+            "exploration_count": exploration_stats["explorations"],
+            "exploration_rate": exploration_stats["exploration_rate"],
+            "explored_models": explored_count,
+        },
+        "dynamic_stats": dynamic_data,
+        "failed_candidates": failed_with_time,
     }
 
 

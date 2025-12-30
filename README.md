@@ -140,21 +140,32 @@ models:
 model="virtual:gpt-oss-120b-reliable"
 ```
 
-**Smart Routing:** Virtual models automatically reorder candidates based on performance and cost:
+**Smart Routing:** Virtual models automatically reorder candidates based on observed performance and cost:
 
-1. **Gist benchmarks** (`gist.yaml`): Static tokens/sec measurements per provider
-2. **Dynamic observations**: Real performance from last 5 requests per provider (2-hour window)
-3. **Blending**: Combines gist (1 sample) with dynamic stats using weighted average
-4. **Value score**: `speed^1.5 / cost` balances performance vs cost
-5. **Adaptive exploration**: 100% shuffle at cold start → 10% at steady state (scales with coverage)
+1. **Dynamic observations**: Real performance stats from recent requests (last 5 per provider, 4-hour window)
+2. **Value score**: `value = tps^speed_weight / cost_per_1m` - balances speed vs cost
+3. **Adaptive exploration**: 100% shuffle at cold start → 10% at steady state (scales with data coverage)
+4. **Failure cooldown**: Failed providers are excluded for 15 minutes
+
+**Value Score Examples** (real provider pricing for GPT-OSS-120B):
+
+| Provider | Cost ($/M) | Observed Speed | speed_weight=0.5 | speed_weight=1.0 | speed_weight=1.5 |
+|----------|------------|----------------|------------------|------------------|------------------|
+| novita   | $0.25      | 50 t/s         | **28** ⭐        | 200              | 1,414            |
+| fireworks| $0.60      | 120 t/s        | 18               | 200              | 2,191            |
+| cerebras | $0.75      | 400 t/s        | 27               | **533** ⭐       | **10,667** ⭐    |
+
+- `speed_weight=0.5` → novita wins (prioritize cost savings)
+- `speed_weight=1.0` → cerebras wins (balanced speed/cost)
+- `speed_weight=1.5` (default) → cerebras wins decisively (prioritize speed)
 
 Example log showing routing decision:
 ```
-🚀 virtual:gpt-oss-120b → [groq(4x, 156t/s, 1040v), fireworks(2x, 89t/s, 445v), deepinfra(1x, 72t/s, 360v)]
+🚀 virtual:gpt-oss-120b → [cerebras(3x, 400t/s, 10667v), fireworks(2x, 120t/s, 2191v), novita(5x, 50t/s, 1414v)]
 ```
-- `4x` = 4 samples (1 gist + 3 dynamic observations)
-- `156t/s` = blended tokens/sec
-- `1040v` = value score (higher = better speed/cost ratio)
+- `3x` = 3 samples observed
+- `400t/s` = average tokens/sec
+- `10667v` = value score (higher = better)
 
 **Dynamic models:** Runtime failover definition
 ```python
@@ -493,10 +504,11 @@ export DEEPSEEK_API_KEY="your-key"
 |----------|---------|-------------|
 | `ELELEM_EXPLORATION_EPSILON` | `0.1` | Minimum exploration rate (steady state). When all providers have been tested, 10% of requests shuffle randomly to detect performance changes. |
 | `ELELEM_EXPLORATION_EPSILON_MAX` | `1.0` | Maximum exploration rate (cold start). When no providers have been tested, 100% of requests shuffle randomly to gather data quickly. Scales linearly with coverage. |
-| `ELELEM_DYNAMIC_ROUTING_ENABLED` | `true` | When enabled, Elelem learns from real request performance and blends it with static benchmarks. Disable to use only gist benchmarks (or YAML order if no gist). |
+| `ELELEM_DYNAMIC_ROUTING_ENABLED` | `true` | When enabled, Elelem reorders candidates based on observed performance. Disable to use YAML definition order. |
 | `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` | `30` | How long (seconds) to cache aggregated performance stats before re-querying the database. Lower = more responsive to changes, higher = less DB load. |
-| `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` | `120` | Time window for performance stats (default: 2 hours). Only requests from this window are considered. |
+| `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` | `240` | Time window for performance stats (default: 4 hours). Only requests from this window are considered. |
 | `ELELEM_DYNAMIC_ROUTING_MAX_SAMPLES` | `5` | Max samples per model for averaging. Uses only the N most recent requests per model within the window. Recent-biased to reflect current performance. |
+| `ELELEM_DYNAMIC_ROUTING_COOLDOWN_MINUTES` | `15` | Cooldown period for failed providers. After a provider fails, it's excluded from routing for this duration. |
 
 ### Docker Deployment
 

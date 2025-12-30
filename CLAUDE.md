@@ -44,24 +44,22 @@ Elelem's core logic has been refactored into focused modules for better maintain
 - `src/elelem/_request_execution.py` - API parameter preparation for requests
 - `src/elelem/_reasoning_tokens.py` - Token extraction and normalization across providers
 - `src/elelem/_dynamic_routing.py` - Dynamic routing store (caches observed performance stats)
-- `src/elelem/_benchmark_store.py` - Gist benchmarks + dynamic blending + epsilon-greedy exploration
+- `src/elelem/_benchmark_store.py` - Candidate reordering logic + epsilon-greedy exploration
 - `src/elelem/_request_id.py` - Human-readable request ID generation (e.g., "blue-4829")
 
 All `_*.py` files are internal modules with flat function signatures (no nested attributes as parameters).
 
 # Dynamic Routing (Virtual Models)
 
-Virtual models support smart provider selection based on performance and cost:
+Virtual models support smart provider selection based on observed performance and cost:
 
-1. **Gist benchmarks**: Static tokens/sec data in `gist.yaml` (counts as 1 sample)
-2. **Dynamic observations**: Real performance stats from recent requests (cached 30s, 30min window)
-3. **Blending**: `blended_tps = (gist_tps * 1 + dynamic_tps * N) / (1 + N)` where N = dynamic sample count
-4. **Value score**: `value = blended_tps^speed_weight / cost_per_1m` (speed_weight default: 1.5)
-5. **Adaptive epsilon-greedy**: Exploration scales with coverage
+1. **Dynamic observations**: Real performance stats from recent requests (cached 30s, 4-hour window)
+2. **Value score**: `value = tps^speed_weight / cost_per_1m` (speed_weight default: 1.5)
+3. **Adaptive epsilon-greedy**: Exploration scales with coverage
    - 0% explored → 100% shuffle (cold start)
    - 100% explored → 10% shuffle (steady state)
    - Formula: `epsilon = min + (max - min) * unexplored_ratio`
-6. **Failure cooldown**: Failed candidates are excluded for a cooldown period (per-container, in-memory)
+4. **Failure cooldown**: Failed candidates are excluded for a cooldown period (per-container, in-memory)
 
 Environment variables:
 - `ELELEM_EXPLORATION_EPSILON` - Min exploration rate (default: 0.1 = 10% at steady state)

@@ -1,8 +1,8 @@
 """
 Dynamic routing for virtual model candidate selection.
 
-This module provides real-time performance-based routing that blends
-observed performance with static benchmark data (gist).
+This module provides real-time performance-based routing using
+observed performance data from recent requests.
 
 Exploration is handled via epsilon-greedy in _benchmark_store.py.
 """
@@ -34,7 +34,7 @@ class DynamicRoutingStore:
     and caches results to minimize DB load. Each container maintains its
     own cache, which is refreshed based on TTL.
 
-    Exploration is handled via epsilon-greedy in _benchmark_store.py (10% random).
+    Exploration is handled via epsilon-greedy in _benchmark_store.py.
     """
 
     def __init__(
@@ -42,24 +42,35 @@ class DynamicRoutingStore:
         metrics_store: Any,  # MetricsStore, but avoid circular import
         cache_ttl: Optional[int] = None,
         window_minutes: Optional[int] = None,
+        max_samples: Optional[int] = None,
+        cooldown_minutes: Optional[int] = None,
     ):
         """Initialize dynamic routing store.
 
         Args:
             metrics_store: MetricsStore instance for DB access
             cache_ttl: Cache TTL in seconds (default: 30)
-            window_minutes: Time window for recent data (default: 30)
+            window_minutes: Time window for recent data (default: 120 = 2 hours)
+            max_samples: Max samples per model for averaging (default: 5)
+            cooldown_minutes: Cooldown period for failed candidates (default: 5)
         """
         self._metrics_store = metrics_store
         self._cache_ttl = cache_ttl or int(
             os.getenv("ELELEM_DYNAMIC_ROUTING_CACHE_TTL", "30")
         )
         self._window_minutes = window_minutes or int(
-            os.getenv("ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES", "30")
+            os.getenv("ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES", "240")
+        )
+        self._max_samples = max_samples or int(
+            os.getenv("ELELEM_DYNAMIC_ROUTING_MAX_SAMPLES", "5")
+        )
+        self._cooldown_minutes = cooldown_minutes or int(
+            os.getenv("ELELEM_DYNAMIC_ROUTING_COOLDOWN_MINUTES", "15")
         )
 
         self._cache: Dict[str, DynamicStats] = {}
         self._cache_time: Optional[datetime] = None
+        self._failed: Dict[str, datetime] = {}  # candidate -> failure timestamp
         self._lock = threading.Lock()
 
         # Check if dynamic routing is enabled
@@ -107,6 +118,42 @@ class DynamicRoutingStore:
 
             return self._cache.copy()
 
+    def mark_failed(self, candidate_ref: str) -> None:
+        """Mark a candidate as failed (starts cooldown period).
+
+        Args:
+            candidate_ref: The model reference (e.g., "gmi:openai/gpt-oss-120b")
+        """
+        with self._lock:
+            self._failed[candidate_ref] = datetime.utcnow()
+            logger.info(f"🚫 Cooldown: {candidate_ref} marked failed ({self._cooldown_minutes}min cooldown)")
+
+    def get_failed_candidates(self) -> set[str]:
+        """Get candidates that failed recently and are in cooldown.
+
+        Returns:
+            Set of model_ref strings that should be skipped
+        """
+        with self._lock:
+            now = datetime.utcnow()
+            cooldown_delta = timedelta(minutes=self._cooldown_minutes)
+
+            # Clean up expired entries and return active ones
+            active_failures = set()
+            expired = []
+
+            for candidate, failure_time in self._failed.items():
+                if now - failure_time < cooldown_delta:
+                    active_failures.add(candidate)
+                else:
+                    expired.append(candidate)
+
+            # Remove expired entries
+            for candidate in expired:
+                del self._failed[candidate]
+
+            return active_failures
+
     def _fetch_stats_from_db(self) -> Dict[str, DynamicStats]:
         """Query recent metrics aggregated by selected_candidate.
 
@@ -123,22 +170,37 @@ class DynamicRoutingStore:
 
         # Query aggregated stats using pre-computed total_tokens_per_second
         # This field uses llm_duration (actual API call time) for accurate tokens/sec
+        # Use window function to get only the N most recent samples per model
         query = text("""
+            WITH ranked AS (
+                SELECT
+                    selected_candidate,
+                    total_tokens_per_second,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY selected_candidate
+                        ORDER BY timestamp DESC
+                    ) as rn
+                FROM request_metrics
+                WHERE status = 'success'
+                  AND timestamp > :window_start
+                  AND selected_candidate IS NOT NULL
+                  AND total_tokens_per_second > 0
+            )
             SELECT
                 selected_candidate,
                 AVG(total_tokens_per_second) as avg_tokens_per_sec,
                 COUNT(*) as sample_count
-            FROM request_metrics
-            WHERE status = 'success'
-              AND timestamp > :window_start
-              AND selected_candidate IS NOT NULL
-              AND total_tokens_per_second > 0
+            FROM ranked
+            WHERE rn <= :max_samples
             GROUP BY selected_candidate
         """)
 
         try:
             with self._metrics_store.engine.connect() as conn:
-                result = conn.execute(query, {"window_start": window_start})
+                result = conn.execute(query, {
+                    "window_start": window_start,
+                    "max_samples": self._max_samples
+                })
                 rows = result.fetchall()
 
             stats = {}
@@ -166,46 +228,3 @@ class DynamicRoutingStore:
         """Force cache refresh on next access."""
         with self._lock:
             self._cache_time = None
-
-
-def blend_scores(
-    gist_tps: Optional[float],
-    dynamic_avg_tps: Optional[float],
-    sample_count: int,
-) -> tuple[Optional[float], float]:
-    """Blend gist and dynamic scores by treating gist as 1 additional sample.
-
-    Gist is treated as a single synthetic sample. The final score is a
-    weighted average where gist has weight 1 and dynamic has weight sample_count.
-
-    Formula: (gist * 1 + dynamic_avg * sample_count) / (1 + sample_count)
-
-    As more real samples come in, gist influence naturally shrinks:
-    - 0 dynamic samples: 100% gist
-    - 1 dynamic sample: 50% gist, 50% dynamic
-    - 4 dynamic samples: 20% gist, 80% dynamic
-    - 9 dynamic samples: 10% gist, 90% dynamic
-
-    Args:
-        gist_tps: Static benchmark tokens/sec (may be None)
-        dynamic_avg_tps: Average observed tokens/sec (may be None)
-        sample_count: Number of dynamic samples
-
-    Returns:
-        Tuple of (blended_tps, gist_weight) where gist_weight is 1/(1+sample_count)
-    """
-    if gist_tps is not None and dynamic_avg_tps is not None and sample_count > 0:
-        # Weighted average: gist counts as 1 sample
-        total_samples = 1 + sample_count
-        blended = (gist_tps + dynamic_avg_tps * sample_count) / total_samples
-        gist_weight = 1.0 / total_samples
-        return blended, gist_weight
-    elif dynamic_avg_tps is not None and sample_count > 0:
-        # No gist, use dynamic only
-        return dynamic_avg_tps, 0.0
-    elif gist_tps is not None:
-        # No dynamic, use gist only
-        return gist_tps, 1.0
-    else:
-        # No data at all
-        return None, 0.0

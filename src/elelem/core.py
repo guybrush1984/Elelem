@@ -478,7 +478,7 @@ class Elelem:
                 speed_weight = routing.get('speed_weight', 1.0)
                 min_tokens_per_sec = routing.get('min_tokens_per_sec', 0.0)
 
-                # Get dynamic stats for blending with gist benchmarks
+                # Get dynamic stats for routing decisions
                 dynamic_stats = self._dynamic_routing_store.get_dynamic_stats()
 
                 # Get failed candidates in cooldown (excluded from routing)
@@ -584,26 +584,17 @@ class Elelem:
         # Format: provider(Nx, XXXt/s, YYYv) where N = samples, v = value score (speed^weight/cost)
         def format_candidate(c):
             provider = c.get('provider')
-            blended_tps = c.get('_blended_tps')
-            value_score = c.get('_benchmark_score')
-            dynamic_sample_count = c.get('_sample_count', 0)
-            gist_tps = c.get('_gist_tps')
+            tps = c.get('_tps')
+            value_score = c.get('_value_score')
+            sample_count = c.get('_sample_count', 0)
 
-            # Calculate total samples: gist counts as 1, plus dynamic samples
-            if gist_tps is not None:
-                total_samples = 1 + dynamic_sample_count
-            elif dynamic_sample_count > 0:
-                total_samples = dynamic_sample_count
-            else:
-                total_samples = 0
-
-            if blended_tps is not None and value_score is not None and value_score > 0:
+            if tps is not None and value_score is not None and value_score > 0:
                 # Show both speed and value score (value = speed^weight / cost)
-                return f"{provider}({total_samples}x, {blended_tps:.0f}t/s, {value_score:.0f}v)"
-            elif blended_tps is not None and blended_tps > 0:
-                return f"{provider}({total_samples}x, {blended_tps:.0f}t/s)"
-            elif total_samples > 0:
-                return f"{provider}({total_samples}x)"
+                return f"{provider}({sample_count}x, {tps:.0f}t/s, {value_score:.0f}v)"
+            elif tps is not None and tps > 0:
+                return f"{provider}({sample_count}x, {tps:.0f}t/s)"
+            elif sample_count > 0:
+                return f"{provider}({sample_count}x)"
             return provider
 
         candidate_info = [format_candidate(c) for c in candidates[:5]]
@@ -1180,10 +1171,9 @@ class Elelem:
             "cached_models": len(self._dynamic_routing_store._cache),
         }
 
-        # Add routing statistics from benchmark store
-        from ._benchmark_store import get_benchmark_store
-        benchmark_store = get_benchmark_store()
-        health["routing_stats"] = benchmark_store.get_routing_stats()
+        # Add routing statistics
+        from ._benchmark_store import get_routing_stats
+        health["routing_stats"] = get_routing_stats()
 
         return health
 

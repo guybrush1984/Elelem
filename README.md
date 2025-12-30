@@ -143,10 +143,10 @@ model="virtual:gpt-oss-120b-reliable"
 **Smart Routing:** Virtual models automatically reorder candidates based on performance and cost:
 
 1. **Gist benchmarks** (`gist.yaml`): Static tokens/sec measurements per provider
-2. **Dynamic observations**: Real performance from recent requests (30-min window)
+2. **Dynamic observations**: Real performance from last 5 requests per provider (2-hour window)
 3. **Blending**: Combines gist (1 sample) with dynamic stats using weighted average
 4. **Value score**: `speed^1.5 / cost` balances performance vs cost
-5. **Exploration**: 10% of requests randomly shuffle order to discover faster providers
+5. **Adaptive exploration**: 100% shuffle at cold start → 10% at steady state (scales with coverage)
 
 Example log showing routing decision:
 ```
@@ -236,17 +236,55 @@ response = await elelem.create_chat_completion(
 
 **Error handling strategy:**
 
-| Error Type | Action |
-|------------|--------|
-| **Parse error** (invalid syntax) | → Failover to next provider (infrastructure error) |
-| **Schema validation error** | → Try LLM fixer → Temperature reduction → Remove response_format (JSON only) → Failover |
-| **Rate limit** | → Exponential backoff retry on same provider |
+**Terminology:**
+- **Provider**: Inference infrastructure (baseten, novita, fireworks, cerebras...)
+- **Model ID**: How the provider names the model (e.g., `deepseek-ai/DeepSeek-V3.2`)
+- **Model reference**: Canonical ID for the underlying model, shared across providers hosting the same model (e.g., `deepseek_v32`)
+- **Candidate**: A specific provider + model combination to try
+- **Virtual model**: A routing rule with multiple candidates to try in order
+
+**Example: Virtual model with 3 candidates**
+```yaml
+virtual:deepseek-cheap:
+  candidates:
+    - baseten:deepseek/deepseek-3.2    # model_reference: deepseek_v32
+    - novita:deepseek/deepseek-3.2     # model_reference: deepseek_v32
+    - parasail:deepseek/deepseek-3.1   # model_reference: deepseek_v31
+```
+
+**Two types of errors, two failover behaviors:**
+
+| Error Type | Examples | Failover |
+|------------|----------|----------|
+| **Infrastructure error** | Timeout, connection error, truncated response | Try same model on different provider |
+| **Model error** | Schema validation fails after all retries | Skip same model, try different model |
+
+**Example: Infrastructure error (timeout)**
+```
+Request to virtual:deepseek-cheap
+  → baseten: timeout after 120s → InfrastructureError
+  → baseten enters 15-minute cooldown
+  → novita: SUCCESS ✓
+```
+
+**Example: Model error (schema validation)**
+```
+Request to virtual:deepseek-cheap with json_schema
+  → baseten: response fails schema → fixer can't fix → retries exhausted → ModelError
+  → novita: SKIPPED (same model_reference "deepseek_v32" would fail same way)
+  → parasail: try deepseek-3.1 (different model_reference "deepseek_v31")
+```
+
+**LLM fixer for schema errors:**
+When schema validation fails, Elelem calls a secondary LLM to attempt repair:
+- Fixer returns `fixable: false` (truncated/empty) → treat as infrastructure error → failover to next provider
+- Fixer returns fixed content → use it, success
+- Fixer fails to fix → reduce temperature → retry → eventually ModelError
 
 **Auto-repair features:**
 - Strips markdown code blocks (` ```json ... ``` `)
 - Fixes trailing commas, single quotes, unquoted keys
 - CSV uses tilde (`~`) for null/empty values
-- LLM fixer calls a secondary model to correct schema errors
 
 ### 3. Metrics & Cost Tracking
 
@@ -453,10 +491,12 @@ export DEEPSEEK_API_KEY="your-key"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ELELEM_EXPLORATION_EPSILON` | `0.1` | Probability of random shuffle for exploration. At 10%, 1 in 10 requests will try providers in random order instead of optimal order. This helps discover if a previously slow provider has improved. Set to `0` to always use optimal order. |
+| `ELELEM_EXPLORATION_EPSILON` | `0.1` | Minimum exploration rate (steady state). When all providers have been tested, 10% of requests shuffle randomly to detect performance changes. |
+| `ELELEM_EXPLORATION_EPSILON_MAX` | `1.0` | Maximum exploration rate (cold start). When no providers have been tested, 100% of requests shuffle randomly to gather data quickly. Scales linearly with coverage. |
 | `ELELEM_DYNAMIC_ROUTING_ENABLED` | `true` | When enabled, Elelem learns from real request performance and blends it with static benchmarks. Disable to use only gist benchmarks (or YAML order if no gist). |
 | `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` | `30` | How long (seconds) to cache aggregated performance stats before re-querying the database. Lower = more responsive to changes, higher = less DB load. |
-| `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` | `30` | Time window for performance stats. Only requests from the last N minutes are considered. Shorter windows react faster to provider issues but have less data. |
+| `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` | `120` | Time window for performance stats (default: 2 hours). Only requests from this window are considered. |
+| `ELELEM_DYNAMIC_ROUTING_MAX_SAMPLES` | `5` | Max samples per model for averaging. Uses only the N most recent requests per model within the window. Recent-biased to reflect current performance. |
 
 ### Docker Deployment
 

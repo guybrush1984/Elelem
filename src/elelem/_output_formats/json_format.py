@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from json_repair import repair_json
 from jsonschema import ValidationError, validate
 
-from .base import OutputFormat, ParseResult, ValidationResult
+from ..fixer_prompts import build_fixer_messages
+from .base import FixerResult, OutputFormat, ParseResult, ValidationResult
 
 logger = logging.getLogger("elelem")
 
@@ -130,43 +131,16 @@ class JsonFormat(OutputFormat):
     def get_fixer_messages(
         self, invalid_content: str, error: str, schema: Dict[str, Any]
     ) -> List[Dict[str, str]]:
-        """Generate JSON fixer messages."""
-        system = """You are a JSON fixer. Your task is to repair invalid JSON so it passes schema validation.
+        """Generate JSON fixer messages from YAML template."""
+        return build_fixer_messages(
+            format_name="json",
+            content=invalid_content,
+            error=error,
+            schema=schema,
+        )
 
-INSTRUCTIONS:
-1. Read the validation error carefully - it tells you exactly what is wrong and where
-2. Parse the error path to locate the exact position of the problem in the JSON
-3. Fix ONLY what the error describes - make minimal changes
-4. If a required field is missing, add it with a value that fits the context
-5. If a key has wrong type, fix the type or remove the invalid key
-
-OUTPUT FORMAT:
-Return a JSON object with exactly two keys:
-- "changes": Brief description of what you fixed (1 sentence max)
-- "fixed": The complete fixed JSON
-
-Example: {"changes": "Added missing 'id' field at path x.y", "fixed": {...}}"""
-
-        user = f"""Fix this JSON that failed schema validation.
-
-VALIDATION ERROR:
-{error}
-
-EXPECTED SCHEMA:
-{json.dumps(schema, indent=2)}
-
-INVALID JSON:
-{invalid_content}"""
-
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
-
-    def extract_fixer_result(
-        self, response_content: str
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Extract fixed JSON and changes from fixer response."""
+    def extract_fixer_result(self, response_content: str) -> FixerResult:
+        """Extract fixed JSON from fixer response."""
         content = response_content.strip()
 
         # Clean markdown if present
@@ -182,19 +156,28 @@ INVALID JSON:
         end = content.rfind("}") + 1
 
         if start < 0 or end <= start:
-            return None, None
+            return FixerResult(content=None, is_fixable=True, changes=None)
 
         json_str = content[start:end]
 
-        # Try to parse as wrapper format {"changes": "...", "fixed": {...}}
         try:
             wrapper = json.loads(json_str)
             if isinstance(wrapper, dict) and "fixed" in wrapper:
+                is_fixable = wrapper.get("fixable", True)
                 changes = wrapper.get("changes", "")
-                fixed_json = json.dumps(wrapper["fixed"], ensure_ascii=False)
-                return fixed_json, changes
+                fixed = wrapper.get("fixed")
+
+                if fixed is None:
+                    return FixerResult(
+                        content=None, is_fixable=is_fixable, changes=changes
+                    )
+
+                fixed_json = json.dumps(fixed, ensure_ascii=False)
+                return FixerResult(
+                    content=fixed_json, is_fixable=is_fixable, changes=changes
+                )
         except json.JSONDecodeError:
             pass
 
-        # Fallback: treat entire response as fixed JSON
-        return json_str, None
+        # Fallback: couldn't parse JSON wrapper
+        return FixerResult(content=None, is_fixable=True, changes=None)

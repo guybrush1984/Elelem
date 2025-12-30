@@ -70,7 +70,7 @@ Issues = "https://github.com/yourorg/elelem/issues"
 where = ["src"]
 
 [tool.setuptools.package-data]
-elelem = ["config.json", "models.yaml"]
+elelem = ["config.json", "models.yaml", "fixer_prompts/*.yaml"]
 
 [tool.setuptools_scm]
 write_to = "src/elelem/_version.py"

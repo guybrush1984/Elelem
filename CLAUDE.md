@@ -57,13 +57,20 @@ Virtual models support smart provider selection based on performance and cost:
 2. **Dynamic observations**: Real performance stats from recent requests (cached 30s, 30min window)
 3. **Blending**: `blended_tps = (gist_tps * 1 + dynamic_tps * N) / (1 + N)` where N = dynamic sample count
 4. **Value score**: `value = blended_tps^speed_weight / cost_per_1m` (speed_weight default: 1.5)
-5. **Epsilon-greedy**: 10% of requests randomly shuffle candidates for exploration
+5. **Adaptive epsilon-greedy**: Exploration scales with coverage
+   - 0% explored → 100% shuffle (cold start)
+   - 100% explored → 10% shuffle (steady state)
+   - Formula: `epsilon = min + (max - min) * unexplored_ratio`
+6. **Failure cooldown**: Failed candidates are excluded for a cooldown period (per-container, in-memory)
 
 Environment variables:
-- `ELELEM_EXPLORATION_EPSILON` - Random shuffle probability (default: 0.1 = 10%)
+- `ELELEM_EXPLORATION_EPSILON` - Min exploration rate (default: 0.1 = 10% at steady state)
+- `ELELEM_EXPLORATION_EPSILON_MAX` - Max exploration rate (default: 1.0 = 100% at cold start)
 - `ELELEM_DYNAMIC_ROUTING_ENABLED` - Enable/disable dynamic routing (default: true)
 - `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` - Stats cache TTL in seconds (default: 30)
-- `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` - Time window for stats (default: 30)
+- `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` - Time window for stats (default: 240 = 4 hours)
+- `ELELEM_DYNAMIC_ROUTING_MAX_SAMPLES` - Max samples per model for averaging (default: 5)
+- `ELELEM_DYNAMIC_ROUTING_COOLDOWN_MINUTES` - Cooldown period for failed candidates (default: 15)
 
 # Output Formats (JSON, YAML, CSV)
 
@@ -80,11 +87,48 @@ Elelem supports three structured output formats in `src/elelem/_output_formats/`
 - Tilde (`~`) for null/empty values
 - Schema uses `tables.{name}.columns.{col}` structure
 
-**Error handling flow (in core.py `_attempt_candidate`):**
-1. `FormatParseError` (syntax error) → `InfrastructureError` → failover to next provider
-2. `FormatSchemaError` (valid syntax, invalid schema) → LLM fixer → temperature reduction → remove response_format → `ModelError` → failover
+## Error Handling and Failover
 
-**LLM fixer:** On schema validation failure, calls a secondary model to fix the output. Each format has `get_fixer_messages()` and `extract_fixer_result()` methods.
+**Key files:**
+- `core.py` lines 620-665: Candidate iteration and error classification
+- `core.py` lines 839-908: Schema validation, fixer, temperature reduction
+- `_format_fixer.py`: LLM fixer logic
+- `_dynamic_routing.py`: Cooldown tracking (`mark_failed`, `get_failed_candidates`)
+
+**Two error types:**
+- `InfrastructureError`: Provider issue (timeout, truncated) → try next candidate + 15min cooldown
+- `ModelError`: Model can't handle task → skip same `model_reference` for this request only
+
+**Candidate iteration** (`core.py:625-660`):
+```python
+failed_model_refs = set()  # Local to this request, not global
+for candidate in candidates:
+    if candidate.model_reference in failed_model_refs:
+        continue  # Skip same model on different provider
+    try:
+        return await _attempt_candidate(...)
+    except InfrastructureError:
+        dynamic_routing_store.mark_failed(candidate.original_model_ref)  # 15min cooldown
+        continue  # Try next candidate
+    except ModelError:
+        failed_model_refs.add(candidate.model_reference)  # Skip same model
+        continue  # Try different model
+```
+
+**Schema validation flow** (`core.py:849-908`):
+```
+FormatSchemaError raised
+  → call_format_fixer() [_format_fixer.py]
+    → fixable=false → InfrastructureError (next candidate)
+    → fixable=true + content → SUCCESS
+    → fixable=true + null → temperature reduction → retry
+  → max retries exhausted → ModelError (skip model_reference)
+```
+
+**LLM Fixer:**
+- Prompts: `src/elelem/fixer_prompts/*.yaml`
+- Response: `{"fixable": bool, "changes": str, "fixed": content|null}`
+- CLI: `uv run fixer.py debug_dumps/xxx.json [--dry-run]`
 
 # Testing
 - When making edits to the model definitions, launching tests/test_config_validation.py is recommended (uv run pytest tests/test_config_validation.py -v)

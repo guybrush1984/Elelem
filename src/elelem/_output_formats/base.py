@@ -21,6 +21,7 @@ class ParseResult:
     content: str = None  # Cleaned/repaired content string
     error: Optional[str] = None  # Error message if parsing failed
     was_repaired: bool = False  # True if content was auto-repaired
+    column_mismatches: List[str] = None  # CSV: rows with wrong column count
 
 
 @dataclass
@@ -30,6 +31,19 @@ class ValidationResult:
     is_valid: bool
     error: Optional[str] = None  # Human-readable error message
     error_path: Optional[str] = None  # Path to error, e.g., "nodes[0].chapter"
+
+
+@dataclass
+class FixerResult:
+    """Result of fixer LLM extraction.
+
+    The fixer returns a structured response indicating whether the content
+    is fixable and what changes were made.
+    """
+
+    content: Optional[str] = None  # Fixed content string, or None if failed/unfixable
+    is_fixable: bool = True  # False if content is too incomplete to repair
+    changes: Optional[str] = None  # Description of changes made or reason if unfixable
 
 
 # =============================================================================
@@ -213,17 +227,19 @@ class OutputFormat(ABC):
         pass
 
     @abstractmethod
-    def extract_fixer_result(
-        self, response_content: str
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Extract fixed content and change description from fixer response.
+    def extract_fixer_result(self, response_content: str) -> "FixerResult":
+        """Extract fixed content from fixer response.
+
+        The fixer returns a JSON wrapper with:
+        - fixable: bool - whether the content can be repaired
+        - changes: str - description of changes or reason if unfixable
+        - fixed: content - the fixed content (format-specific) or null
 
         Args:
             response_content: Raw response from fixer LLM
 
         Returns:
-            Tuple of (fixed_content, changes_description)
-            Returns (None, None) if extraction fails
+            FixerResult with content, is_fixable flag, and changes description
         """
         pass
 
@@ -261,7 +277,15 @@ class OutputFormat(ABC):
                 format_type=self.name,
             )
 
-        # Step 3: Validate schema if provided
+        # Step 3: Check for column count mismatches (CSV-specific)
+        # This is a structural error that the fixer can correct
+        if parse_result.column_mismatches:
+            error_msg = "Column count mismatch: " + " | ".join(parse_result.column_mismatches[:5])
+            raise FormatSchemaError(
+                error_msg, content=parse_result.content, format_type=self.name
+            )
+
+        # Step 4: Validate schema if provided
         if schema:
             validation = self.validate_schema(parse_result.data, schema)
             if not validation.is_valid:

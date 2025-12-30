@@ -4,9 +4,10 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-import yaml  # For schema display in fixer
+import yaml
 
-from .base import OutputFormat, ParseResult, ValidationResult
+from ..fixer_prompts import build_fixer_messages
+from .base import FixerResult, OutputFormat, ParseResult, ValidationResult
 
 logger = logging.getLogger("elelem")
 
@@ -64,13 +65,17 @@ class CsvFormat(OutputFormat):
         return ParseResult(success=False, error="Could not detect valid CSV structure")
 
     def _try_parse(self, content: str, delimiter: str) -> ParseResult:
-        """Parse multi-table CSV with given delimiter."""
+        """Parse multi-table CSV with given delimiter.
+
+        Also tracks column count mismatches for later validation.
+        """
         tables: Dict[str, List[Dict[str, str]]] = {}
+        column_mismatches: List[str] = []  # Track column count issues
         current_table: Optional[str] = None
         headers: Optional[List[str]] = None
 
         try:
-            for line in content.strip().split("\n"):
+            for line_num, line in enumerate(content.strip().split("\n"), 1):
                 line = line.strip()
                 if not line:
                     continue
@@ -85,6 +90,13 @@ class CsvFormat(OutputFormat):
                     if headers is None:
                         headers = values
                     else:
+                        # Track column count mismatches (before padding/truncating)
+                        if len(values) != len(headers):
+                            row_idx = len(tables[current_table])
+                            column_mismatches.append(
+                                f"{current_table}[{row_idx}]: expected {len(headers)} columns, got {len(values)}"
+                            )
+
                         # Pad row to match header length (repair missing columns)
                         while len(values) < len(headers):
                             values.append("")
@@ -94,7 +106,10 @@ class CsvFormat(OutputFormat):
                         tables[current_table].append(row)
 
             if tables:
-                return ParseResult(success=True, data=tables, content=content)
+                result = ParseResult(success=True, data=tables, content=content)
+                # Attach column mismatches for validation phase
+                result.column_mismatches = column_mismatches
+                return result
 
             return ParseResult(success=False, error="No tables found")
         except Exception as e:
@@ -270,67 +285,58 @@ class CsvFormat(OutputFormat):
     def get_fixer_messages(
         self, invalid_content: str, error: str, schema: Dict[str, Any]
     ) -> List[Dict[str, str]]:
-        """Generate CSV fixer messages."""
-        system = """You are a CSV fixer. Your task is to repair invalid CSV tables so they pass validation.
+        """Generate CSV fixer messages from YAML template."""
+        return build_fixer_messages(
+            format_name="csv",
+            content=invalid_content,
+            error=error,
+            schema=schema,
+        )
 
-INSTRUCTIONS:
-1. Read the validation error carefully
-2. Fix ONLY what the error describes - make minimal changes
-3. Use semicolon (;) as delimiter
-4. Use tilde (~) for null/empty values
-5. Ensure all required columns are present
+    def extract_fixer_result(self, response_content: str) -> FixerResult:
+        """Extract fixed CSV from JSON fixer response."""
+        import json
 
-OUTPUT FORMAT:
-Return corrected CSV tables starting with:
-###TABLE:_changes
-change
-description of what you fixed
-
-Then all the corrected tables:
-###TABLE:table_name
-column1;column2;...
-value1;~;..."""
-
-        user = f"""Fix these CSV tables that failed validation.
-
-VALIDATION ERROR:
-{error}
-
-EXPECTED SCHEMA:
-{yaml.dump(schema, default_flow_style=False)}
-
-INVALID CSV:
-{invalid_content}"""
-
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
-
-    def extract_fixer_result(
-        self, response_content: str
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Extract fixed CSV and changes from fixer response."""
-        changes = None
         content = response_content.strip()
 
-        # Look for _changes table
-        if "###TABLE:_changes" in content:
-            parts = content.split("###TABLE:_changes")
-            if len(parts) > 1:
-                changes_section = parts[1].split("###TABLE:")[0]
-                lines = [
-                    line.strip()
-                    for line in changes_section.strip().split("\n")
-                    if line.strip()
-                ]
-                if len(lines) > 1:
-                    changes = lines[1]  # Skip header row
-                # Reconstruct without _changes table
-                remaining = parts[1].split("###TABLE:")[1:]
-                content = "###TABLE:" + "###TABLE:".join(remaining)
+        # Clean markdown if present
+        if content.startswith("```"):
+            lines = content.split("\n")
+            if lines[-1].strip() == "```":
+                content = "\n".join(lines[1:-1])
+            else:
+                content = "\n".join(lines[1:])
 
-        if not content.strip():
-            return None, None
+        # Find JSON boundaries
+        start = content.find("{")
+        end = content.rfind("}") + 1
 
-        return content.strip(), changes
+        if start < 0 or end <= start:
+            return FixerResult(content=None, is_fixable=True, changes=None)
+
+        json_str = content[start:end]
+
+        try:
+            wrapper = json.loads(json_str)
+            if isinstance(wrapper, dict):
+                is_fixable = wrapper.get("fixable", True)
+                changes = wrapper.get("changes", "")
+                fixed = wrapper.get("fixed")
+
+                # Handle the fixed content
+                if fixed is None:
+                    return FixerResult(
+                        content=None, is_fixable=is_fixable, changes=changes
+                    )
+
+                # fixed should be a string for CSV
+                if isinstance(fixed, str):
+                    return FixerResult(
+                        content=fixed.strip(), is_fixable=is_fixable, changes=changes
+                    )
+
+        except json.JSONDecodeError:
+            pass
+
+        # Fallback: couldn't parse JSON wrapper
+        return FixerResult(content=None, is_fixable=True, changes=None)

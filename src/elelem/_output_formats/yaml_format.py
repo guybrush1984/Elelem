@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 from jsonschema import ValidationError, validate
 
-from .base import OutputFormat, ParseResult, ValidationResult
+from ..fixer_prompts import build_fixer_messages
+from .base import FixerResult, OutputFormat, ParseResult, ValidationResult
 
 logger = logging.getLogger("elelem")
 
@@ -155,55 +156,41 @@ class YamlFormat(OutputFormat):
     def get_fixer_messages(
         self, invalid_content: str, error: str, schema: Dict[str, Any]
     ) -> List[Dict[str, str]]:
-        """Generate YAML fixer messages."""
-        system = """You are a YAML fixer. Your task is to repair invalid YAML so it passes schema validation.
+        """Generate YAML fixer messages from YAML template."""
+        return build_fixer_messages(
+            format_name="yaml",
+            content=invalid_content,
+            error=error,
+            schema=schema,
+        )
 
-INSTRUCTIONS:
-1. Read the validation error carefully
-2. Fix ONLY what the error describes - make minimal changes
-3. Ensure proper YAML indentation (2 spaces per level)
-4. Use proper YAML syntax
-
-OUTPUT FORMAT:
-Return a YAML document with two top-level keys:
-changes: "Brief description of what you fixed"
-fixed:
-  ... the complete corrected YAML structure ..."""
-
-        user = f"""Fix this YAML that failed schema validation.
-
-VALIDATION ERROR:
-{error}
-
-EXPECTED SCHEMA:
-{yaml.dump(schema, default_flow_style=False)}
-
-INVALID YAML:
-{invalid_content}"""
-
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
-
-    def extract_fixer_result(
-        self, response_content: str
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Extract fixed YAML and changes from fixer response."""
+    def extract_fixer_result(self, response_content: str) -> FixerResult:
+        """Extract fixed YAML from fixer response."""
         try:
             # First extract from markdown if present
             content = self.extract_from_markdown(response_content)
 
             wrapper = yaml.safe_load(content)
             if isinstance(wrapper, dict) and "fixed" in wrapper:
+                is_fixable = wrapper.get("fixable", True)
                 changes = wrapper.get("changes", "")
+                fixed = wrapper.get("fixed")
+
+                if fixed is None:
+                    return FixerResult(
+                        content=None, is_fixable=is_fixable, changes=changes
+                    )
+
                 fixed_yaml = yaml.dump(
-                    wrapper["fixed"],
+                    fixed,
                     allow_unicode=True,
                     default_flow_style=False,
                 )
-                return fixed_yaml, changes
+                return FixerResult(
+                    content=fixed_yaml, is_fixable=is_fixable, changes=changes
+                )
         except Exception:
             pass
 
-        return None, None
+        # Fallback: couldn't parse YAML wrapper
+        return FixerResult(content=None, is_fixable=True, changes=None)

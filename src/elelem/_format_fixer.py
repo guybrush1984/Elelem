@@ -5,6 +5,7 @@ Replaces the JSON-specific _json_fixer.py.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from ._output_formats import OutputFormat
@@ -17,6 +18,20 @@ logger = logging.getLogger("elelem")
 DEFAULT_FIXER_MODEL = "cerebras:openai/gpt-oss-120b?reasoning=medium"
 
 
+@dataclass
+class FixerOutput:
+    """Result from the format fixer.
+
+    Attributes:
+        content: Fixed content string, or None if fix failed
+        is_fixable: True if content was fixable, False if too incomplete to repair.
+                    When False, caller should failover to next provider.
+    """
+
+    content: Optional[str]
+    is_fixable: bool
+
+
 async def call_format_fixer(
     elelem_instance: "Elelem",
     format_handler: OutputFormat,
@@ -26,7 +41,7 @@ async def call_format_fixer(
     request_id: str,
     fixer_model: str = None,
     max_iterations: int = 2,
-) -> Optional[str]:
+) -> FixerOutput:
     """Call fixer LLM to repair invalid output.
 
     This is a generic fixer that works with any output format by delegating
@@ -43,11 +58,13 @@ async def call_format_fixer(
         max_iterations: Max fix attempts (default: 2)
 
     Returns:
-        Fixed content string if successful, None otherwise
+        FixerOutput with:
+        - content: Fixed content string if successful, None otherwise
+        - is_fixable: False if content was too incomplete to repair (triggers failover)
     """
     if not schema:
         logger.debug(f"[{request_id}] Fixer skipped - no schema available")
-        return None
+        return FixerOutput(content=None, is_fixable=True)
 
     model = fixer_model or DEFAULT_FIXER_MODEL
     current_content = invalid_content
@@ -78,50 +95,60 @@ async def call_format_fixer(
             response_content = response.choices[0].message.content
             if not response_content:
                 logger.warning(f"[{request_id}] {format_name} fixer returned empty response")
-                return None
+                return FixerOutput(content=None, is_fixable=True)
 
             # Extract fixed content using format-specific logic
-            fixed_content, changes = format_handler.extract_fixer_result(response_content)
-            if not fixed_content:
+            fixer_result = format_handler.extract_fixer_result(response_content)
+
+            # Check if fixer reported content as unfixable (too incomplete)
+            if not fixer_result.is_fixable:
+                logger.warning(
+                    f"[{request_id}] {format_name} fixer: unfixable - {fixer_result.changes}"
+                )
+                return FixerOutput(content=None, is_fixable=False)
+
+            if not fixer_result.content:
                 logger.warning(
                     f"[{request_id}] Could not extract fixed content from fixer response"
                 )
-                return None
+                return FixerOutput(content=None, is_fixable=True)
 
             # Validate the fix
-            parse_result = format_handler.parse(fixed_content)
+            parse_result = format_handler.parse(fixer_result.content)
             if not parse_result.success:
                 logger.warning(
                     f"[{request_id}] Fixer output failed to parse: {parse_result.error}"
                 )
-                current_content = fixed_content
+                current_content = fixer_result.content
                 current_error = f"Parse error: {parse_result.error}"
                 continue
 
             validation = format_handler.validate_schema(parse_result.data, schema)
             if validation.is_valid:
                 # Success!
-                if changes:
-                    logger.info(f"[{request_id}] ✅ {format_name} fixer: {changes}")
+                if fixer_result.changes:
+                    logger.info(f"[{request_id}] ✅ {format_name} fixer: {fixer_result.changes}")
                 else:
                     error_path = validation.error_path or "structure"
                     logger.info(
                         f"[{request_id}] ✅ {format_name} fixer repaired: {error_path}"
                     )
-                return parse_result.content
+                return FixerOutput(content=parse_result.content, is_fixable=True)
             else:
                 # Still invalid - prepare for next iteration
-                if changes:
-                    logger.info(f"[{request_id}] 🔧 {format_name} fixer partial: {changes}")
+                if fixer_result.changes:
+                    logger.info(
+                        f"[{request_id}] 🔧 {format_name} fixer partial: {fixer_result.changes}"
+                    )
                 logger.warning(f"[{request_id}] Fix still invalid: {validation.error}")
                 current_content = parse_result.content
                 current_error = validation.error
 
         except Exception as e:
             logger.warning(f"[{request_id}] {format_name} fixer failed with error: {e}")
-            return None
+            return FixerOutput(content=None, is_fixable=True)
 
     logger.warning(
         f"[{request_id}] {format_name} fixer exhausted {max_iterations} iterations"
     )
-    return None
+    return FixerOutput(content=None, is_fixable=True)

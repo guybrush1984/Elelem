@@ -422,7 +422,7 @@ class Elelem:
                 cache_tracker.cache_age_seconds = cache_age
                 cache_tracker.finalize_with_candidate(
                     self._metrics_store,
-                    selected_candidate="cache",
+                    selected_candidate=None,  # Don't pollute routing stats with cache hits
                     actual_model=model,
                     actual_provider="cache",
                     status="success",
@@ -481,11 +481,15 @@ class Elelem:
                 # Get dynamic stats for blending with gist benchmarks
                 dynamic_stats = self._dynamic_routing_store.get_dynamic_stats()
 
+                # Get failed candidates in cooldown (excluded from routing)
+                failed_candidates = self._dynamic_routing_store.get_failed_candidates()
+
                 candidates = reorder_candidates_by_benchmark(
                     candidates,
                     speed_weight=speed_weight,
                     min_tokens_per_sec=min_tokens_per_sec,
                     dynamic_stats=dynamic_stats,
+                    failed_candidates=failed_candidates,
                     logger=self.logger,
                     request_id=request_id
                 )
@@ -636,6 +640,9 @@ class Elelem:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (infra): {e}")
                 request_tracker.record_retry("candidate_iterations")
                 last_error = e
+                # Mark candidate as failed for cooldown (only for virtual models with routing)
+                if candidate.get('original_model_ref'):
+                    self._dynamic_routing_store.mark_failed(candidate['original_model_ref'])
                 # Continue to next candidate (infrastructure errors don't blacklist the model)
                 continue
             except ModelError as e:
@@ -848,7 +855,7 @@ class Elelem:
                         # Try format fixer for schema validation errors
                         fixer_succeeded = False
                         if self._json_fixer_enabled and format_schema:
-                            fixed_content = await call_format_fixer(
+                            fixer_output = await call_format_fixer(
                                 elelem_instance=self,
                                 format_handler=format_handler,
                                 invalid_content=e.content or content,
@@ -857,13 +864,22 @@ class Elelem:
                                 request_id=request_id,
                                 fixer_model=self._json_fixer_model
                             )
-                            if fixed_content:
-                                content = fixed_content
+
+                            # Check if content was unfixable (truncated/empty)
+                            # This triggers immediate failover to next provider
+                            if not fixer_output.is_fixable:
+                                raise InfrastructureError(
+                                    f"{format_handler.name.upper()} response unfixable (truncated/empty)",
+                                    provider=provider_name, model=model_name
+                                )
+
+                            if fixer_output.content:
+                                content = fixer_output.content
                                 request_tracker.record_retry("format_fixer")
                                 fixer_succeeded = True
 
                         if not fixer_succeeded:
-                            # Fixer failed or disabled - try temperature reduction
+                            # Fixer failed (but content was fixable) - try temperature reduction
                             if attempt < max_retries:
                                 if temperature_reductions and len(temperature_reductions) > 0:
                                     reduction_idx = min(attempt, len(temperature_reductions) - 1)

@@ -141,17 +141,10 @@ class RequestTracker:
     def mark_llm_start(self):
         """Mark when LLM API call starts."""
         self.llm_start_time = time.time()
-        import logging
-        logging.getLogger("elelem.metrics").info(f"[{self.request_id}] ⏱️ LLM start")
 
     def mark_llm_end(self):
         """Mark when LLM API call completes successfully."""
         self.llm_end_time = time.time()
-        import logging
-        llm_dur = self.llm_end_time - self.llm_start_time if self.llm_start_time else None
-        logging.getLogger("elelem.metrics").info(
-            f"[{self.request_id}] ⏱️ LLM end: {llm_dur:.3f}s" if llm_dur else f"[{self.request_id}] ⏱️ LLM end (no start!)"
-        )
 
     def finalize(self, status: str = 'success', **kwargs):
         """Finalize the request with outcome data.
@@ -239,16 +232,6 @@ class RequestTracker:
         llm_duration = None
         if self.llm_start_time and self.llm_end_time:
             llm_duration = self.llm_end_time - self.llm_start_time
-
-        # Log timing info for debugging dynamic routing stats
-        import logging
-        timing_logger = logging.getLogger("elelem.metrics")
-        timing_logger.info(
-            f"[{self.request_id}] 📈 Timing: total={total_duration:.3f}s, llm={llm_duration:.3f}s, "
-            f"output_tokens={self.output_tokens}, tps={self.output_tokens/llm_duration:.1f}" if llm_duration else
-            f"[{self.request_id}] 📈 Timing: total={total_duration:.3f}s, llm=None (fallback), "
-            f"output_tokens={self.output_tokens}"
-        )
 
         total_tokens = self.input_tokens + self.output_tokens
         output_tokens = self.output_tokens

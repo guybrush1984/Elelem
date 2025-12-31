@@ -141,10 +141,17 @@ class RequestTracker:
     def mark_llm_start(self):
         """Mark when LLM API call starts."""
         self.llm_start_time = time.time()
+        import logging
+        logging.getLogger("elelem.metrics").info(f"[{self.request_id}] ⏱️ LLM start")
 
     def mark_llm_end(self):
         """Mark when LLM API call completes successfully."""
         self.llm_end_time = time.time()
+        import logging
+        llm_dur = self.llm_end_time - self.llm_start_time if self.llm_start_time else None
+        logging.getLogger("elelem.metrics").info(
+            f"[{self.request_id}] ⏱️ LLM end: {llm_dur:.3f}s" if llm_dur else f"[{self.request_id}] ⏱️ LLM end (no start!)"
+        )
 
     def finalize(self, status: str = 'success', **kwargs):
         """Finalize the request with outcome data.
@@ -233,11 +240,24 @@ class RequestTracker:
         if self.llm_start_time and self.llm_end_time:
             llm_duration = self.llm_end_time - self.llm_start_time
 
+        # Log timing info for debugging dynamic routing stats
+        import logging
+        timing_logger = logging.getLogger("elelem.metrics")
+        timing_logger.info(
+            f"[{self.request_id}] 📈 Timing: total={total_duration:.3f}s, llm={llm_duration:.3f}s, "
+            f"output_tokens={self.output_tokens}, tps={self.output_tokens/llm_duration:.1f}" if llm_duration else
+            f"[{self.request_id}] 📈 Timing: total={total_duration:.3f}s, llm=None (fallback), "
+            f"output_tokens={self.output_tokens}"
+        )
+
         total_tokens = self.input_tokens + self.output_tokens
+        output_tokens = self.output_tokens
 
         # Use LLM duration for accurate tokens/sec (falls back to total_duration if not available)
         effective_duration = llm_duration if llm_duration else total_duration
-        record['total_tokens_per_second'] = total_tokens / effective_duration if effective_duration > 0 and total_tokens > 0 else 0.0
+        # Only count OUTPUT tokens for routing - input tokens (prefill) are processed instantly
+        # Output generation is what determines actual response latency
+        record['total_tokens_per_second'] = output_tokens / effective_duration if effective_duration > 0 and output_tokens > 0 else 0.0
         record['cost_per_token'] = self.total_cost_usd / total_tokens if total_tokens > 0 and self.total_cost_usd > 0 else 0.0
 
         # Add all retry counts

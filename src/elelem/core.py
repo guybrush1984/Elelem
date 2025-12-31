@@ -21,7 +21,7 @@ from ._exceptions import InfrastructureError, ModelError, JsonSchemaError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
 from ._response_processing import collect_streaming_response, ChunkTimeoutError, process_response_content
 from ._json_validation import is_json_validation_api_error  # Still needed for API error detection
-from ._provider_management import create_provider_client, initialize_providers, get_model_config
+from ._provider_management import create_provider_client, get_model_config
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
 from ._benchmark_store import reorder_candidates_by_benchmark
@@ -233,48 +233,22 @@ class Elelem:
         return extract_runtime_costs(response, cost_config, self.logger)
     
     def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
-        """Remove unsupported parameters from api_kwargs."""
-        self.logger.debug(f"[DEBUG] _cleanup_api_kwargs called for model '{model}'")
-        self.logger.debug(f"[DEBUG]   api_kwargs keys: {list(api_kwargs.keys())}")
-        self.logger.debug(f"[DEBUG]   response_format in api_kwargs: {'response_format' in api_kwargs}")
-        if 'response_format' in api_kwargs:
-            self.logger.debug(f"[DEBUG]   response_format value: {api_kwargs['response_format']}")
-
-        # Get capabilities from the passed model_config (which comes from candidate)
+        """Remove unsupported parameters from api_kwargs based on model capabilities."""
         capabilities = model_config.get("capabilities", {})
-        supports_json_mode = capabilities.get("supports_json_mode", True)
-        should_remove_rf = not supports_json_mode
-        has_response_format = "response_format" in api_kwargs
 
-        self.logger.debug(f"[DEBUG]   capabilities from model_config: {capabilities}")
-        self.logger.debug(f"[DEBUG]   supports_json_mode: {supports_json_mode}")
-        self.logger.debug(f"[DEBUG]   should_remove_rf: {should_remove_rf}")
-        self.logger.debug(f"[DEBUG]   has response_format: {has_response_format}")
-
-        if should_remove_rf and has_response_format:
-            self.logger.debug(f"[DEBUG] REMOVING response_format for {model} (not supported)")
+        # Remove response_format if model doesn't support JSON mode
+        if not capabilities.get("supports_json_mode", True) and "response_format" in api_kwargs:
+            self.logger.debug(f"Removing response_format for {model} (not supported)")
             api_kwargs.pop("response_format")
-        else:
-            if not should_remove_rf:
-                self.logger.debug(f"[DEBUG] NOT removing response_format - model supports JSON mode")
-            if not has_response_format:
-                self.logger.debug(f"[DEBUG] NOT removing response_format - not present in kwargs")
 
         # Remove temperature if not supported
-        if not capabilities.get("supports_temperature", True):
-            if "temperature" in api_kwargs:
-                self.logger.debug(f"Removing temperature for {model} (not supported)")
-                api_kwargs.pop("temperature")
+        if not capabilities.get("supports_temperature", True) and "temperature" in api_kwargs:
+            self.logger.debug(f"Removing temperature for {model} (not supported)")
+            api_kwargs.pop("temperature")
 
         # Remove Elelem-specific parameters that should not be passed to provider APIs
-        if "enforce_schema_in_prompt" in api_kwargs:
-            api_kwargs.pop("enforce_schema_in_prompt")
-        if "yaml_schema" in api_kwargs:
-            api_kwargs.pop("yaml_schema")
-        if "csv_schema" in api_kwargs:
-            api_kwargs.pop("csv_schema")
-
-        self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
+        for param in ["enforce_schema_in_prompt", "yaml_schema", "csv_schema"]:
+            api_kwargs.pop(param, None)
 
     def _process_response_content(self, response: Any, format_handler: OutputFormat = None) -> str:
         """Process and clean response content."""
@@ -718,13 +692,8 @@ class Elelem:
                                       candidate, stats_model_name, self.config, provider_name)
 
         # Clean up unsupported parameters for this candidate model
-        self.logger.debug(f"[{request_id}] Full candidate dict: {candidate}")
         candidate_key = candidate.get('model', f"{provider_name}:{model_name}")
-        self.logger.debug(f"[{request_id}] Candidate key: {candidate_key}")
-        self.logger.debug(f"[{request_id}] Capabilities passed to cleanup: {capabilities}")
-        self.logger.debug(f"[{request_id}] Before cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
         self._cleanup_api_kwargs(api_kwargs, candidate_key, {'capabilities': capabilities})
-        self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
 
         # Preprocess messages for structured output formats
         enforce_schema_in_prompt = kwargs.get('enforce_schema_in_prompt', False)

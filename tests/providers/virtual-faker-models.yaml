@@ -103,3 +103,11 @@ models:
     candidates:
       - model: "virtual:faker-model-error-inner"  # Will be flattened, both fail with same model_ref
       - model: "faker:basic"                       # Different model_reference - should succeed
+
+  # Virtual inheriting from virtual with routing override only
+  # Use case: -cheap variants that just change speed_weight
+  "virtual:faker-benchmark-cheap":
+    routing:
+      speed_weight: 0.3  # Favor cost over speed (different from parent's 1.0)
+    candidates:
+      - model: "virtual:faker-benchmark-test"  # Inherits all candidates from parent

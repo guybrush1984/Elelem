@@ -89,7 +89,9 @@ from elelem._benchmark_store import get_routing_stats as get_exploration_stats
 from elelem.server.models import (
     ChatCompletionRequest,
     ErrorResponse,
-    HealthResponse
+    HealthResponse,
+    WarmupRequest,
+    WarmupResponse,
 )
 
 # Configure logging
@@ -289,15 +291,19 @@ async def get_routing_stats():
     # Get dynamic routing store from elelem instance
     routing_store = elelem._dynamic_routing_store
 
-    # Get dynamic stats
+    # Get dynamic stats, sorted by model (after :) then by speed (descending)
     dynamic_stats = routing_store.get_dynamic_stats()
+    sorted_stats = sorted(
+        dynamic_stats.items(),
+        key=lambda x: (x[0].split(':', 1)[1] if ':' in x[0] else x[0], -x[1].avg_tokens_per_sec)
+    )
     dynamic_data = {
         model_ref: {
             "avg_tokens_per_sec": round(stats.avg_tokens_per_sec, 1),
             "sample_count": stats.sample_count,
             "last_updated": stats.last_updated.isoformat() if stats.last_updated else None
         }
-        for model_ref, stats in dynamic_stats.items()
+        for model_ref, stats in sorted_stats
     }
 
     # Get failed candidates in cooldown
@@ -338,6 +344,67 @@ async def get_routing_stats():
         "dynamic_stats": dynamic_data,
         "failed_candidates": failed_with_time,
     }
+
+
+async def _run_warmup(candidates: list, prompt: str, parallel: bool):
+    """Background task to call all candidates for warmup."""
+    import asyncio
+
+    async def call_one(c):
+        try:
+            await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                model=c.get('original_model_ref', c.get('model')),
+                cache=False, tags=["warmup"]
+            )
+            logger.info(f"🔥 Warmup OK: {c.get('provider')}:{c.get('model_id')}")
+        except Exception as e:
+            logger.warning(f"🔥 Warmup FAIL: {c.get('provider')}:{c.get('model_id')} - {e}")
+
+    if parallel:
+        await asyncio.gather(*[call_one(c) for c in candidates])
+    else:
+        for c in candidates:
+            await call_one(c)
+
+    elelem._dynamic_routing_store.invalidate_cache()
+    logger.info(f"🔥 Warmup complete: {len(candidates)} candidates tested")
+
+
+@app.post("/v1/routing/warmup", response_model=WarmupResponse)
+async def warmup_routing(request: WarmupRequest):
+    """Warmup routing by calling each candidate directly to populate metrics.
+
+    Returns immediately after validating request. Warmup runs in background.
+    Check /v1/routing/stats to see results as they populate.
+    """
+    import asyncio
+
+    # Validate models and collect candidates
+    all_candidates = []
+    errors = []
+
+    for virtual_model in request.models:
+        try:
+            candidates = elelem.config.get_model_config(virtual_model).get('candidates', [])
+            available = [c for c in candidates if elelem._ensure_provider_initialized(c.get('provider'))]
+            all_candidates.extend(available)
+        except ValueError as e:
+            errors.append(f"{virtual_model}: {e}")
+
+    if errors and not all_candidates:
+        raise HTTPException(status_code=400, detail={"errors": errors})
+
+    prompt = request.prompt or f"It's {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}. Write a poem on LLMs in about 100 words."
+
+    asyncio.create_task(_run_warmup(all_candidates, prompt, request.parallel))
+
+    return WarmupResponse(
+        status="started",
+        models=request.models,
+        total_candidates=len(all_candidates),
+        message=f"Warmup started for {len(all_candidates)} candidates. Check /v1/routing/stats for results."
+    )
 
 
 @app.post("/v1/chat/completions")
@@ -522,6 +589,8 @@ async def root():
             "chat_completions": "/v1/chat/completions",
             "models": "/v1/models",
             "health": "/health",
+            "routing_stats": "/v1/routing/stats",
+            "routing_warmup": "/v1/routing/warmup",
             "metrics_summary": "/v1/metrics/summary",
             "metrics_data": "/v1/metrics/data"
         }

@@ -404,6 +404,32 @@ class TestElelemWithFaker:
         assert len(requests) == 2, f"Expected 2 requests (skipping same model_ref from chained virtual), got {len(requests)}"
 
     @pytest.mark.asyncio
+    async def test_virtual_inherits_candidates_with_routing_override(self, elelem_with_faker_env):
+        """Test virtual model inheriting from another virtual with routing override.
+
+        Use case: -cheap variants that just change speed_weight while
+        inheriting all candidates from the parent virtual.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        # Get config for the "cheap" variant that references another virtual
+        config_cheap = elelem.config.get_model_config("virtual:faker-benchmark-cheap")
+        config_parent = elelem.config.get_model_config("virtual:faker-benchmark-test")
+
+        # Verify routing is different
+        assert config_cheap['routing']['speed_weight'] == 0.3, "Cheap variant should have speed_weight=0.3"
+        assert config_parent['routing']['speed_weight'] == 1.0, "Parent should have speed_weight=1.0"
+
+        # Verify candidates are inherited (flattened from parent)
+        assert len(config_cheap['candidates']) == len(config_parent['candidates']), \
+            f"Cheap variant should inherit all {len(config_parent['candidates'])} candidates from parent"
+
+        # Verify candidate providers match
+        cheap_providers = [c['provider'] for c in config_cheap['candidates']]
+        parent_providers = [c['provider'] for c in config_parent['candidates']]
+        assert cheap_providers == parent_providers, "Candidate providers should match parent"
+
+    @pytest.mark.asyncio
     async def test_request_validation_through_elelem(self, elelem_with_faker_env):
         """Test that requests through Elelem are properly formatted."""
         elelem, faker = elelem_with_faker_env

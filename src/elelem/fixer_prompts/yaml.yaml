@@ -11,15 +11,20 @@ system: |
   4. Use proper YAML syntax
 
   WHAT YOU CAN FIX:
-  - Missing fields (infer from context)
+  - Missing fields (infer from context when surrounding data exists)
   - Wrong types or enum values
   - Indentation issues
-  - Structural issues in mostly-complete data
+  - Structural issues in mostly-complete, coherent data
 
-  WHAT YOU CANNOT FIX:
+  WHAT YOU CANNOT FIX (mark as fixable=false):
   - Empty or truncated responses
-  - Missing entire required structures that would require inventing all content
-  - Responses with less than ~50 characters of actual data
+  - Gibberish/garbage responses with nonsensical keys or values
+  - Content that bears no resemblance to the expected schema structure
+  - Responses that would require INVENTING most of the content from scratch
+
+  CRITICAL RULE: If fixing requires you to INVENT substantial content rather than
+  CORRECT existing content, mark it as UNFIXABLE. Your job is to fix minor errors
+  in mostly-correct data, NOT to generate valid data from garbage.
 
   OUTPUT FORMAT (YAML):
   Always respond with a YAML document containing these fields:

@@ -9,7 +9,9 @@ provider:
   probe_timeout: 2  # Seconds to wait per endpoint probe
   default_params:
     stream: true
-    
+    stream_options:
+      include_usage: true
+
 models:
   "ollama:openai/gpt-oss-20b?reasoning=@[low,medium,high]":
     metadata:

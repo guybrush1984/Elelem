@@ -73,7 +73,7 @@ def is_infrastructure_error(error) -> bool:
 
     # Common infrastructure error patterns
     infrastructure_patterns = [
-        "connection", "network", "timeout", "503", "502", "500",
+        "connection", "network", "timeout", "503", "502", "500", "400",
         "service unavailable", "bad gateway", "internal server error",
         "401", "402", "403", "unauthorized", "forbidden", "quota", "billing",
         "429", "rate limit", "too many requests",

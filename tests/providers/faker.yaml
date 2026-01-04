@@ -231,7 +231,10 @@ models:
       currency: USD
 
   # Benchmark routing test models - different speeds and costs for testing
-  # Fast provider - high speed, medium cost (high value score)
+  # Assumed speeds: fast=100 t/s, medium=50 t/s, slow=10 t/s
+  # Value = speed / output_cost
+  #
+  # Fast provider - 100 t/s, low cost → value = 100/0.20 = 500 (highest)
   "faker:fast-provider":
     provider: faker
     model_id: fast-provider
@@ -240,11 +243,11 @@ models:
       supports_temperature: true
       supports_system: true
     cost:
-      input_cost_per_1m: 0.20
-      output_cost_per_1m: 0.50
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.20
       currency: USD
 
-  # Slow provider - low speed, low cost (low value score)
+  # Slow provider - 10 t/s, high cost → value = 10/0.50 = 20 (lowest)
   "faker:slow-provider":
     provider: faker
     model_id: slow-provider
@@ -253,11 +256,11 @@ models:
       supports_temperature: true
       supports_system: true
     cost:
-      input_cost_per_1m: 0.05
-      output_cost_per_1m: 0.10
+      input_cost_per_1m: 0.25
+      output_cost_per_1m: 0.50
       currency: USD
 
-  # Medium provider - medium speed, medium cost
+  # Medium provider - 50 t/s, medium cost → value = 50/0.25 = 200 (middle)
   "faker:medium-provider":
     provider: faker
     model_id: medium-provider

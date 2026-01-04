@@ -53,10 +53,15 @@ jobs:
         echo "💾 Running cache tests (SQLite-based unit tests)..."
         uv run pytest tests/test_cache.py -v
 
-    - name: Run benchmark store tests
+    - name: Run dynamic routing tests
       run: |
-        echo "📊 Running benchmark store tests..."
-        uv run pytest tests/test_benchmark_store.py -v
+        echo "🎲 Running dynamic routing tests..."
+        uv run pytest tests/test_dynamic_routing.py -v
+
+    - name: Run output format tests
+      run: |
+        echo "📋 Running output format tests..."
+        uv run pytest tests/test_output_formats.py -v
 
     - name: Log in to Docker Hardened Images (dhi.io)
       # Required for Docker Compose integration tests

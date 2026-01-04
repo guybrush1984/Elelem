@@ -276,8 +276,14 @@ def extract_yaml_from_markdown(content: str, logger: logging.Logger) -> str:
     return content
 
 
-def process_response_content(response: Any, json_mode_requested: bool, yaml_mode_requested: bool, logger: logging.Logger) -> str:
-    """Process and clean response content."""
+def process_response_content(response: Any, logger: logging.Logger = None, format_handler: Any = None) -> str:
+    """Process and clean response content.
+
+    Args:
+        response: The API response object
+        logger: Logger instance
+        format_handler: Optional OutputFormat handler for markdown extraction
+    """
     # Check finish_reason first - this should always be present
     finish_reason = getattr(response.choices[0], 'finish_reason', None)
     if finish_reason != 'stop':
@@ -296,24 +302,22 @@ def process_response_content(response: Any, json_mode_requested: bool, yaml_mode
 
     # Handle None content (some providers may return None for empty responses)
     if content is None:
-        logger.warning("Response content is None despite finish_reason being 'stop'")
+        if logger:
+            logger.warning("Response content is None despite finish_reason being 'stop'")
         content = ""
 
     # Handle content as list (structured content parts) or string
     if isinstance(content, list):
-        logger.debug(f"Content is a list with {len(content)} parts")
+        if logger:
+            logger.debug(f"Content is a list with {len(content)} parts")
         _, response_text = extract_text_from_content_parts(content, logger)
         content = response_text or ""
 
     # Remove think tags if present
     content = remove_think_tags(content, logger)
 
-    # Extract JSON from markdown if JSON mode was requested
-    if json_mode_requested:
-        content = extract_json_from_markdown(content, logger)
-
-    # Extract YAML from markdown if YAML mode was requested
-    if yaml_mode_requested:
-        content = extract_yaml_from_markdown(content, logger)
+    # Extract from markdown using format handler if provided
+    if format_handler is not None:
+        content = format_handler.extract_from_markdown(content)
 
     return content

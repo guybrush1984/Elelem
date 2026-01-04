@@ -140,7 +140,7 @@ models:
       stream: true
       reasoning_effort: $reasoning
 
-  # DeepSeek V3.2 - non-reasoning (requires reasoning_effort=none to disable)
+  # DeepSeek V3.2 - non-reasoning (reasoning_effort=false disables reasoning)
   "fireworks:deepseek/deepseek-3.2":
     metadata:
       model_reference: "deepseek_v32"
@@ -155,7 +155,7 @@ models:
       output_cost_per_1m: 1.68
       currency: USD
     default_params:
-      reasoning_effort: none
+      reasoning_effort: "false"
 
   # DeepSeek V3.2 - reasoning enabled
   "fireworks:deepseek/deepseek-3.2?reasoning":

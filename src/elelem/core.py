@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import time
-import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any
 import openai
@@ -20,14 +19,18 @@ from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
 from ._exceptions import InfrastructureError, ModelError, JsonSchemaError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
-from ._response_processing import collect_streaming_response, ChunkTimeoutError, remove_think_tags, extract_json_from_markdown, extract_yaml_from_markdown, process_response_content
-from ._json_validation import validate_json_schema, is_json_validation_api_error, add_json_instructions_to_messages, validate_json_response
-from ._yaml_validation import validate_yaml_schema, add_yaml_instructions_to_messages, validate_yaml_response
-from ._provider_management import create_provider_client, initialize_providers, get_model_config
+from ._response_processing import collect_streaming_response, ChunkTimeoutError, process_response_content
+from ._json_validation import is_json_validation_api_error  # Still needed for API error detection
+from ._provider_management import create_provider_client, get_model_config
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
 from ._request_execution import prepare_api_kwargs
 from ._benchmark_store import reorder_candidates_by_benchmark
-from ._json_fixer import call_json_fixer
+from ._dynamic_routing import DynamicRoutingStore
+from ._output_formats import FormatRegistry, FormatParseError, FormatSchemaError, OutputFormat
+from ._format_fixer import call_format_fixer
+from ._request_id import generate_request_id
+from ._request_state import RequestState, RequestContext
+from ._request_handlers import RequestStateMachine
 
 
 class Elelem:
@@ -53,6 +56,11 @@ class Elelem:
 
         # Initialize metrics system (unified SQLAlchemy backend)
         self._metrics_store = MetricsStore()
+
+        # Initialize dynamic routing store (for performance-based provider selection)
+        self._dynamic_routing_store = DynamicRoutingStore(
+            metrics_store=self._metrics_store
+        )
 
         # Initialize cache if enabled (shares database with metrics)
         if cache_enabled:
@@ -212,115 +220,39 @@ class Elelem:
         """
         return await collect_streaming_response(stream, logger=self.logger, request_id=request_id, chunk_timeout=chunk_timeout)
         
-    def _remove_think_tags(self, content: str) -> str:
-        """Remove <think>...</think> tags from content."""
-        return remove_think_tags(content, self.logger)
-        
-    def _extract_json_from_markdown(self, content: str) -> str:
-        """Extract JSON from markdown code blocks."""
-        return extract_json_from_markdown(content, self.logger)
-        
-    def _validate_json_schema(self, json_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Validate a JSON object against a JSON Schema."""
-        return validate_json_schema(json_obj, schema)
-        
     def _is_json_validation_api_error(self, error: Exception) -> bool:
         """Check if the error is a json_validate_failed API error."""
         return is_json_validation_api_error(error)
-        
-    def _add_json_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict, json_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
-        """Add JSON formatting instructions to messages when response_format is JSON."""
-        supports_system = capabilities.get("supports_system", True)
-        return add_json_instructions_to_messages(messages, supports_system, json_schema, enforce_schema_in_prompt)
-
-    def _extract_yaml_from_markdown(self, content: str) -> str:
-        """Extract YAML from markdown code blocks."""
-        return extract_yaml_from_markdown(content, self.logger)
-
-    def _validate_yaml_schema(self, yaml_obj: Any, schema: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Validate a YAML object against a JSON Schema."""
-        return validate_yaml_schema(yaml_obj, schema)
-
-    def _add_yaml_instructions_to_messages(self, messages: List[Dict[str, str]], capabilities: Dict, yaml_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
-        """Add YAML formatting instructions to messages when YAML mode is requested."""
-        supports_system = capabilities.get("supports_system", True)
-        return add_yaml_instructions_to_messages(messages, supports_system, yaml_schema, enforce_schema_in_prompt)
-
-    def _validate_yaml_response(self, content: str, yaml_schema: Any) -> None:
-        """Validate YAML response content and schema."""
-        validate_yaml_response(content, yaml_schema)
 
     def _calculate_costs(self, model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0, runtime_costs: Dict = None, candidate_cost_config: Dict = None) -> Dict[str, float]:
         """Calculate costs based on model pricing or runtime data from provider."""
         return calculate_costs(model, input_tokens, output_tokens, reasoning_tokens, runtime_costs, candidate_cost_config, self.logger)
-    
+
     def _extract_runtime_costs(self, response, cost_config: str) -> Dict[str, Any]:
         """Extract runtime cost information from response when cost config is 'runtime'."""
         return extract_runtime_costs(response, cost_config, self.logger)
-        
-    
-    
-    def _preprocess_messages(self, messages: List[Dict[str, str]], model: str, json_mode_requested: bool, yaml_mode_requested: bool, capabilities: Dict, json_schema: Optional[Dict] = None, yaml_schema: Optional[Dict] = None, enforce_schema_in_prompt: bool = False) -> List[Dict[str, str]]:
-        """Preprocess messages for the request."""
-        if json_mode_requested:
-            # Always add JSON instructions when JSON is requested
-            # Include schema in instructions only if enforce_schema_in_prompt is True
-            return self._add_json_instructions_to_messages(messages, capabilities, json_schema, enforce_schema_in_prompt)
-        elif yaml_mode_requested:
-            # Always add YAML instructions when YAML is requested (client-side only)
-            # Include schema in instructions only if enforce_schema_in_prompt is True
-            return self._add_yaml_instructions_to_messages(messages, capabilities, yaml_schema, enforce_schema_in_prompt)
-        return messages
     
     def _cleanup_api_kwargs(self, api_kwargs: Dict, model: str, model_config: Dict) -> None:
-        """Remove unsupported parameters from api_kwargs."""
-        self.logger.debug(f"[DEBUG] _cleanup_api_kwargs called for model '{model}'")
-        self.logger.debug(f"[DEBUG]   api_kwargs keys: {list(api_kwargs.keys())}")
-        self.logger.debug(f"[DEBUG]   response_format in api_kwargs: {'response_format' in api_kwargs}")
-        if 'response_format' in api_kwargs:
-            self.logger.debug(f"[DEBUG]   response_format value: {api_kwargs['response_format']}")
-
-        # Get capabilities from the passed model_config (which comes from candidate)
+        """Remove unsupported parameters from api_kwargs based on model capabilities."""
         capabilities = model_config.get("capabilities", {})
-        supports_json_mode = capabilities.get("supports_json_mode", True)
-        should_remove_rf = not supports_json_mode
-        has_response_format = "response_format" in api_kwargs
 
-        self.logger.debug(f"[DEBUG]   capabilities from model_config: {capabilities}")
-        self.logger.debug(f"[DEBUG]   supports_json_mode: {supports_json_mode}")
-        self.logger.debug(f"[DEBUG]   should_remove_rf: {should_remove_rf}")
-        self.logger.debug(f"[DEBUG]   has response_format: {has_response_format}")
-
-        if should_remove_rf and has_response_format:
-            self.logger.debug(f"[DEBUG] REMOVING response_format for {model} (not supported)")
+        # Remove response_format if model doesn't support JSON mode
+        if not capabilities.get("supports_json_mode", True) and "response_format" in api_kwargs:
+            self.logger.debug(f"Removing response_format for {model} (not supported)")
             api_kwargs.pop("response_format")
-        else:
-            if not should_remove_rf:
-                self.logger.debug(f"[DEBUG] NOT removing response_format - model supports JSON mode")
-            if not has_response_format:
-                self.logger.debug(f"[DEBUG] NOT removing response_format - not present in kwargs")
 
         # Remove temperature if not supported
-        if not capabilities.get("supports_temperature", True):
-            if "temperature" in api_kwargs:
-                self.logger.debug(f"Removing temperature for {model} (not supported)")
-                api_kwargs.pop("temperature")
+        if not capabilities.get("supports_temperature", True) and "temperature" in api_kwargs:
+            self.logger.debug(f"Removing temperature for {model} (not supported)")
+            api_kwargs.pop("temperature")
 
         # Remove Elelem-specific parameters that should not be passed to provider APIs
-        if "enforce_schema_in_prompt" in api_kwargs:
-            api_kwargs.pop("enforce_schema_in_prompt")
-        if "yaml_schema" in api_kwargs:
-            api_kwargs.pop("yaml_schema")
+        for param in ["enforce_schema_in_prompt", "yaml_schema", "csv_schema"]:
+            api_kwargs.pop(param, None)
 
-        self.logger.debug(f"[DEBUG] _cleanup_api_kwargs finished. Final response_format in api_kwargs: {'response_format' in api_kwargs}")
-
-    def _process_response_content(self, response: Any, json_mode_requested: bool, yaml_mode_requested: bool) -> str:
+    def _process_response_content(self, response: Any, format_handler: OutputFormat = None) -> str:
         """Process and clean response content."""
-        return process_response_content(response, json_mode_requested, yaml_mode_requested, self.logger)
-    
-    def _validate_json_response(self, content: str, json_schema: Any, api_error: Exception, request_id: str = None) -> str:
-        """Validate JSON response content and schema. Returns possibly repaired content."""
-        return validate_json_response(content, json_schema, api_error, request_id)
+        return process_response_content(response, self.logger, format_handler)
 
     def _dump_validation_debug(self, request_id: str, messages: List[Dict[str, str]],
                                 api_kwargs: Dict[str, Any], content: str, error: Exception,
@@ -417,8 +349,8 @@ class Elelem:
         Returns:
             OpenAI-compatible response dictionary
         """
-        # Generate unique request ID for tracking
-        request_id = str(uuid.uuid4())[:8]
+        # Generate human-readable request ID for tracking
+        request_id = generate_request_id()
         start_time = time.time()
 
         # Normalize tags
@@ -466,7 +398,7 @@ class Elelem:
                 cache_tracker.cache_age_seconds = cache_age
                 cache_tracker.finalize_with_candidate(
                     self._metrics_store,
-                    selected_candidate="cache",
+                    selected_candidate=None,  # Don't pollute routing stats with cache hits
                     actual_model=model,
                     actual_provider="cache",
                     status="success",
@@ -521,11 +453,21 @@ class Elelem:
             if routing:
                 speed_weight = routing.get('speed_weight', 1.0)
                 min_tokens_per_sec = routing.get('min_tokens_per_sec', 0.0)
+
+                # Get dynamic stats for routing decisions
+                dynamic_stats = self._dynamic_routing_store.get_dynamic_stats()
+
+                # Get failed candidates in cooldown (excluded from routing)
+                failed_candidates = self._dynamic_routing_store.get_failed_candidates()
+
                 candidates = reorder_candidates_by_benchmark(
                     candidates,
                     speed_weight=speed_weight,
                     min_tokens_per_sec=min_tokens_per_sec,
-                    logger=self.logger
+                    dynamic_stats=dynamic_stats,
+                    failed_candidates=failed_candidates,
+                    logger=self.logger,
+                    request_id=request_id
                 )
 
         except ValueError as e:
@@ -570,12 +512,31 @@ class Elelem:
         yaml_schema = kwargs.get("yaml_schema")
         yaml_mode_requested = yaml_schema is not None
 
-        # Validate mutual exclusivity between JSON and YAML
-        if json_mode_requested and yaml_mode_requested:
+        # Detect CSV mode request (Elelem-specific, client-side only)
+        csv_schema = kwargs.get("csv_schema")
+        csv_mode_requested = csv_schema is not None
+
+        # Validate mutual exclusivity between JSON, YAML, and CSV
+        active_formats = sum([json_mode_requested, yaml_mode_requested, csv_mode_requested])
+        if active_formats > 1:
             raise ValueError(
-                "Cannot use both JSON and YAML modes simultaneously. "
-                "Provide either response_format with json_object/json_schema OR yaml_schema, not both."
+                "Cannot use multiple output formats simultaneously. "
+                "Provide only one of: response_format (json_object/json_schema), yaml_schema, or csv_schema."
             )
+
+        # Resolve format handler for new abstraction layer
+        format_handler: Optional[OutputFormat] = None
+        format_schema = None
+        if json_mode_requested:
+            format_handler = FormatRegistry.get("json")
+            format_schema = json_schema
+        elif yaml_mode_requested:
+            format_handler = FormatRegistry.get("yaml")
+            format_schema = yaml_schema
+        elif csv_mode_requested:
+            format_handler = FormatRegistry.get("csv")
+            format_schema = csv_schema
+            self.logger.debug(f"[{request_id}] CSV format requested (client-side validation)")
 
         # Get original temperature
         original_temperature = kwargs.get("temperature", 1.0)
@@ -585,6 +546,8 @@ class Elelem:
             kwargs.pop("json_schema")
         if "yaml_schema" in kwargs:
             kwargs.pop("yaml_schema")
+        if "csv_schema" in kwargs:
+            kwargs.pop("csv_schema")
 
         # Warn if json_schema provided without JSON response format
         if json_schema and not json_mode_requested:
@@ -593,24 +556,39 @@ class Elelem:
                 "Schema validation will be skipped."
             )
         
-        # Build list of candidate providers for logging (with benchmark scores if available)
+        # Build list of candidate providers for logging (with routing info)
+        # Format: provider(Nx, XXXt/s, YYYv) where N = samples, v = value score (speed^weight/cost)
         def format_candidate(c):
             provider = c.get('provider')
-            score = c.get('_benchmark_score')
-            if score is not None:
-                return f"{provider}({score:.1f})"
+            tps = c.get('_tps')
+            value_score = c.get('_value_score')
+            sample_count = c.get('_sample_count', 0)
+
+            if tps is not None and value_score is not None and value_score > 0:
+                # Show both speed and value score (value = speed^weight / cost)
+                return f"{provider}({sample_count}x, {tps:.0f}t/s, {value_score:.0f}v)"
+            elif tps is not None and tps > 0:
+                return f"{provider}({sample_count}x, {tps:.0f}t/s)"
+            elif sample_count > 0:
+                return f"{provider}({sample_count}x)"
             return provider
-        candidate_info = [format_candidate(c) for c in candidates]
-        self.logger.info(f"[{request_id}] 🚀 Starting {model} with {len(candidates)} candidate(s): {', '.join(candidate_info)} (temp={original_temperature})")
+
+        candidate_info = [format_candidate(c) for c in candidates[:5]]
+        if len(candidates) > 5:
+            candidate_info.append(f"+{len(candidates)-5}")
+        self.logger.info(f"[{request_id}] 🚀 {model} → [{', '.join(candidate_info)}] (temp={original_temperature})")
         if json_mode_requested:
             self.logger.debug(f"[{request_id}] 📋 JSON mode requested")
         if yaml_mode_requested:
             self.logger.debug(f"[{request_id}] 📄 YAML mode requested")
+        if csv_mode_requested:
+            self.logger.debug(f"[{request_id}] 📊 CSV mode requested")
         
         # Iterate through candidates
         # Track failed model_references to skip candidates with the same underlying model
         failed_model_refs = set()
         last_error = None
+        cumulative_path = []  # Track full journey across all candidates
 
         for candidate_idx, candidate in enumerate(candidates):
             # Skip candidates whose model_reference has already failed with ModelError
@@ -623,13 +601,18 @@ class Elelem:
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
-                    json_mode_requested, json_schema, yaml_mode_requested, yaml_schema,
-                    original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs
+                    format_handler, format_schema,
+                    original_temperature, tags, cache, cache_key, start_time, request_tracker,
+                    cumulative_path=cumulative_path, **kwargs
                 )
             except InfrastructureError as e:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (infra): {e}")
+                cumulative_path.append("NEXT_CANDIDATE")
                 request_tracker.record_retry("candidate_iterations")
                 last_error = e
+                # Mark candidate as failed for cooldown (only for virtual models with routing)
+                if candidate.get('original_model_ref'):
+                    self._dynamic_routing_store.mark_failed(candidate['original_model_ref'])
                 # Continue to next candidate (infrastructure errors don't blacklist the model)
                 continue
             except ModelError as e:
@@ -637,6 +620,7 @@ class Elelem:
                 if candidate_model_ref:
                     failed_model_refs.add(candidate_model_ref)
                     self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (model): {e} - skipping model_reference '{candidate_model_ref}'")
+                    cumulative_path.append("SKIP_MODEL")
                     request_tracker.record_retry("candidate_iterations")
                     last_error = e
                     # Continue to find a candidate with a different model_reference
@@ -657,13 +641,32 @@ class Elelem:
     
     async def _attempt_candidate(self, candidate, candidate_idx, total_candidates,
                                 messages, original_model, model_config, request_id,
-                                json_mode_requested, json_schema, yaml_mode_requested, yaml_schema,
-                                original_temperature, tags, cache, cache_key, start_time, request_tracker, **kwargs):
-        """Attempt to complete request with a specific candidate."""
-        
+                                format_handler: Optional[OutputFormat], format_schema: Optional[Dict],
+                                original_temperature, tags, cache, cache_key, start_time, request_tracker,
+                                cumulative_path: list = None, **kwargs):
+        """Attempt to complete request with a specific candidate.
+
+        Uses the RequestStateMachine to process the request through explicit states:
+            CALL_API → EXTRACT_TOKENS → VALIDATE_FORMAT → TRY_FIXER → REDUCE_TEMPERATURE
+
+        Terminal states:
+            SUCCESS → return response
+            NEXT_CANDIDATE → raise InfrastructureError (try next provider)
+            SKIP_MODEL → raise ModelError (skip same model_reference)
+
+        Args:
+            format_handler: OutputFormat handler (json, yaml, csv) or None if no format requested
+            format_schema: Schema for validation, or None
+            cumulative_path: List to accumulate state path across all candidate attempts
+        """
+        if cumulative_path is None:
+            cumulative_path = []
+        # === Setup phase (unchanged) ===
+
         # Get timeout for this candidate
         timeout = self.config.get_candidate_timeout(candidate, model_config)
-        
+        chunk_timeout = self.config.get_candidate_chunk_timeout(candidate, model_config)
+
         # Setup provider and model for this candidate
         provider_name = candidate['provider']
         model_name = candidate['model_id']
@@ -674,338 +677,194 @@ class Elelem:
         if provider_name in self._token_providers:
             token = self._token_providers[provider_name].get_token()
             provider_client.api_key = token
-        
+
         # Use original model reference for statistics (cost lookup)
-        # For virtual models: use the original model reference (e.g., "parasail:gpt-oss-120b")
-        # For regular models: use the original requested model name (e.g., "fireworks:deepseek-v3p1")
         stats_model_name = candidate.get('original_model_ref', original_model)
         candidate_model_name = f"{provider_name}:{model_name}"
-        
+
         self.logger.info(f"[{request_id}] 🎯 Candidate {candidate_idx}/{total_candidates}: {candidate_model_name} (timeout={timeout}s)")
-        
+
         # Get provider configuration for defaults
         provider_config = self.config.get_provider_config(provider_name)
 
         # Prepare API parameters with proper precedence
-        # Use stats_model_name (candidate's original_model_ref) for extra_body lookup
         api_kwargs = prepare_api_kwargs(kwargs, original_temperature, provider_config,
                                       candidate, stats_model_name, self.config, provider_name)
-        
+
         # Clean up unsupported parameters for this candidate model
-        self.logger.debug(f"[{request_id}] Full candidate dict: {candidate}")
-        candidate_key = candidate.get('model', f"{provider_name}:{model_name}")  # Fallback to constructed name
-        self.logger.debug(f"[{request_id}] Candidate key: {candidate_key}")
-        self.logger.debug(f"[{request_id}] Capabilities passed to cleanup: {capabilities}")
-        self.logger.debug(f"[{request_id}] Before cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
+        candidate_key = candidate.get('model', f"{provider_name}:{model_name}")
         self._cleanup_api_kwargs(api_kwargs, candidate_key, {'capabilities': capabilities})
-        self.logger.debug(f"[{request_id}] After cleanup - response_format in kwargs: {'response_format' in api_kwargs}")
 
-        # Preprocess messages for JSON/YAML mode if needed
-        # Only inject schema into prompt if enforce_schema_in_prompt=True (default False to save tokens)
+        # Preprocess messages for structured output formats
         enforce_schema_in_prompt = kwargs.get('enforce_schema_in_prompt', False)
-        modified_messages = self._preprocess_messages(messages, candidate_model_name, json_mode_requested, yaml_mode_requested, capabilities, json_schema, yaml_schema, enforce_schema_in_prompt)
+        if format_handler:
+            supports_system = capabilities.get("supports_system", True)
+            schema_for_prompt = format_schema if enforce_schema_in_prompt else None
+            modified_messages = format_handler.add_instructions_to_messages(
+                messages, schema_for_prompt, supports_system
+            )
+        else:
+            modified_messages = messages
 
-        # Retry logic for this candidate (temperature reduction, JSON validation)
-        max_retries = self.config.retry_settings["max_json_retries"]
-        max_rate_limit_retries = self.config.retry_settings["max_rate_limit_retries"]
-        temperature_reductions = self.config.retry_settings["temperature_reductions"]
-        min_temp = self.config.retry_settings["min_temp"]
+        # === Build request context for state machine ===
+        ctx = RequestContext(
+            # Request info
+            request_id=request_id,
+            messages=modified_messages,
+            original_model=original_model,
+            format_handler=format_handler,
+            format_schema=format_schema,
+            original_temperature=original_temperature,
 
-        total_input_tokens = 0
-        total_output_tokens = 0
-        total_reasoning_tokens = 0
-        rate_limit_attempts = 0  # Separate counter for rate limit retries
+            # Candidate info
+            provider_name=provider_name,
+            model_name=model_name,
+            candidate=candidate,
+            timeout=timeout,
+            chunk_timeout=chunk_timeout,
+            capabilities=capabilities,
+            api_kwargs=api_kwargs,
+            provider_client=provider_client,
+            stats_model_name=stats_model_name,
 
-        # Use max of JSON retries and rate limit retries to ensure both can complete
-        max_loop_iterations = max(max_retries, max_rate_limit_retries) + 1
-        for attempt in range(max_loop_iterations):
-            try:
-                current_temp = api_kwargs.get('temperature', original_temperature)
-                self.logger.debug(f"[{request_id}] 🔄 Attempt {attempt + 1}/{max_retries + 1} - temp={current_temp}")
-                
-                # Make API call with timeout
-                try:
-                    chunk_count = None  # Track streaming chunks
-                    if api_kwargs.get("stream", False):
-                        # Handle streaming response
-                        # Use timeout for initial connection, then chunk_timeout for streaming
-                        chunk_timeout = self.config.get_candidate_chunk_timeout(candidate, model_config)
-                        stream = await asyncio.wait_for(
-                            provider_client.chat.completions.create(
-                                messages=modified_messages,
-                                model=model_name,
-                                **api_kwargs
-                            ),
-                            timeout=timeout
-                        )
-                        response, chunk_count = await self._collect_streaming_response(stream, request_id, chunk_timeout=chunk_timeout)
-                    else:
-                        # Handle non-streaming response
-                        response = await asyncio.wait_for(
-                            provider_client.chat.completions.create(
-                                messages=modified_messages,
-                                model=model_name,
-                                **api_kwargs
-                            ),
-                            timeout=timeout
-                        )
-                    api_error = None
-                except asyncio.TimeoutError as e:
-                    # Timeout is an infrastructure error - try next candidate
-                    raise InfrastructureError(f"Request timed out after {timeout}s", provider=provider_name, model=model_name)
-                except ChunkTimeoutError as e:
-                    # Chunk timeout (cold start or stream stall) - try next candidate
-                    raise InfrastructureError(f"Streaming chunk timeout: {str(e)}", provider=provider_name, model=model_name)
-                except RateLimitError:
-                    # Let rate limit errors pass through to outer handler for proper retry logic
-                    raise
-                except Exception as api_e:
-                    # Classify the error
-                    if self._is_infrastructure_error(api_e):
-                        raise InfrastructureError(f"API infrastructure error: {str(api_e)}", provider=provider_name, model=model_name)
-                    elif self._is_json_validation_api_error(api_e) and json_mode_requested:
-                        # API-level JSON validation errors will be handled in JSON validation section
-                        api_error = api_e
-                        response = None
-                    else:
-                        # Other API errors are typically model errors (don't iterate)
-                        raise ModelError(f"API error: {str(api_e)}", provider=provider_name, model=model_name)
-                
-                # Extract tokens from response
-                if response:
-                    # Extract normalized token counts
-                    input_tokens, output_tokens, reasoning_tokens, total_tokens = extract_token_counts(response, self.logger)
+            # Mutable state
+            current_temperature=api_kwargs.get('temperature', original_temperature),
 
-                    # Extract reasoning content
-                    reasoning_content = extract_reasoning_content(response, self.logger)
+            # Configuration
+            max_retries=self.config.retry_settings["max_json_retries"],
+            max_rate_limit_retries=self.config.retry_settings["max_rate_limit_retries"],
+            temperature_reductions=self.config.retry_settings["temperature_reductions"],
+            min_temp=self.config.retry_settings["min_temp"],
+            rate_limit_backoff=self.config.retry_settings["rate_limit_backoff"],
 
-                    total_input_tokens += input_tokens
-                    total_output_tokens += output_tokens
-                    total_reasoning_tokens += reasoning_tokens
+            # Tracking
+            request_tracker=request_tracker,
+        )
 
-                    content = self._process_response_content(response, json_mode_requested, yaml_mode_requested)
-                else:
-                    content = ""
-                    reasoning_content = None
-                
-                # JSON validation if requested
-                if json_mode_requested:
-                    try:
-                        # Validation may repair malformed JSON, update content with repaired version
-                        content = self._validate_json_response(content, json_schema, api_error, request_id)
-                    except json.JSONDecodeError as e:
-                        # JSON parsing failed completely - this is an infrastructure issue
-                        # (empty response, truncated, garbled) - failover to next provider
-                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "json",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=json_schema)
-                        raise InfrastructureError(
-                            f"JSON parse failed: {str(e)[:100]}",
-                            provider=provider_name, model=model_name
-                        )
-                    except JsonSchemaError as e:
-                        # JSON parsed OK but doesn't match schema - try to fix it
-                        self._dump_validation_debug(request_id, messages, api_kwargs, e.content or content, e, "json",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=json_schema)
+        # === Run state machine ===
+        state_machine = RequestStateMachine(self)
+        result = await state_machine.run(ctx)
 
-                        # Try JSON fixer for schema validation errors (JSON exists but has wrong structure)
-                        fixer_succeeded = False
-                        if self._json_fixer_enabled and json_schema:
-                            fixed_content = await call_json_fixer(
-                                elelem_instance=self,
-                                invalid_json=e.content or content,
-                                error=str(e),
-                                schema=json_schema,
-                                request_id=request_id,
-                                fixer_model=self._json_fixer_model
-                            )
-                            if fixed_content:
-                                # Fixer succeeded - use the fixed content
-                                content = fixed_content
-                                request_tracker.record_retry("json_fixer")
-                                fixer_succeeded = True
+        # Extend cumulative path with this candidate's journey (excluding terminal state for non-success)
+        if result.path:
+            # For SUCCESS, include full path; for errors, exclude terminal state (will be added by caller)
+            if result.next_state == RequestState.SUCCESS:
+                cumulative_path.extend(result.path)
+            else:
+                cumulative_path.extend(result.path[:-1])  # Exclude NEXT_CANDIDATE/SKIP_MODEL
 
-                        if not fixer_succeeded:
-                            # Fixer failed or disabled - try temperature reduction if we have retries left
-                            if attempt < max_retries:
-                                # Try temperature reduction
-                                if temperature_reductions and len(temperature_reductions) > 0:
-                                    reduction_idx = min(attempt, len(temperature_reductions) - 1)
-                                    reduction = temperature_reductions[reduction_idx]
-                                    new_temp = max(current_temp - reduction, min_temp)
+        # === Handle terminal states ===
+        if result.next_state == RequestState.SUCCESS:
+            return self._build_success_response(
+                ctx, start_time, cache, cache_key, original_model, candidate_model_name,
+                state_path=cumulative_path
+            )
+        elif result.next_state == RequestState.NEXT_CANDIDATE:
+            raise result.error
+        elif result.next_state == RequestState.SKIP_MODEL:
+            raise result.error
+        else:
+            # Should never happen
+            raise RuntimeError(f"Unexpected terminal state: {result.next_state}")
 
-                                    if new_temp < current_temp:
-                                        api_kwargs['temperature'] = new_temp
-                                        request_tracker.record_retry("temperature_reductions")
-                                        self.logger.warning(f"[{request_id}] JSON schema validation failed (fixer didn't help), reducing temperature to {new_temp}")
-                                        self.logger.warning(f"[{request_id}] Validation error: {e}")
-                                        continue
+    def _build_success_response(self, ctx: RequestContext, start_time: float,
+                                cache: bool, cache_key: str, original_model: str,
+                                candidate_model_name: str, state_path: list = None):
+        """Build the success response from context after state machine completes.
 
-                                # Try removing response format
-                                if 'response_format' in api_kwargs:
-                                    api_kwargs.pop('response_format', None)
-                                    api_kwargs['temperature'] = original_temperature
-                                    request_tracker.record_retry("response_format_removals")
-                                    self.logger.warning(f"[{request_id}] Removing response_format and retrying")
-                                    continue
+        This handles:
+        - Cost calculation
+        - Logging
+        - Metrics finalization
+        - Response augmentation
+        - Caching
+        """
+        duration = time.time() - start_time
+        response = ctx.response
 
-                            # All retries exhausted and fixer couldn't help
-                            raise ModelError(f"JSON schema validation failed after all retries and fixer: {e}", provider=provider_name, model=model_name)
+        # Get cost configuration for this candidate
+        candidate_cost_config = ctx.candidate.get('cost', {})
 
-                # YAML validation if requested
-                if yaml_mode_requested:
-                    try:
-                        self._validate_yaml_response(content, yaml_schema)
-                    except json.JSONDecodeError as e:
-                        # YAML validation reuses JSONDecodeError for retry compatibility
-                        if attempt < max_retries:
-                            # Try temperature reduction
-                            if temperature_reductions and len(temperature_reductions) > 0:
-                                reduction_idx = min(attempt, len(temperature_reductions) - 1)
-                                reduction = temperature_reductions[reduction_idx]
-                                new_temp = max(current_temp - reduction, min_temp)
+        # Extract runtime costs if model is configured for runtime pricing
+        runtime_costs = self._extract_runtime_costs(response, candidate_cost_config)
+        costs = self._calculate_costs(
+            ctx.stats_model_name,
+            ctx.total_input_tokens,
+            ctx.total_output_tokens,
+            ctx.total_reasoning_tokens,
+            runtime_costs,
+            candidate_cost_config
+        )
 
-                                if new_temp < current_temp:
-                                    api_kwargs['temperature'] = new_temp
-                                    request_tracker.record_retry("temperature_reductions")
-                                    self.logger.warning(f"[{request_id}] YAML validation failed, reducing temperature to {new_temp}")
-                                    self.logger.warning(f"[{request_id}] Validation error: {e}")
-                                    self.logger.warning(f"[{request_id}] Failed content:\n{content}")
-                                    self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
-                                                                provider=provider_name, model_id=model_name, original_model=original_model,
-                                                                schema=yaml_schema)
-                                    continue
+        # Log success with provider info, tokens, and cost
+        provider_info = ""
+        if hasattr(response, 'provider') and response.provider:
+            provider_info = f" via {response.provider}"
 
-                        # All YAML retries exhausted - this is a model error, don't iterate candidates
-                        # Note: Don't finalize here - outer loop handles finalization to avoid duplicates
-                        self._dump_validation_debug(request_id, messages, api_kwargs, content, e, "yaml",
-                                                    provider=provider_name, model_id=model_name, original_model=original_model,
-                                                    schema=yaml_schema)
-                        raise ModelError(f"YAML validation failed after all retries: {e}", provider=provider_name, model=model_name)
+        token_info = f"tokens: {ctx.total_input_tokens}→{ctx.total_output_tokens}"
+        if ctx.total_reasoning_tokens > 0:
+            token_info += f" (reasoning: {ctx.total_reasoning_tokens})"
 
-                # Success! Calculate duration and return
-                duration = time.time() - start_time
+        cost_info = ""
+        if costs and costs.get('total_cost_usd', 0) > 0:
+            cost_info = f", cost: ${costs['total_cost_usd']:.6f}"
 
-                # Get cost configuration for this candidate
-                candidate_cost_config = candidate.get('cost', {})
+        chunk_info = ""
+        if ctx.chunk_count is not None:
+            chunk_info = f", chunks: {ctx.chunk_count}"
 
-                # Extract runtime costs if model is configured for runtime pricing
-                runtime_costs = self._extract_runtime_costs(response, candidate_cost_config)
-                costs = self._calculate_costs(stats_model_name, total_input_tokens, total_output_tokens,
-                                            total_reasoning_tokens, runtime_costs, candidate_cost_config)
+        # Format state path (compact: only show non-happy-path or abbreviated)
+        path_info = ""
+        if state_path:
+            path_str = "→".join(state_path)
+            path_info = f" [{path_str}]"
 
-                # Log success with provider info, tokens, and cost
-                provider_info = ""
-                if hasattr(response, 'provider') and response.provider:
-                    provider_info = f" via {response.provider}"
+        self.logger.info(
+            f"[{ctx.request_id}] ✅ SUCCESS{path_info} - {candidate_model_name}{provider_info} "
+            f"in {duration:.2f}s | {token_info}{cost_info}{chunk_info}"
+        )
 
-                # Build token/cost info string
-                token_info = f"tokens: {total_input_tokens}→{total_output_tokens}"
-                if total_reasoning_tokens > 0:
-                    token_info += f" (reasoning: {total_reasoning_tokens})"
+        # Finalize request tracking
+        ctx.request_tracker.finalize_with_candidate(
+            self._metrics_store,
+            selected_candidate=ctx.stats_model_name,
+            actual_model=ctx.stats_model_name,
+            actual_provider=runtime_costs.get("actual_provider") if runtime_costs else ctx.provider_name,
+            status="success",
+            input_tokens=ctx.total_input_tokens,
+            output_tokens=ctx.total_output_tokens,
+            reasoning_tokens=ctx.total_reasoning_tokens,
+            total_cost_usd=costs.get('total_cost_usd', 0.0)
+        )
 
-                cost_info = ""
-                if costs and costs.get('total_cost_usd', 0) > 0:
-                    cost_info = f", cost: ${costs['total_cost_usd']:.6f}"
+        # Update response content
+        response.choices[0].message.content = ctx.content
 
-                # Add chunk count for streaming responses
-                chunk_info = ""
-                if chunk_count is not None:
-                    chunk_info = f", chunks: {chunk_count}"
+        # Add Elelem-specific metrics to the response object
+        response.elelem_metrics = {
+            "request_duration_seconds": duration,
+            "provider_used": ctx.provider_name,
+            "model_used": ctx.stats_model_name,
+            "tokens": {
+                "input": ctx.total_input_tokens,
+                "output": ctx.total_output_tokens,
+                "reasoning": ctx.total_reasoning_tokens,
+                "total": ctx.total_input_tokens + ctx.total_output_tokens
+            },
+            "costs_usd": costs,
+            "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
+        }
 
-                self.logger.info(f"[{request_id}] ✅ SUCCESS - {candidate_model_name}{provider_info} in {duration:.2f}s | {token_info}{cost_info}{chunk_info}")
+        # Add reasoning content if present
+        if ctx.reasoning_content:
+            response.elelem_metrics["reasoning_content"] = ctx.reasoning_content
+            response.choices[0].message.reasoning = ctx.reasoning_content
 
-                # Finalize request tracking with candidate details and store
-                request_tracker.finalize_with_candidate(
-                    self._metrics_store,
-                    selected_candidate=f"{provider_name}:{candidate_model_name}",
-                    actual_model=stats_model_name,
-                    actual_provider=runtime_costs.get("actual_provider") if runtime_costs else provider_name,
-                    status="success",
-                    input_tokens=total_input_tokens,
-                    output_tokens=total_output_tokens,
-                    reasoning_tokens=total_reasoning_tokens,
-                    total_cost_usd=costs.get('total_cost_usd', 0.0)
-                )
+        # Cache the successful response
+        if self.cache and cache and cache_key:
+            self.cache.set(cache_key, original_model, response)
 
-                # Update response content
-                response.choices[0].message.content = content
-
-                # Add Elelem-specific metrics to the response object
-                response.elelem_metrics = {
-                    "request_duration_seconds": duration,
-                    "provider_used": provider_name,
-                    "model_used": stats_model_name,
-                    "tokens": {
-                        "input": total_input_tokens,
-                        "output": total_output_tokens,
-                        "reasoning": total_reasoning_tokens,
-                        "total": total_input_tokens + total_output_tokens
-                    },
-                    "costs_usd": costs,
-                    "actual_provider": runtime_costs.get("actual_provider") if runtime_costs else None
-                }
-
-                # Add reasoning content if present
-                if reasoning_content:
-                    response.elelem_metrics["reasoning_content"] = reasoning_content
-                    response.choices[0].message.reasoning = reasoning_content
-
-                # Cache the successful response using the key computed at the start
-                # (before any message preprocessing or kwargs modifications)
-                if self.cache and cache and cache_key:
-                    self.cache.set(cache_key, original_model, response)
-
-                return response
-                
-            except (InfrastructureError, ModelError):
-                # Re-raise classification errors as-is
-                raise
-            except RateLimitError as e:
-                # Handle OpenAI rate limit errors with dedicated retry logic
-                if rate_limit_attempts < max_rate_limit_retries:
-                    backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                    wait_time = backoff_times[min(rate_limit_attempts, len(backoff_times) - 1)]
-                    rate_limit_attempts += 1
-                    request_tracker.record_retry("rate_limit_retries")
-                    self.logger.warning(f"[{request_id}] Rate limit hit, waiting {wait_time}s (attempt {rate_limit_attempts}/{max_rate_limit_retries})")
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    # Rate limit exhaustion is infrastructure issue - try next candidate
-                    raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}", provider=provider_name, model=model_name)
-            except (AuthenticationError, PermissionDeniedError) as e:
-                # Authentication/permission errors are infrastructure issues - try next candidate
-                raise InfrastructureError(f"Authentication/permission error: {e}", provider=provider_name, model=model_name)
-            except (InternalServerError, BadRequestError, NotFoundError) as e:
-                # Server errors, bad requests, and model not found are infrastructure issues
-                # (e.g., model might exist on another provider) - try next candidate
-                raise InfrastructureError(f"Server/request error: {e}", provider=provider_name, model=model_name)
-            except (ConflictError, UnprocessableEntityError) as e:
-                # These are request validation issues - don't retry candidate
-                raise ModelError(f"Request validation error: {e}", provider=provider_name, model=model_name)
-            except Exception as e:
-                # Fallback for any other unexpected errors
-                # Check if it might be a rate limit that wasn't caught as RateLimitError
-                if "429" in str(e) or "rate limit" in str(e).lower():
-                    if rate_limit_attempts < max_rate_limit_retries:
-                        backoff_times = self.config.retry_settings["rate_limit_backoff"]
-                        wait_time = backoff_times[min(rate_limit_attempts, len(backoff_times) - 1)]
-                        rate_limit_attempts += 1
-                        request_tracker.record_retry("rate_limit_retries")
-                        self.logger.warning(f"[{request_id}] Rate limit (fallback), waiting {wait_time}s (attempt {rate_limit_attempts}/{max_rate_limit_retries})")
-                        await asyncio.sleep(wait_time)
-                        continue
-                    else:
-                        raise InfrastructureError(f"Rate limit exhausted after {rate_limit_attempts} retries: {e}", provider=provider_name, model=model_name)
-
-                # Other unexpected errors
-                raise ModelError(f"Unexpected error: {e}", provider=provider_name, model=model_name)
-
-        # Retry loop exhausted - move to next candidate
-        self.logger.warning(f"[{request_id}] 🔄 Retry loop exhausted (attempt={attempt}, rate_limit_attempts={rate_limit_attempts}), trying next candidate")
-        raise InfrastructureError("Exhausted all retry attempts for candidate", provider=provider_name, model=model_name)
+        return response
     
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""
@@ -1145,9 +1004,22 @@ class Elelem:
         """Get health status of Elelem and its subsystems.
 
         Returns:
-            Dictionary with health status including metrics backends
+            Dictionary with health status including metrics backends and dynamic routing
         """
-        return self._metrics_store.get_health_status()
+        health = self._metrics_store.get_health_status()
+
+        # Add dynamic routing status
+        health["dynamic_routing"] = {
+            "enabled": self._dynamic_routing_store.enabled,
+            "cache_ttl": self._dynamic_routing_store._cache_ttl,
+            "cached_models": len(self._dynamic_routing_store._cache),
+        }
+
+        # Add routing statistics
+        from ._benchmark_store import get_routing_stats
+        health["routing_stats"] = get_routing_stats()
+
+        return health
 
 
     def close(self):

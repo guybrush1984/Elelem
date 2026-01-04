@@ -43,8 +43,90 @@ Elelem's core logic has been refactored into focused modules for better maintain
 - `src/elelem/_retry_logic.py` - Retry strategies, error classification, and analytics tracking
 - `src/elelem/_request_execution.py` - API parameter preparation for requests
 - `src/elelem/_reasoning_tokens.py` - Token extraction and normalization across providers
+- `src/elelem/_dynamic_routing.py` - Dynamic routing store (caches observed performance stats)
+- `src/elelem/_benchmark_store.py` - Candidate reordering logic + epsilon-greedy exploration
+- `src/elelem/_request_id.py` - Human-readable request ID generation (e.g., "blue-4829")
 
 All `_*.py` files are internal modules with flat function signatures (no nested attributes as parameters).
+
+# Dynamic Routing (Virtual Models)
+
+Virtual models support smart provider selection based on observed performance and cost:
+
+1. **Dynamic observations**: Real performance stats from recent requests (cached 30s, 4-hour window)
+2. **Value score**: `value = tps^speed_weight / cost_per_1m` (speed_weight default: 1.5)
+3. **Adaptive epsilon-greedy**: Exploration scales with coverage
+   - 0% explored → 100% shuffle (cold start)
+   - 100% explored → 10% shuffle (steady state)
+   - Formula: `epsilon = min + (max - min) * unexplored_ratio`
+4. **Failure cooldown**: Failed candidates are excluded for a cooldown period (per-container, in-memory)
+
+Environment variables:
+- `ELELEM_EXPLORATION_EPSILON` - Min exploration rate (default: 0.1 = 10% at steady state)
+- `ELELEM_EXPLORATION_EPSILON_MAX` - Max exploration rate (default: 1.0 = 100% at cold start)
+- `ELELEM_DYNAMIC_ROUTING_ENABLED` - Enable/disable dynamic routing (default: true)
+- `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` - Stats cache TTL in seconds (default: 30)
+- `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` - Time window for stats (default: 240 = 4 hours)
+- `ELELEM_DYNAMIC_ROUTING_MAX_SAMPLES` - Max samples per model for averaging (default: 5)
+- `ELELEM_DYNAMIC_ROUTING_COOLDOWN_MINUTES` - Cooldown period for failed candidates (default: 15)
+
+# Output Formats (JSON, YAML, CSV)
+
+Elelem supports three structured output formats in `src/elelem/_output_formats/`:
+- `json_format.py` - JSON with JSON Schema validation
+- `yaml_format.py` - YAML with JSON Schema validation
+- `csv_format.py` - Multi-table CSV with custom schema format
+
+**Usage:** Pass schema via `json_schema=`, `yaml_schema=`, or `csv_schema=` parameter.
+
+**CSV format specifics:**
+- Tables marked with `###TABLE:name` header
+- Semicolon (`;`) delimiter (avoids comma issues in content)
+- Tilde (`~`) for null/empty values
+- Schema uses `tables.{name}.columns.{col}` structure
+
+## Error Handling and Failover
+
+**Key files:**
+- `core.py` lines 620-665: Candidate iteration and error classification
+- `core.py` lines 839-908: Schema validation, fixer, temperature reduction
+- `_format_fixer.py`: LLM fixer logic
+- `_dynamic_routing.py`: Cooldown tracking (`mark_failed`, `get_failed_candidates`)
+
+**Two error types:**
+- `InfrastructureError`: Provider issue (timeout, truncated) → try next candidate + 15min cooldown
+- `ModelError`: Model can't handle task → skip same `model_reference` for this request only
+
+**Candidate iteration** (`core.py:625-660`):
+```python
+failed_model_refs = set()  # Local to this request, not global
+for candidate in candidates:
+    if candidate.model_reference in failed_model_refs:
+        continue  # Skip same model on different provider
+    try:
+        return await _attempt_candidate(...)
+    except InfrastructureError:
+        dynamic_routing_store.mark_failed(candidate.original_model_ref)  # 15min cooldown
+        continue  # Try next candidate
+    except ModelError:
+        failed_model_refs.add(candidate.model_reference)  # Skip same model
+        continue  # Try different model
+```
+
+**Schema validation flow** (`core.py:849-908`):
+```
+FormatSchemaError raised
+  → call_format_fixer() [_format_fixer.py]
+    → fixable=false → InfrastructureError (next candidate)
+    → fixable=true + content → SUCCESS
+    → fixable=true + null → temperature reduction → retry
+  → max retries exhausted → ModelError (skip model_reference)
+```
+
+**LLM Fixer:**
+- Prompts: `src/elelem/fixer_prompts/*.yaml`
+- Response: `{"fixable": bool, "changes": str, "fixed": content|null}`
+- CLI: `uv run fixer.py debug_dumps/xxx.json [--dry-run]`
 
 # Testing
 - When making edits to the model definitions, launching tests/test_config_validation.py is recommended (uv run pytest tests/test_config_validation.py -v)

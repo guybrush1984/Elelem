@@ -29,12 +29,12 @@ conditions:
         message: "This JSON is missing the required status field"
         data: 123
 
-  # json-fixer returns valid JSON with all required fields
+  # json-fixer returns wrapper format with fixable, changes, and fixed fields
   - check: "model_contains"
     value: "json-fixer"
     response:
       type: "success"
-      content: '{"status": "fixed", "message": "Repaired by fixer", "data": 456}'
+      content: '{"fixable": true, "changes": "Added missing status field", "fixed": {"status": "fixed", "message": "Repaired by fixer", "data": 456}}'
 
 default_response:
   type: "success"

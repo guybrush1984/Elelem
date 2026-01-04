@@ -85,17 +85,23 @@ if sentry_dsn:
         # Filter out expected errors to reduce noise
         before_send=sentry_before_send,
     )
-from elelem._benchmark_store import get_benchmark_store
+from elelem._benchmark_store import get_routing_stats as get_exploration_stats
 from elelem.server.models import (
     ChatCompletionRequest,
     ErrorResponse,
-    HealthResponse
+    HealthResponse,
+    WarmupRequest,
+    WarmupResponse,
 )
 
 # Configure logging
 log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
+
+# Suppress verbose httpx request logging (default WARNING to reduce noise)
+httpx_log_level = os.getenv('HTTPX_LOG_LEVEL', 'WARNING').upper()
+logging.getLogger('httpx').setLevel(getattr(logging, httpx_log_level, logging.WARNING))
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -154,12 +160,6 @@ async def startup_event():
     else:
         logger.info("📦 Response cache disabled")
 
-    # Start benchmark fetching if configured
-    benchmark_store = get_benchmark_store()
-    await benchmark_store.start_background_fetch()
-    if benchmark_store.enabled:
-        logger.info(f"📊 Benchmark routing enabled (source: {benchmark_store.source})")
-
     # Log Sentry status
     if sentry_dsn:
         logger.info(f"🔍 Sentry error monitoring enabled (environment: {os.getenv('SENTRY_ENVIRONMENT', 'development')})")
@@ -201,10 +201,6 @@ async def shutdown_event():
     """Clean up on server shutdown."""
     global elelem
     logger.info("🛑 Shutting down Elelem server...")
-
-    # Stop benchmark fetching
-    benchmark_store = get_benchmark_store()
-    benchmark_store.stop()
 
     # Clean up using proper encapsulation
     if elelem:
@@ -279,38 +275,136 @@ async def list_models():
         )
 
 
-@app.get("/v1/benchmark/status")
-async def get_benchmark_status():
-    """Get benchmark routing status and current data.
+@app.get("/v1/routing/stats")
+async def get_routing_stats():
+    """Get detailed dynamic routing statistics.
 
     Returns:
-        - enabled: Whether benchmark routing is configured
-        - source: The configured benchmark source (file path or URL)
-        - interval_seconds: How often benchmarks are refreshed
-        - last_fetch: Timestamp of last successful fetch
-        - last_error: Error message from last failed fetch (if any)
-        - entries_count: Number of models with benchmark data
+        - config: Current routing configuration (window, cooldown, samples, epsilon)
+        - dynamic_stats: Per-model speed stats from recent requests
+        - failed_candidates: Models currently in cooldown after failures
+        - exploration: Current exploration state (epsilon, coverage, stats)
     """
-    store = get_benchmark_store()
-    return store.get_status()
+    import os
+    from datetime import datetime
 
+    # Get dynamic routing store from elelem instance
+    routing_store = elelem._dynamic_routing_store
 
-@app.get("/v1/benchmark/data")
-async def get_benchmark_data():
-    """Get all current benchmark data.
-
-    Returns a dict mapping model references to their benchmark metrics:
-    - tokens_per_second: Average output tokens per second
-    - cost_per_1m_output: Cost per 1M output tokens (extrapolated)
-    - avg_duration: Average request duration in seconds
-    - success_rate: Request success rate (0.0 to 1.0)
-    - sample_count: Number of benchmark samples
-    """
-    store = get_benchmark_store()
-    return {
-        "enabled": store.enabled,
-        "data": store.get_all_benchmarks()
+    # Get dynamic stats, sorted by model (after :) then by speed (descending)
+    dynamic_stats = routing_store.get_dynamic_stats()
+    sorted_stats = sorted(
+        dynamic_stats.items(),
+        key=lambda x: (x[0].split(':', 1)[1] if ':' in x[0] else x[0], -x[1].avg_tokens_per_sec)
+    )
+    dynamic_data = {
+        model_ref: {
+            "avg_tokens_per_sec": round(stats.avg_tokens_per_sec, 1),
+            "sample_count": stats.sample_count,
+            "last_updated": stats.last_updated.isoformat() if stats.last_updated else None
+        }
+        for model_ref, stats in sorted_stats
     }
+
+    # Get failed candidates in cooldown
+    failed = routing_store.get_failed_candidates()
+    failed_with_time = {}
+    for candidate, failure_time in routing_store._failed.items():
+        remaining = routing_store._cooldown_minutes * 60 - (datetime.utcnow() - failure_time).total_seconds()
+        if remaining > 0:
+            failed_with_time[candidate] = {
+                "failed_at": failure_time.isoformat(),
+                "remaining_seconds": round(remaining)
+            }
+
+    # Calculate exploration state
+    explored_count = len(dynamic_data)
+
+    min_epsilon = float(os.environ.get('ELELEM_EXPLORATION_EPSILON', '0.1'))
+    max_epsilon = float(os.environ.get('ELELEM_EXPLORATION_EPSILON_MAX', '1.0'))
+
+    # Get exploration stats from routing module
+    exploration_stats = get_exploration_stats()
+
+    return {
+        "config": {
+            "window_minutes": routing_store._window_minutes,
+            "cooldown_minutes": routing_store._cooldown_minutes,
+            "max_samples": routing_store._max_samples,
+            "cache_ttl_seconds": routing_store._cache_ttl,
+            "min_epsilon": min_epsilon,
+            "max_epsilon": max_epsilon,
+        },
+        "exploration": {
+            "total_routing_decisions": exploration_stats["total"],
+            "exploration_count": exploration_stats["explorations"],
+            "exploration_rate": exploration_stats["exploration_rate"],
+            "explored_models": explored_count,
+        },
+        "dynamic_stats": dynamic_data,
+        "failed_candidates": failed_with_time,
+    }
+
+
+async def _run_warmup(candidates: list, prompt: str, parallel: bool):
+    """Background task to call all candidates for warmup."""
+    import asyncio
+
+    async def call_one(c):
+        try:
+            await elelem.create_chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                model=c.get('original_model_ref', c.get('model')),
+                cache=False, tags=["warmup"]
+            )
+            logger.info(f"🔥 Warmup OK: {c.get('provider')}:{c.get('model_id')}")
+        except Exception as e:
+            logger.warning(f"🔥 Warmup FAIL: {c.get('provider')}:{c.get('model_id')} - {e}")
+
+    if parallel:
+        await asyncio.gather(*[call_one(c) for c in candidates])
+    else:
+        for c in candidates:
+            await call_one(c)
+
+    elelem._dynamic_routing_store.invalidate_cache()
+    logger.info(f"🔥 Warmup complete: {len(candidates)} candidates tested")
+
+
+@app.post("/v1/routing/warmup", response_model=WarmupResponse)
+async def warmup_routing(request: WarmupRequest):
+    """Warmup routing by calling each candidate directly to populate metrics.
+
+    Returns immediately after validating request. Warmup runs in background.
+    Check /v1/routing/stats to see results as they populate.
+    """
+    import asyncio
+
+    # Validate models and collect candidates
+    all_candidates = []
+    errors = []
+
+    for virtual_model in request.models:
+        try:
+            candidates = elelem.config.get_model_config(virtual_model).get('candidates', [])
+            available = [c for c in candidates if elelem._ensure_provider_initialized(c.get('provider'))]
+            all_candidates.extend(available)
+        except ValueError as e:
+            errors.append(f"{virtual_model}: {e}")
+
+    if errors and not all_candidates:
+        raise HTTPException(status_code=400, detail={"errors": errors})
+
+    prompt = request.prompt or f"It's {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}. Write a poem on LLMs in about 100 words."
+
+    asyncio.create_task(_run_warmup(all_candidates, prompt, request.parallel))
+
+    return WarmupResponse(
+        status="started",
+        models=request.models,
+        total_candidates=len(all_candidates),
+        message=f"Warmup started for {len(all_candidates)} candidates. Check /v1/routing/stats for results."
+    )
 
 
 @app.post("/v1/chat/completions")
@@ -409,12 +503,18 @@ async def get_metrics_summary(
     - Duration statistics
     - Retry analytics
     """
+    import time
+    request_start = time.time()
+    logger.info(f"📊 /v1/metrics/summary called - tags={tags}, start_time={start_time}, end_time={end_time}")
     try:
         tag_list = tags.split(',') if tags else None
         summary = elelem.get_summary(start_time, end_time, tag_list)
+        duration = time.time() - request_start
+        logger.info(f"📊 /v1/metrics/summary completed in {duration:.3f}s")
         return summary
     except Exception as e:
-        logger.error(f"Error getting metrics summary: {e}")
+        duration = time.time() - request_start
+        logger.error(f"📊 /v1/metrics/summary failed after {duration:.3f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -427,11 +527,17 @@ async def get_metrics_tags():
     - provider:groq
     - Any user-defined tags
     """
+    import time
+    request_start = time.time()
+    logger.info("📊 /v1/metrics/tags called")
     try:
         tags = elelem.get_metrics_tags()
+        duration = time.time() - request_start
+        logger.info(f"📊 /v1/metrics/tags completed in {duration:.3f}s - {len(tags)} tags")
         return {"tags": tags}
     except Exception as e:
-        logger.error(f"Error getting metrics tags: {e}")
+        duration = time.time() - request_start
+        logger.error(f"📊 /v1/metrics/tags failed after {duration:.3f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -446,6 +552,9 @@ async def get_metrics_data(
 
     Returns array of request records from unified metrics structure.
     """
+    import time
+    request_start = time.time()
+    logger.info(f"📊 /v1/metrics/data called - tags={tags}, start_time={start_time}, end_time={end_time}")
     try:
         if format != "json":
             raise HTTPException(status_code=400, detail="Only 'json' format is currently supported")
@@ -460,9 +569,12 @@ async def get_metrics_data(
                 if hasattr(ts, 'strftime'):
                     row['timestamp'] = ts.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
+        duration = time.time() - request_start
+        logger.info(f"📊 /v1/metrics/data completed in {duration:.3f}s - {len(data)} rows")
         return data
     except Exception as e:
-        logger.error(f"Error getting metrics data: {e}")
+        duration = time.time() - request_start
+        logger.error(f"📊 /v1/metrics/data failed after {duration:.3f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -477,6 +589,8 @@ async def root():
             "chat_completions": "/v1/chat/completions",
             "models": "/v1/models",
             "health": "/health",
+            "routing_stats": "/v1/routing/stats",
+            "routing_warmup": "/v1/routing/warmup",
             "metrics_summary": "/v1/metrics/summary",
             "metrics_data": "/v1/metrics/data"
         }
@@ -485,4 +599,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, access_log=False)

@@ -136,9 +136,36 @@ models:
 ```
 
 ```python
-# Automatically tries Groq → Fireworks → DeepInfra
+# Automatically tries providers in optimal order (see Smart Routing below)
 model="virtual:gpt-oss-120b-reliable"
 ```
+
+**Smart Routing:** Virtual models automatically reorder candidates based on observed performance and cost:
+
+1. **Dynamic observations**: Real performance stats from recent requests (last 5 per provider, 4-hour window)
+2. **Value score**: `value = tps^speed_weight / cost_per_1m` - balances speed vs cost
+3. **Adaptive exploration**: 100% shuffle at cold start → 10% at steady state (scales with data coverage)
+4. **Failure cooldown**: Failed providers are excluded for 15 minutes
+
+**Value Score Examples** (real provider pricing for GPT-OSS-120B):
+
+| Provider | Cost ($/M) | Observed Speed | speed_weight=0.5 | speed_weight=1.0 | speed_weight=1.5 |
+|----------|------------|----------------|------------------|------------------|------------------|
+| novita   | $0.25      | 50 t/s         | **28** ⭐        | 200              | 1,414            |
+| fireworks| $0.60      | 120 t/s        | 18               | 200              | 2,191            |
+| cerebras | $0.75      | 400 t/s        | 27               | **533** ⭐       | **10,667** ⭐    |
+
+- `speed_weight=0.5` → novita wins (prioritize cost savings)
+- `speed_weight=1.0` → cerebras wins (balanced speed/cost)
+- `speed_weight=1.5` (default) → cerebras wins decisively (prioritize speed)
+
+Example log showing routing decision:
+```
+🚀 virtual:gpt-oss-120b → [cerebras(3x, 400t/s, 10667v), fireworks(2x, 120t/s, 2191v), novita(5x, 50t/s, 1414v)]
+```
+- `3x` = 3 samples observed
+- `400t/s` = average tokens/sec
+- `10667v` = value score (higher = better)
 
 **Dynamic models:** Runtime failover definition
 ```python
@@ -161,9 +188,11 @@ model="dynamic:{candidates: [groq:openai/gpt-oss-120b, openai:gpt-4.1], timeout:
 - Response truncation due to max_tokens (finish_reason: length)
 - All candidates exhausted
 
-### 2. JSON Mode & Schema Validation
+### 2. Output Formats: JSON, YAML, CSV
 
-Elelem provides robust JSON handling with automatic retry strategies:
+Elelem supports three structured output formats with schema validation, auto-repair, and LLM-based error correction.
+
+#### JSON Format
 
 ```python
 response = await elelem.create_chat_completion(
@@ -172,26 +201,101 @@ response = await elelem.create_chat_completion(
     response_format={"type": "json_object"},
     json_schema={
         "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "integer"}
-        },
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
         "required": ["name", "age"]
-    },
-    temperature=1.0
+    }
 )
 ```
 
-**Retry strategy on JSON errors:**
-1. **Parse error:** Reduce temperature by 0.2, retry (up to 3 times)
-2. **Still failing:** Remove `response_format`, retry
-3. **Still failing:** Try next candidate
+#### YAML Format
 
-**JSON processing:**
-- Strips markdown code blocks (```json ... ```)
-- Fixes common errors (trailing commas, single quotes)
-- Validates against schema if provided
-- Works even with models that don't support native JSON mode
+```python
+response = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Generate a story outline"}],
+    yaml_schema={
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "chapters": {"type": "array", "items": {"type": "object"}}
+        }
+    }
+)
+```
+
+#### CSV Format (Multi-Table)
+
+```python
+response = await elelem.create_chat_completion(
+    model="groq:openai/gpt-oss-120b",
+    messages=[{"role": "user", "content": "Extract characters and locations"}],
+    csv_schema={
+        "tables": {
+            "characters": {
+                "required": True,
+                "columns": {
+                    "id": {"type": "string", "required": True},
+                    "name": {"type": "string"},
+                    "role": {"type": "string", "enum": ["hero", "villain"]}
+                }
+            }
+        }
+    }
+)
+# Output: ###TABLE:characters\nid;name;role\nc1;Aragorn;hero
+```
+
+**Error handling strategy:**
+
+**Terminology:**
+- **Provider**: Inference infrastructure (baseten, novita, fireworks, cerebras...)
+- **Model ID**: How the provider names the model (e.g., `deepseek-ai/DeepSeek-V3.2`)
+- **Model reference**: Canonical ID for the underlying model, shared across providers hosting the same model (e.g., `deepseek_v32`)
+- **Candidate**: A specific provider + model combination to try
+- **Virtual model**: A routing rule with multiple candidates to try in order
+
+**Example: Virtual model with 3 candidates**
+```yaml
+virtual:deepseek-cheap:
+  candidates:
+    - baseten:deepseek/deepseek-3.2    # model_reference: deepseek_v32
+    - novita:deepseek/deepseek-3.2     # model_reference: deepseek_v32
+    - parasail:deepseek/deepseek-3.1   # model_reference: deepseek_v31
+```
+
+**Two types of errors, two failover behaviors:**
+
+| Error Type | Examples | Failover |
+|------------|----------|----------|
+| **Infrastructure error** | Timeout, connection error, truncated response | Try same model on different provider |
+| **Model error** | Schema validation fails after all retries | Skip same model, try different model |
+
+**Example: Infrastructure error (timeout)**
+```
+Request to virtual:deepseek-cheap
+  → baseten: timeout after 120s → InfrastructureError
+  → baseten enters 15-minute cooldown
+  → novita: SUCCESS ✓
+```
+
+**Example: Model error (schema validation)**
+```
+Request to virtual:deepseek-cheap with json_schema
+  → baseten: response fails schema → fixer can't fix → retries exhausted → ModelError
+  → novita: SKIPPED (same model_reference "deepseek_v32" would fail same way)
+  → parasail: try deepseek-3.1 (different model_reference "deepseek_v31")
+```
+
+**LLM fixer for schema errors:**
+When schema validation fails, Elelem calls a secondary LLM to attempt repair:
+- Fixer returns `fixable: false` (truncated/empty) → treat as infrastructure error → failover to next provider
+- Fixer returns fixed content → use it, success
+- Fixer fails to fix → reduce temperature → retry → eventually ModelError
+
+**Auto-repair features:**
+- Strips markdown code blocks (` ```json ... ``` `)
+- Fixes trailing commas, single quotes, unquoted keys
+- CSV uses tilde (`~`) for null/empty values
 
 ### 3. Metrics & Cost Tracking
 
@@ -393,6 +497,18 @@ export SCALEWAY_SECRET_KEY="your-secret-key"
 export OPENROUTER_API_KEY="your-key"
 export DEEPSEEK_API_KEY="your-key"
 ```
+
+**Smart Routing configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ELELEM_EXPLORATION_EPSILON` | `0.1` | Minimum exploration rate (steady state). When all providers have been tested, 10% of requests shuffle randomly to detect performance changes. |
+| `ELELEM_EXPLORATION_EPSILON_MAX` | `1.0` | Maximum exploration rate (cold start). When no providers have been tested, 100% of requests shuffle randomly to gather data quickly. Scales linearly with coverage. |
+| `ELELEM_DYNAMIC_ROUTING_ENABLED` | `true` | When enabled, Elelem reorders candidates based on observed performance. Disable to use YAML definition order. |
+| `ELELEM_DYNAMIC_ROUTING_CACHE_TTL` | `30` | How long (seconds) to cache aggregated performance stats before re-querying the database. Lower = more responsive to changes, higher = less DB load. |
+| `ELELEM_DYNAMIC_ROUTING_WINDOW_MINUTES` | `240` | Time window for performance stats (default: 4 hours). Only requests from this window are considered. |
+| `ELELEM_DYNAMIC_ROUTING_MAX_SAMPLES` | `5` | Max samples per model for averaging. Uses only the N most recent requests per model within the window. Recent-biased to reflect current performance. |
+| `ELELEM_DYNAMIC_ROUTING_COOLDOWN_MINUTES` | `15` | Cooldown period for failed providers. After a provider fails, it's excluded from routing for this duration. |
 
 ### Docker Deployment
 

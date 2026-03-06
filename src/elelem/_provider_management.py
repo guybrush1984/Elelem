@@ -170,8 +170,17 @@ def validate_provider_models(provider_name: str, endpoint: str, api_key: Optiona
 
 
 def create_provider_client(api_key: str, base_url: str, timeout: int,
-                          provider_name: str, default_headers: Dict) -> openai.AsyncOpenAI:
-    """Create an OpenAI-compatible client for any provider."""
+                          provider_name: str, default_headers: Dict,
+                          client_type: str = None):
+    """Create an API client for any provider.
+
+    For OpenAI-compatible providers, returns AsyncOpenAI.
+    For Anthropic, returns an AnthropicAdapter (duck-type compatible).
+    """
+    if client_type == "anthropic":
+        from ._anthropic_adapter import AnthropicAdapter
+        return AnthropicAdapter(api_key=api_key)
+
     client_kwargs = {
         "api_key": api_key,
         "base_url": base_url,

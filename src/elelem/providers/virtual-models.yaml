@@ -311,3 +311,16 @@ models:
       speed_weight: 2.0
     candidates:
       - model: "virtual:kimi-k2"
+
+  # ---------------------------------------------------------------------------
+  # Claude Sonnet 4.6 — Anthropic direct, then OpenRouter, then DeepSeek fallback
+  # ---------------------------------------------------------------------------
+  "virtual:claude-sonnet-4.6":
+    metadata:
+      model_reference: "anthropic_claude_sonnet_46"
+    timeout: 120s
+    candidates:
+      - model: "anthropic:anthropic/claude-sonnet-4.6"
+      - model: "openrouter:anthropic/claude-sonnet-4.6"
+      - model: "virtual:deepseek-v3.2"
+        priority: always_last

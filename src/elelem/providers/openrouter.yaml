@@ -4,7 +4,8 @@ provider:
   headers:
     HTTP-Referer: https://github.com/guybrush1984/Elelem
     X-Title: Elelem
-  default_params: {}
+  default_params:
+    stream: true
   extra_body:
     usage:
       include: true
@@ -50,6 +51,51 @@ models:
       model_reference: "anthropic_claude_sonnet_4"
     provider: openrouter
     model_id: anthropic/claude-sonnet-4
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  "openrouter:anthropic/claude-opus-4.6":
+    metadata:
+      model_reference: "anthropic_claude_opus_46"
+    provider: openrouter
+    model_id: anthropic/claude-opus-4.6
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  "openrouter:anthropic/claude-sonnet-4.6":
+    metadata:
+      model_reference: "anthropic_claude_sonnet_46"
+    provider: openrouter
+    model_id: anthropic/claude-sonnet-4.6
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  "openrouter:anthropic/claude-haiku-4.5":
+    metadata:
+      model_reference: "anthropic_claude_haiku_45"
+    provider: openrouter
+    model_id: anthropic/claude-haiku-4.5
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  "openrouter:qwen/qwen3.5-plus":
+    metadata:
+      model_reference: "alibaba_qwen35_plus"
+    provider: openrouter
+    model_id: qwen/qwen3.5-plus-02-15
     capabilities:
       supports_json_mode: false
       supports_temperature: true

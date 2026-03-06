@@ -1,0 +1,129 @@
+# Anthropic provider configuration and models
+# Uses ANTHROPIC_API_KEY env var for authentication
+# Anthropic API is NOT OpenAI-compatible — uses adapter (client_type: anthropic)
+
+provider:
+  auth_type: anthropic
+  client_type: anthropic
+  default_params:
+    stream: true
+  max_tokens_default: 16384
+
+models:
+  # ---------------------------------------------------------------------------
+  # Current generation
+  # ---------------------------------------------------------------------------
+
+  # Claude Opus 4.6 - most intelligent, best for agents and coding
+  "anthropic:anthropic/claude-opus-4.6":
+    metadata:
+      model_reference: "anthropic_claude_opus_46"
+    provider: anthropic
+    model_id: claude-opus-4-6
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 5.00
+      output_cost_per_1m: 25.00
+      currency: USD
+
+  # Claude Opus 4.6 with adaptive thinking
+  "anthropic:anthropic/claude-opus-4.6?thinking":
+    metadata:
+      model_reference: "anthropic_claude_opus_46"
+      model_configuration: "thinking"
+    provider: anthropic
+    model_id: claude-opus-4-6
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 5.00
+      output_cost_per_1m: 25.00
+      currency: USD
+    default_params:
+      max_tokens: 16000
+      extra_body:
+        thinking:
+          type: adaptive
+
+  # Claude Sonnet 4.6 - best speed/intelligence balance
+  "anthropic:anthropic/claude-sonnet-4.6":
+    metadata:
+      model_reference: "anthropic_claude_sonnet_46"
+    provider: anthropic
+    model_id: claude-sonnet-4-6
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 3.00
+      output_cost_per_1m: 15.00
+      currency: USD
+
+  # Claude Sonnet 4.6 with extended thinking
+  "anthropic:anthropic/claude-sonnet-4.6?thinking":
+    metadata:
+      model_reference: "anthropic_claude_sonnet_46"
+      model_configuration: "thinking"
+    provider: anthropic
+    model_id: claude-sonnet-4-6
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 3.00
+      output_cost_per_1m: 15.00
+      currency: USD
+    default_params:
+      max_tokens: 16000
+      extra_body:
+        thinking:
+          type: enabled
+          budget_tokens: 10000
+
+  # Claude Haiku 4.5 - fastest, near-frontier intelligence
+  "anthropic:anthropic/claude-haiku-4.5":
+    metadata:
+      model_reference: "anthropic_claude_haiku_45"
+    provider: anthropic
+    model_id: claude-haiku-4-5-20251001
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.00
+      output_cost_per_1m: 5.00
+      currency: USD
+
+  # Claude Haiku 4.5 with extended thinking
+  "anthropic:anthropic/claude-haiku-4.5?thinking":
+    metadata:
+      model_reference: "anthropic_claude_haiku_45"
+      model_configuration: "thinking"
+    provider: anthropic
+    model_id: claude-haiku-4-5-20251001
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.00
+      output_cost_per_1m: 5.00
+      currency: USD
+    default_params:
+      max_tokens: 16000
+      extra_body:
+        thinking:
+          type: enabled
+          budget_tokens: 10000

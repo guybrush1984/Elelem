@@ -86,6 +86,30 @@ class StaticKeyProvider(TokenProvider):
         return self._api_key
 
 
+class AnthropicTokenProvider(TokenProvider):
+    """Token provider for Anthropic's Messages API."""
+
+    def __init__(self, provider_name: str, provider_config: Dict, logger: logging.Logger):
+        env_var = "ANTHROPIC_API_KEY"
+        self._api_key = os.getenv(env_var)
+        if not self._api_key:
+            raise ValueError(f"No API key found (env var: {env_var})")
+
+        self._provider_name = provider_name
+        logger.debug(f"[{provider_name}] Loaded API key from {env_var}")
+
+    def get_token(self) -> str:
+        return self._api_key
+
+    def get_endpoint(self) -> str:
+        return "https://api.anthropic.com"
+
+    def probe(self, endpoint: str, timeout: float, logger: logging.Logger) -> ProbeResult:
+        # Anthropic has no /models endpoint — skip probe (same as Vertex)
+        logger.debug(f"[{self._provider_name}] Skipping probe (Anthropic provider)")
+        return ProbeResult(success=True)
+
+
 class GoogleVertexProvider(TokenProvider):
     """Token provider for Google Vertex AI with auto-refresh."""
 
@@ -149,6 +173,7 @@ class GoogleVertexProvider(TokenProvider):
 
 # Registry of cloud token providers (require auth_type in config)
 CLOUD_PROVIDERS: Dict[str, Type[TokenProvider]] = {
+    "anthropic": AnthropicTokenProvider,
     "google_vertex": GoogleVertexProvider,
     # Future: "aws_bedrock": AWSBedrockProvider,
     # Future: "azure_openai": AzureOpenAIProvider,

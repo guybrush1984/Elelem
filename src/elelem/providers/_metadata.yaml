@@ -147,11 +147,46 @@ model_metadata:
     model_nickname: "qwen3-30b-a3b"
     model_page: "https://huggingface.co/Qwen/Qwen3-30B-A3B"
     license: "Qwen License"
-    reasoning: "no"    
+    reasoning: "no"
+
+  alibaba_qwen35_plus: &alibaba-qwen35-plus
+    model_owner: "Alibaba"
+    model_nickname: "qwen3.5-plus"
+    model_page: "https://huggingface.co/Qwen"
+    license: "Qwen License"
+    reasoning: "no"
+
+  anthropic_claude_opus_46: &anthropic-claude-opus-46
+    model_owner: "Anthropic"
+    model_nickname: "claude-opus-4.6"
+    model_page: "https://www.anthropic.com/claude"
+    license: "Proprietary"
+    reasoning: "no"
+
+  anthropic_claude_sonnet_46: &anthropic-claude-sonnet-46
+    model_owner: "Anthropic"
+    model_nickname: "claude-sonnet-4.6"
+    model_page: "https://www.anthropic.com/claude"
+    license: "Proprietary"
+    reasoning: "no"
+
+  anthropic_claude_haiku_45: &anthropic-claude-haiku-45
+    model_owner: "Anthropic"
+    model_nickname: "claude-haiku-4.5"
+    model_page: "https://www.anthropic.com/claude"
+    license: "Proprietary"
+    reasoning: "no"
 
   anthropic_claude_sonnet_4: &anthropic-claude-sonnet-4
     model_owner: "Anthropic"
     model_nickname: "claude-sonnet-4"
+    model_page: "https://www.anthropic.com/claude"
+    license: "Proprietary"
+    reasoning: "no"
+
+  anthropic_claude_opus_4: &anthropic-claude-opus-4
+    model_owner: "Anthropic"
+    model_nickname: "claude-opus-4"
     model_page: "https://www.anthropic.com/claude"
     license: "Proprietary"
     reasoning: "no"

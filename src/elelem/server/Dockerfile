@@ -27,7 +27,8 @@ RUN python -m venv /opt/venv && \
         psycopg2-binary \
         json-repair \
         requests \
-        google-auth
+        google-auth \
+        anthropic
 
 # Copy source code to site-packages
 # Fix permissions for non-root user in hardened image

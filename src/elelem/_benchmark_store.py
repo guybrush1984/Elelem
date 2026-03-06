@@ -166,7 +166,7 @@ def reorder_candidates_by_benchmark(
 
         # Get cost from candidate's model config (YAML) - always authoritative
         model_cost = candidate.get('cost', {})
-        cost_per_1m = model_cost.get('output_cost_per_1m', 0)
+        cost_per_1m = model_cost.get('output_cost_per_1m', 0) if isinstance(model_cost, dict) else 0
 
         # Get dynamic stats (observed tokens/s from recent requests)
         tps = None

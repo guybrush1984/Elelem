@@ -187,12 +187,14 @@ class Elelem:
 
         # Create provider client
         custom_headers = provider_config.get("headers")
+        client_type = provider_config.get("client_type")
         self._providers[provider_name] = create_provider_client(
             api_key=api_key,
             base_url=endpoint,
             timeout=self.config.timeout_seconds,
             provider_name=provider_name,
-            default_headers=custom_headers
+            default_headers=custom_headers,
+            client_type=client_type
         )
         self.logger.debug(f"[{provider_name}] Initialized successfully")
         return True

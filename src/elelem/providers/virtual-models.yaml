@@ -23,6 +23,7 @@ models:
       - model: "baseten:deepseek/deepseek-3.2"
       - model: "parasail:deepseek/deepseek-3.2"
       - model: "fireworks:deepseek/deepseek-3.2"
+      - model: "friendli:deepseek/deepseek-3.2"
       - model: "vertex:deepseek/deepseek-3.2"
       - model: "openai:openai/gpt-4.1"
         priority: always_last
@@ -52,6 +53,7 @@ models:
       - model: "novita:deepseek/deepseek-3.2?reasoning"
       - model: "baseten:deepseek/deepseek-3.2?reasoning"
       - model: "fireworks:deepseek/deepseek-3.2?reasoning"
+      - model: "friendli:deepseek/deepseek-3.2?reasoning"
       - model: "parasail:deepseek/deepseek-3.2?reasoning"
       - model: "vertex:deepseek/deepseek-3.2?reasoning"
       - model: "openai:openai/gpt-4.1"

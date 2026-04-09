@@ -1,0 +1,43 @@
+# Friendli provider configuration and models
+# Reasoning enabled via extra_body: parse_reasoning + chat_template_kwargs.thinking
+provider:
+  endpoint: https://api.friendli.ai/serverless/v1
+  default_params:
+    stream: true
+    stream_options:
+      include_usage: true
+
+models:
+  "friendli:deepseek/deepseek-3.2":
+    metadata:
+      model_reference: "deepseek_v32"
+    provider: friendli
+    model_id: deepseek-ai/DeepSeek-V3.2
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.50
+      output_cost_per_1m: 1.50
+      currency: USD
+
+  "friendli:deepseek/deepseek-3.2?reasoning":
+    metadata:
+      model_reference: "deepseek_v32"
+      model_configuration: "reasoning"
+    provider: friendli
+    model_id: deepseek-ai/DeepSeek-V3.2
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.50
+      output_cost_per_1m: 1.50
+      currency: USD
+    extra_body:
+      parse_reasoning: true
+      chat_template_kwargs:
+        thinking: true

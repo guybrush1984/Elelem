@@ -312,6 +312,19 @@ models:
     candidates:
       - model: "virtual:kimi-k2"
 
+  # ===========================================================================
+  # GOOGLE GEMMA 4 31B
+  # ===========================================================================
+
+  "virtual:gemma4-31b":
+    metadata:
+      model_reference: "google_gemma4_31b"
+    timeout: 120s
+    candidates:
+      - model: "ollama:google/gemma4-31b"
+        priority: always_first
+      - model: "openrouter:google/gemma-4-31b-it"
+
   # ---------------------------------------------------------------------------
   # Claude Sonnet 4.6 — Anthropic direct, then OpenRouter, then DeepSeek fallback
   # ---------------------------------------------------------------------------

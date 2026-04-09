@@ -1,6 +1,7 @@
 # OpenRouter provider configuration and models
 provider:
   endpoint: https://openrouter.ai/api/v1
+  max_tokens_default: 16384
   headers:
     HTTP-Referer: https://github.com/guybrush1984/Elelem
     X-Title: Elelem
@@ -96,6 +97,17 @@ models:
       model_reference: "alibaba_qwen35_plus"
     provider: openrouter
     model_id: qwen/qwen3.5-plus-02-15
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+
+  "openrouter:google/gemma-4-31b-it":
+    metadata:
+      model_reference: "google_gemma4_31b"
+    provider: openrouter
+    model_id: google/gemma-4-31b-it
     capabilities:
       supports_json_mode: false
       supports_temperature: true

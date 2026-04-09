@@ -107,6 +107,13 @@ model_metadata:
     license: "Gemma Terms of Use"
     reasoning: "no"
 
+  google_gemma4_31b: &google-gemma4-31b
+    model_owner: "Google"
+    model_nickname: "gemma4-31b"
+    model_page: "https://huggingface.co/google/gemma-4-31B-it"
+    license: "Apache 2.0"
+    reasoning: "no"
+
   mistral_small_32: &mistral-small-32
     model_owner: "Mistral AI"
     model_nickname: "mistral-small-3.2-24b"

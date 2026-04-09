@@ -1968,3 +1968,96 @@ class TestElelemWithFaker:
         print("✅ Format mutual exclusivity correctly enforced")
 
     print("All comprehensive stats tests added to test_elelem_with_faker.py")
+
+    # =========================================================================
+    # MIN_TPS TESTS — Streaming speed enforcement
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_min_tps_skips_slow_provider(self, elelem_with_faker_env):
+        """Test that min_tps skips slow streaming providers and uses fast one."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # min_tps=10 with eval_window=2s:
+        #   slow-provider (1s/chunk) → ~1 chunk in 2s → ~0.6 tps → too slow
+        #   medium-provider (0.5s/chunk) → ~4 chunks in 2s → ~5 tps → too slow
+        #   fast-provider (instant) → all chunks instantly → high tps → passes
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-min-tps-test",
+            messages=[{"role": "user", "content": "Test min_tps"}],
+            min_tps=10,
+            min_tps_eval_window=2,
+        )
+
+        assert response
+        content = response.choices[0].message.content
+        # Should have reached fast-provider (slow and medium both too slow at min_tps=10)
+        assert "fast" in content.lower(), f"Expected fast provider response, got: {content}"
+        print(f"✅ min_tps skipped slow providers, got: {content}")
+
+    @pytest.mark.asyncio
+    async def test_min_tps_all_too_slow_falls_back(self, elelem_with_faker_env):
+        """Test that when ALL candidates are too slow, min_tps is ignored and request succeeds."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # All candidates in faker-min-tps-all-slow are slow/medium — both will fail min_tps
+        # The fallback should retry without min_tps and succeed
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-min-tps-all-slow",
+            messages=[{"role": "user", "content": "Test fallback"}],
+            min_tps=5,
+            min_tps_eval_window=2,
+        )
+
+        assert response
+        content = response.choices[0].message.content
+        # Should still succeed — one of the slow providers completes without min_tps
+        assert content, f"Expected non-empty response from fallback, got empty"
+        print(f"✅ All too slow → fallback succeeded: {content}")
+
+    @pytest.mark.asyncio
+    async def test_min_tps_ignored_for_single_candidate(self, elelem_with_faker_env):
+        """Test that min_tps is ignored for non-virtual models (single candidate)."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # Direct model call with min_tps — should succeed regardless of speed
+        # because there's no fallback candidate
+        response = await elelem.create_chat_completion(
+            model="faker-streaming:slow-provider",
+            messages=[{"role": "user", "content": "Test single candidate"}],
+            min_tps=999,  # Impossibly high — would fail if enforced
+            min_tps_eval_window=2,
+        )
+
+        assert response
+        content = response.choices[0].message.content
+        assert "slow" in content.lower(), f"Expected slow provider response, got: {content}"
+        print(f"✅ min_tps ignored for single candidate: {content}")
+
+    @pytest.mark.asyncio
+    async def test_min_tps_no_effect_when_not_set(self, elelem_with_faker_env):
+        """Test that without min_tps, slow providers complete normally."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # No min_tps — slow provider should complete normally
+        response = await elelem.create_chat_completion(
+            model="faker-streaming:slow-provider",
+            messages=[{"role": "user", "content": "Test no min_tps"}],
+        )
+
+        assert response
+        content = response.choices[0].message.content
+        assert "slow" in content.lower(), f"Expected slow provider response, got: {content}"
+        print(f"✅ No min_tps, slow provider completed: {content}")

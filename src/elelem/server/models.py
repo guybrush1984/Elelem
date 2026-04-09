@@ -36,6 +36,7 @@ class ChatCompletionRequest(BaseModel):
     csv_schema: Optional[Dict[str, Any]] = None  # Multi-table CSV schema {"tables": {"name": {"columns": {...}}}}
     cache: Optional[bool] = True  # Enable cache by default, set False to bypass
     enforce_schema_in_prompt: Optional[bool] = False  # Force schema injection (default False saves tokens)
+    min_tps: Optional[float] = None  # Minimum tokens/sec — abort and try next candidate if too slow
 
 
 class ErrorResponse(BaseModel):

@@ -21,6 +21,22 @@ class ModelError(Exception):
         self.model = model
 
 
+class TooSlowError(Exception):
+    """Provider is streaming too slowly for this request's min_tps requirement.
+
+    Triggers next candidate WITHOUT cooldown — the provider isn't broken,
+    just too slow for this particular request.
+    """
+
+    def __init__(self, message: str, observed_tps: float = 0, elapsed: float = 0,
+                 provider: str = None, model: str = None):
+        super().__init__(message)
+        self.observed_tps = observed_tps
+        self.elapsed = elapsed
+        self.provider = provider
+        self.model = model
+
+
 class JsonSchemaError(Exception):
     """JSON parsed successfully but failed schema validation. Potentially fixable by LLM."""
 

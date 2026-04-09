@@ -254,11 +254,13 @@ class ScenarioManager:
         elif response_type == 'streaming':
             chunks = response_config.get('chunks', [{"delta": {"content": "Streaming response"}}])
             tokens = response_config.get('tokens', {'input': 50, 'output': 20})
+            chunk_delay = response_config.get('chunk_delay', 0)
 
             return self.response_generator.generate_streaming_response(
                 chunks=chunks,
                 tokens=tokens,
-                model=model
+                model=model,
+                chunk_delay=chunk_delay
             )
 
         else:

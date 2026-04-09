@@ -19,3 +19,42 @@ models:
       input_cost_per_1m: 0.12
       output_cost_per_1m: 0.35
       currency: USD
+
+  # Slow streaming provider for min_tps testing
+  "faker-streaming:slow-provider":
+    provider: faker-streaming
+    model_id: slow-provider
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.10
+      output_cost_per_1m: 0.30
+      currency: USD
+
+  # Medium streaming provider for min_tps testing
+  "faker-streaming:medium-provider":
+    provider: faker-streaming
+    model_id: medium-provider
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.15
+      output_cost_per_1m: 0.40
+      currency: USD
+
+  # Fast streaming provider for min_tps testing
+  "faker-streaming:fast-provider":
+    provider: faker-streaming
+    model_id: fast-provider
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.20
+      output_cost_per_1m: 0.50
+      currency: USD

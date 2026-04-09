@@ -303,8 +303,15 @@ class ResponseGenerator:
 
         return jsonify(response_data)
 
-    def generate_streaming_response(self, chunks: List[Dict], tokens: Dict[str, int], model: str = "faker:stream"):
-        """Generate streaming response with SSE format."""
+    def generate_streaming_response(self, chunks: List[Dict], tokens: Dict[str, int], model: str = "faker:stream", chunk_delay: float = 0):
+        """Generate streaming response with SSE format.
+
+        Args:
+            chunks: List of chunk dicts with 'delta' or 'finish_reason'
+            tokens: Token counts {'input': N, 'output': N}
+            model: Model name for response
+            chunk_delay: Delay in seconds between each chunk (simulates slow providers)
+        """
         import uuid
         import time
         import json
@@ -330,6 +337,8 @@ class ResponseGenerator:
 
             # Send content chunks
             for chunk_data in chunks:
+                if chunk_delay > 0:
+                    time.sleep(chunk_delay)
                 if "delta" in chunk_data:
                     chunk = {
                         "id": completion_id,

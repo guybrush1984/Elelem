@@ -87,6 +87,8 @@ class RequestContext:
     candidate: Dict = field(default_factory=dict)
     timeout: float = 120.0
     chunk_timeout: Optional[float] = None
+    min_tps: Optional[float] = None  # Minimum tokens/sec — abort if too slow (no cooldown)
+    min_tps_eval_window: int = 10  # Seconds before evaluating tps
     capabilities: Dict = field(default_factory=dict)
 
     # API kwargs (mutable - temperature may change)

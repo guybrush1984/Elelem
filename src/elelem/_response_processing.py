@@ -59,7 +59,69 @@ class ChunkTimeoutError(Exception):
     pass
 
 
-async def collect_streaming_response(stream, logger=None, request_id=None, chunk_timeout=None):
+class StreamingAbortError(Exception):
+    """Raised when streaming is aborted due to content issues (wrong format start, repetition loops)."""
+    pass
+
+
+class StreamingTooSlowError(Exception):
+    """Raised when streaming tps is below the min_tps threshold after evaluation window."""
+    def __init__(self, message: str, observed_tps: float = 0, elapsed: float = 0):
+        super().__init__(message)
+        self.observed_tps = observed_tps
+        self.elapsed = elapsed
+
+
+def _validate_format_start(content: str, format_name: str) -> Optional[str]:
+    """Check if streaming content starts appropriately for the expected format.
+
+    Returns error message if content is obviously wrong format, None if OK or
+    not enough content to judge yet.
+    """
+    import re
+
+    stripped = content.lstrip()
+    if len(stripped) < 30:
+        return None  # Not enough content to judge
+
+    # Skip past <think>...</think> prefix (DeepSeek-style inline reasoning)
+    if stripped.startswith('<think>'):
+        if '</think>' not in stripped:
+            return None  # Still in thinking block, wait
+        idx = stripped.index('</think>') + len('</think>')
+        stripped = stripped[idx:].lstrip()
+        if len(stripped) < 30:
+            return None
+
+    first_char = stripped[0] if stripped else ''
+
+    if format_name == "json":
+        # JSON must start with { or [ (or backtick for markdown-wrapped)
+        if first_char not in ('{', '[', '`'):
+            return f"Expected JSON (must start with {{/[) but got: {stripped[:80]!r}"
+
+    elif format_name == "csv":
+        first_line = stripped.split('\n', 1)[0].strip()
+        if not first_line.startswith('###TABLE:'):
+            return f"Expected CSV (must start with ###TABLE:) but got: {stripped[:80]!r}"
+
+    elif format_name == "yaml":
+        first_line = stripped.split('\n', 1)[0].strip()
+        # Valid YAML starts: mapping key (word:), sequence item (- ), document marker (---), markdown wrapper (`)
+        yaml_start = (
+            re.match(r'^[\w"\'][\w\s"\'.-]*:', first_line)  # mapping key
+            or first_line.startswith('- ')                    # sequence item
+            or first_line.startswith('---')                   # document marker
+            or first_line.startswith('`')                     # markdown wrapper
+        )
+        if not yaml_start:
+            return f"Expected YAML (must start with key:/- /---) but got: {stripped[:80]!r}"
+
+    return None
+
+
+
+async def collect_streaming_response(stream, logger=None, request_id=None, chunk_timeout=None, format_name=None, min_tps=None, min_tps_eval_window=10):
     """Collect streaming chunks and reconstruct a normal response object.
 
     Args:
@@ -69,6 +131,12 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
         chunk_timeout: Optional timeout (seconds) for receiving each chunk.
                        If set and no chunk arrives within this time, raises ChunkTimeoutError.
                        This helps detect serverless cold starts and stream stalls.
+        format_name: Optional expected output format ('json', 'yaml', 'csv').
+                     Enables early abort when content obviously doesn't match.
+        min_tps: Optional minimum tokens/second threshold. If set, streaming is
+                 aborted after an evaluation window if tps is below this value.
+                 Raises StreamingTooSlowError (no provider cooldown).
+        min_tps_eval_window: Seconds of streaming before evaluating tps (default: 10).
     """
     import time
     import json
@@ -86,6 +154,9 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
     last_trace_time = None
     trace_interval = 30  # 30 seconds
     long_gap_threshold = 15  # Warn if gap between chunks exceeds this
+    format_start_validated = False  # Set True once format start looks OK
+    tps_eval_window = min_tps_eval_window
+    tps_checked = False  # Only check once
 
     # Convert stream to async iterator for manual iteration with timeout
     stream_iter = stream.__aiter__()
@@ -162,6 +233,40 @@ async def collect_streaming_response(stream, logger=None, request_id=None, chunk
             # Capture finish_reason
             if hasattr(choice, 'finish_reason') and choice.finish_reason:
                 finish_reason = choice.finish_reason
+
+        # === Content quality checks ===
+        request_prefix = f"[{request_id}] " if request_id else ""
+
+        # Format start check: runs every chunk until validated (cheap — just checks first ~30 chars)
+        if format_name and not format_start_validated and content_parts:
+            accumulated = ''.join(content_parts)
+            error = _validate_format_start(accumulated, format_name)
+            if error is not None:
+                elapsed = current_time - first_chunk_time if first_chunk_time else 0
+                if logger:
+                    logger.warning(f"{request_prefix}🛑 Wrong format after {chunk_count} chunks ({elapsed:.1f}s): {error}")
+                raise StreamingAbortError(error)
+            elif len(accumulated.lstrip()) >= 30:
+                format_start_validated = True
+
+        # Min tps check: after evaluation window, check if provider is fast enough
+        if min_tps and not tps_checked and first_chunk_time:
+            elapsed = current_time - first_chunk_time
+            if elapsed >= tps_eval_window:
+                tps_checked = True
+                total_chars = sum(len(p) for p in content_parts) + sum(len(p) for p in reasoning_content_parts)
+                observed_tps = (total_chars / 3.5) / elapsed if elapsed > 0 else 0
+                if observed_tps < min_tps:
+                    if logger:
+                        logger.warning(f"{request_prefix}🐢 Too slow: {observed_tps:.1f} tps after {elapsed:.1f}s (min: {min_tps} tps) — aborting")
+                    raise StreamingTooSlowError(
+                        f"Streaming too slow: {observed_tps:.1f} tps < {min_tps} tps after {elapsed:.1f}s",
+                        observed_tps=observed_tps,
+                        elapsed=elapsed,
+                    )
+                else:
+                    if logger:
+                        logger.info(f"{request_prefix}🐇 Speed check passed: {observed_tps:.1f} tps after {elapsed:.1f}s (min: {min_tps} tps)")
 
         # Keep the last chunk for metadata (id, usage, etc.)
         final_chunk = chunk

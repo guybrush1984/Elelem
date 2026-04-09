@@ -104,6 +104,27 @@ models:
       - model: "virtual:faker-model-error-inner"  # Will be flattened, both fail with same model_ref
       - model: "faker:basic"                       # Different model_reference - should succeed
 
+  # Virtual model for min_tps testing — slow, medium, fast candidates
+  # Used with faker-streaming provider (streaming by default)
+  "virtual:faker-min-tps-test":
+    timeout: 30s
+    candidates:
+      - model: "faker-streaming:slow-provider"
+        timeout: 30s
+      - model: "faker-streaming:medium-provider"
+        timeout: 30s
+      - model: "faker-streaming:fast-provider"
+        timeout: 30s
+
+  # Virtual model where ALL candidates are slow — tests fallback without min_tps
+  "virtual:faker-min-tps-all-slow":
+    timeout: 30s
+    candidates:
+      - model: "faker-streaming:slow-provider"
+        timeout: 30s
+      - model: "faker-streaming:medium-provider"
+        timeout: 30s
+
   # Virtual inheriting from virtual with routing override only
   # Use case: -cheap variants that just change speed_weight
   "virtual:faker-benchmark-cheap":

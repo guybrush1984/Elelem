@@ -1,0 +1,64 @@
+scenario: "elelem_min_tps"
+description: "Test min_tps streaming speed check - slow streaming that triggers too-slow abort"
+type: "conditional"
+
+# Simulates providers with different streaming speeds.
+# slow-provider: 1s per chunk = very slow tps (will trigger min_tps abort)
+# fast-provider: no delay = instant (will pass min_tps check)
+
+conditions:
+  - check: "model_contains"
+    value: "slow-provider"
+    response:
+      type: "streaming"
+      chunk_delay: 1.0
+      chunks:
+        - delta: {"content": "This is a slow "}
+        - delta: {"content": "streaming response "}
+        - delta: {"content": "that takes "}
+        - delta: {"content": "a very long "}
+        - delta: {"content": "time to "}
+        - delta: {"content": "complete fully."}
+        - finish_reason: "stop"
+      tokens:
+        input: 20
+        output: 15
+
+  - check: "model_contains"
+    value: "medium-provider"
+    response:
+      type: "streaming"
+      chunk_delay: 0.5
+      chunks:
+        - delta: {"content": "This is a medium "}
+        - delta: {"content": "speed streaming "}
+        - delta: {"content": "response that "}
+        - delta: {"content": "goes at a "}
+        - delta: {"content": "reasonable pace."}
+        - finish_reason: "stop"
+      tokens:
+        input: 20
+        output: 12
+
+  - check: "model_contains"
+    value: "fast-provider"
+    response:
+      type: "streaming"
+      chunks:
+        - delta: {"content": "This is a fast "}
+        - delta: {"content": "streaming response "}
+        - delta: {"content": "that completes "}
+        - delta: {"content": "very quickly!"}
+        - finish_reason: "stop"
+      tokens:
+        input: 20
+        output: 10
+
+default_response:
+  type: "streaming"
+  chunks:
+    - delta: {"content": "Default response"}
+    - finish_reason: "stop"
+  tokens:
+    input: 20
+    output: 5

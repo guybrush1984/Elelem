@@ -17,9 +17,9 @@ from ._request_state import (
     StateTransition,
     TERMINAL_STATES,
 )
-from ._exceptions import InfrastructureError, ModelError
+from ._exceptions import InfrastructureError, ModelError, TooSlowError
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
-from ._response_processing import process_response_content, ChunkTimeoutError
+from ._response_processing import process_response_content, ChunkTimeoutError, StreamingAbortError, StreamingTooSlowError
 from ._output_formats import FormatParseError, FormatSchemaError
 from ._format_fixer import call_format_fixer
 
@@ -116,7 +116,10 @@ class RequestStateMachine:
                     timeout=ctx.timeout
                 )
                 ctx.response, ctx.chunk_count = await self.elelem._collect_streaming_response(
-                    stream, ctx.request_id, chunk_timeout=ctx.chunk_timeout
+                    stream, ctx.request_id, chunk_timeout=ctx.chunk_timeout,
+                    format_name=ctx.format_handler.name if ctx.format_handler else None,
+                    min_tps=ctx.min_tps,
+                    min_tps_eval_window=ctx.min_tps_eval_window
                 )
             else:
                 # Non-streaming request
@@ -147,6 +150,28 @@ class RequestStateMachine:
                 RequestState.NEXT_CANDIDATE,
                 error=InfrastructureError(
                     f"Streaming chunk timeout: {e}",
+                    provider=ctx.provider_name,
+                    model=ctx.model_name
+                )
+            )
+
+        except StreamingAbortError as e:
+            return StateTransition(
+                RequestState.NEXT_CANDIDATE,
+                error=InfrastructureError(
+                    f"Streaming aborted: {e}",
+                    provider=ctx.provider_name,
+                    model=ctx.model_name
+                )
+            )
+
+        except StreamingTooSlowError as e:
+            return StateTransition(
+                RequestState.NEXT_CANDIDATE,
+                error=TooSlowError(
+                    f"Too slow: {e}",
+                    observed_tps=e.observed_tps,
+                    elapsed=e.elapsed,
                     provider=ctx.provider_name,
                     model=ctx.model_name
                 )

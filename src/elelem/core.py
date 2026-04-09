@@ -17,9 +17,9 @@ from openai import (
 from .config import Config
 from .metrics import MetricsStore
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
-from ._exceptions import InfrastructureError, ModelError, JsonSchemaError
+from ._exceptions import InfrastructureError, ModelError, JsonSchemaError, TooSlowError
 from ._cost_calculation import calculate_costs, extract_runtime_costs
-from ._response_processing import collect_streaming_response, ChunkTimeoutError, process_response_content
+from ._response_processing import collect_streaming_response, ChunkTimeoutError, StreamingAbortError, process_response_content
 from ._json_validation import is_json_validation_api_error  # Still needed for API error detection
 from ._provider_management import create_provider_client, get_model_config
 from ._retry_logic import update_retry_analytics, handle_json_retry, is_infrastructure_error
@@ -208,7 +208,7 @@ class Elelem:
         return get_model_config(model, self._models, self._providers)
         
         
-    async def _collect_streaming_response(self, stream, request_id=None, chunk_timeout=None):
+    async def _collect_streaming_response(self, stream, request_id=None, chunk_timeout=None, format_name=None, min_tps=None, min_tps_eval_window=10):
         """Collect streaming chunks and reconstruct a normal response object.
 
         Args:
@@ -216,11 +216,14 @@ class Elelem:
             request_id: Request ID for logging
             chunk_timeout: Optional timeout (seconds) for receiving each chunk.
                           If no chunk arrives within this time, raises ChunkTimeoutError.
+            format_name: Optional expected format ('json', 'yaml', 'csv') for early abort.
+            min_tps: Optional minimum tokens/sec — abort if too slow after eval window.
+            min_tps_eval_window: Seconds before evaluating tps (default: 10).
 
         Returns:
             Tuple of (response, chunk_count)
         """
-        return await collect_streaming_response(stream, logger=self.logger, request_id=request_id, chunk_timeout=chunk_timeout)
+        return await collect_streaming_response(stream, logger=self.logger, request_id=request_id, chunk_timeout=chunk_timeout, format_name=format_name, min_tps=min_tps, min_tps_eval_window=min_tps_eval_window)
         
     def _is_json_validation_api_error(self, error: Exception) -> bool:
         """Check if the error is a json_validate_failed API error."""
@@ -544,6 +547,8 @@ class Elelem:
         original_temperature = kwargs.get("temperature", 1.0)
 
         # Remove Elelem-specific parameters (if present)
+        min_tps = kwargs.pop("min_tps", None)
+        min_tps_eval_window = kwargs.pop("min_tps_eval_window", 10)
         if "json_schema" in kwargs:
             kwargs.pop("json_schema")
         if "yaml_schema" in kwargs:
@@ -590,6 +595,7 @@ class Elelem:
         # Track failed model_references to skip candidates with the same underlying model
         failed_model_refs = set()
         last_error = None
+        too_slow_best = None  # (candidate, observed_tps) — fastest too-slow candidate for fallback
         cumulative_path = []  # Track full journey across all candidates
 
         for candidate_idx, candidate in enumerate(candidates):
@@ -600,13 +606,33 @@ class Elelem:
                 continue
 
             try:
+                # Only enforce min_tps when there are other candidates to fall back to
+                effective_min_tps = min_tps if len(candidates) > 1 else None
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
                     format_handler, format_schema,
                     original_temperature, tags, cache, cache_key, start_time, request_tracker,
-                    cumulative_path=cumulative_path, **kwargs
+                    cumulative_path=cumulative_path, min_tps=effective_min_tps, min_tps_eval_window=min_tps_eval_window, **kwargs
                 )
+            except TooSlowError as e:
+                self.logger.warning(f"[{request_id}] 🐢 Candidate {candidate_idx + 1} too slow ({e.observed_tps:.1f} tps): {e}")
+                cumulative_path.append("NEXT_CANDIDATE")
+                request_tracker.record_retry("candidate_iterations")
+                last_error = e
+                # Track the fastest too-slow candidate for fallback
+                if not too_slow_best or e.observed_tps > too_slow_best[1]:
+                    too_slow_best = (candidate, e.observed_tps)
+                # No cooldown — provider works fine, just too slow for this request
+                # Record partial tps observation so dynamic routing learns the speed
+                candidate_ref = candidate.get('original_model_ref')
+                if candidate_ref and self._metrics_store:
+                    self._record_partial_tps(
+                        request_id, candidate_ref, candidate.get('provider', ''),
+                        candidate.get('model_id', ''), model,
+                        e.observed_tps, e.elapsed, tags
+                    )
+                continue
             except InfrastructureError as e:
                 self.logger.warning(f"[{request_id}] 🔄 Candidate {candidate_idx + 1} failed (infra): {e}")
                 cumulative_path.append("NEXT_CANDIDATE")
@@ -632,6 +658,34 @@ class Elelem:
                     request_tracker.finalize_failure(self._metrics_store, "ModelError", str(e))
                     raise e
 
+        # All candidates too slow — retry the full chain without min_tps
+        if too_slow_best and isinstance(last_error, TooSlowError):
+            self.logger.warning(f"[{request_id}] 🐢→🔄 All candidates too slow (fastest: {too_slow_best[1]:.1f} tps), retrying without min_tps")
+            for candidate_idx, candidate in enumerate(candidates):
+                candidate_model_ref = candidate.get('model_reference')
+                if candidate_model_ref and candidate_model_ref in failed_model_refs:
+                    continue
+                try:
+                    return await self._attempt_candidate(
+                        candidate, candidate_idx + 1, len(candidates),
+                        messages, model, model_config, request_id,
+                        format_handler, format_schema,
+                        original_temperature, tags, cache, cache_key, start_time, request_tracker,
+                        cumulative_path=cumulative_path, min_tps=None, **kwargs
+                    )
+                except InfrastructureError as e:
+                    cumulative_path.append("NEXT_CANDIDATE")
+                    last_error = e
+                    if candidate.get('original_model_ref'):
+                        self._dynamic_routing_store.mark_failed(candidate['original_model_ref'])
+                    continue
+                except ModelError as e:
+                    if candidate_model_ref:
+                        failed_model_refs.add(candidate_model_ref)
+                    last_error = e
+                    cumulative_path.append("SKIP_MODEL")
+                    continue
+
         # All candidates exhausted (either tried or skipped)
         if last_error:
             request_tracker.finalize_failure(self._metrics_store, "AllCandidatesFailed", str(last_error))
@@ -645,7 +699,7 @@ class Elelem:
                                 messages, original_model, model_config, request_id,
                                 format_handler: Optional[OutputFormat], format_schema: Optional[Dict],
                                 original_temperature, tags, cache, cache_key, start_time, request_tracker,
-                                cumulative_path: list = None, **kwargs):
+                                cumulative_path: list = None, min_tps: Optional[float] = None, min_tps_eval_window: int = 10, **kwargs):
         """Attempt to complete request with a specific candidate.
 
         Uses the RequestStateMachine to process the request through explicit states:
@@ -724,6 +778,8 @@ class Elelem:
             candidate=candidate,
             timeout=timeout,
             chunk_timeout=chunk_timeout,
+            min_tps=min_tps,
+            min_tps_eval_window=min_tps_eval_window,
             capabilities=capabilities,
             api_kwargs=api_kwargs,
             provider_client=provider_client,
@@ -868,6 +924,30 @@ class Elelem:
 
         return response
     
+    def _record_partial_tps(self, request_id, candidate_ref, provider, model_id,
+                            requested_model, observed_tps, elapsed, tags):
+        """Record a partial tps observation from an aborted-too-slow stream.
+
+        Writes a 'success' record with the observed tps so the dynamic routing
+        store picks up the speed for future candidate ranking.
+        """
+        try:
+            from .metrics import RequestTracker
+            partial = RequestTracker(request_id=f"{request_id}-tps-{provider}")
+            partial.requested_model = requested_model
+            partial.selected_candidate = candidate_ref
+            partial.actual_provider = provider
+            partial.actual_model = model_id
+            partial.output_tokens = int(observed_tps * elapsed)
+            partial.llm_start_time = partial.start_time
+            partial.llm_end_time = partial.start_time + elapsed
+            partial.tags = tags or []
+            partial.finalize(status="success")
+            self._metrics_store.finalize_request(partial)
+            self.logger.debug(f"[{request_id}] 📊 Recorded partial tps: {candidate_ref} @ {observed_tps:.1f} t/s")
+        except Exception as e:
+            self.logger.warning(f"[{request_id}] Failed to record partial tps: {e}")
+
     def _is_infrastructure_error(self, error) -> bool:
         """Determine if an error is infrastructure-related (should try next candidate)."""
         return is_infrastructure_error(error)

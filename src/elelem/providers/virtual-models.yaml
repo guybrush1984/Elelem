@@ -80,7 +80,6 @@ models:
     candidates:
       - model: "ollama:deepseek/deepseek-3.1"
         priority: always_first
-      - model: "gmi:deepseek/deepseek-3.1"
       - model: "deepinfra:deepseek/deepseek-3.1"
       - model: "novita:deepseek/deepseek-3.1"
       - model: "fireworks:deepseek/deepseek-3.1"
@@ -182,7 +181,6 @@ models:
       model_reference: "openai_gpt_oss_20b"
     timeout: 120s
     candidates:
-      - model: "gmi:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "novita:openai/gpt-oss-20b?reasoning=$reasoning"
       - model: "groq:openai/gpt-oss-20b?reasoning=$reasoning"
@@ -214,7 +212,6 @@ models:
     candidates:
       - model: "ollama:openai/gpt-oss-120b?reasoning=$reasoning"
         priority: always_first
-      - model: "gmi:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "baseten:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-120b?reasoning=$reasoning"
       - model: "deepinfra:openai/gpt-oss-120b-turbo?reasoning=$reasoning"

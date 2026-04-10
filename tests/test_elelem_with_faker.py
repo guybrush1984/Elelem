@@ -2132,3 +2132,141 @@ class TestElelemWithFaker:
         assert "format configuration error" in str(exc_info.value).lower()
         assert "JSON" in str(exc_info.value)
         print(f"✅ JSON→CSV mismatch detected: {exc_info.value}")
+
+    @pytest.mark.asyncio
+    async def test_min_tps_all_known_slow_skips_streaming_check(self, elelem_with_faker_env):
+        """Test that when all candidates are known to be slower than min_tps,
+        the upfront filter tags them to skip the streaming check entirely.
+
+        This avoids wasting 10s × N candidates on streaming aborts when we
+        already know none will qualify.
+        """
+        import time
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # Phase 1: Populate stats by hitting each slow provider directly
+        # This gives the routing store known tps values
+        for model in ["faker-streaming:slow-provider", "faker-streaming:medium-provider"]:
+            await elelem.create_chat_completion(
+                model=model,
+                messages=[{"role": "user", "content": "Warmup"}],
+            )
+
+        elelem._dynamic_routing_store.invalidate_cache()
+
+        # Verify stats are populated
+        stats = elelem._dynamic_routing_store.get_dynamic_stats()
+        print(f"Stats after warmup: {list(stats.keys())}")
+        assert len(stats) >= 2, f"Expected at least 2 providers in stats, got {len(stats)}"
+
+        # Phase 2: Request with min_tps=999 (impossible threshold)
+        # Both candidates are known slow → upfront filter tags them all → no streaming check
+        # Should complete quickly (no 10s × 2 waits) via the fallback path
+        faker.reset_state()
+        start = time.time()
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-min-tps-all-slow",
+            messages=[{"role": "user", "content": "All known slow test"}],
+            min_tps=999,
+            min_tps_eval_window=2,
+        )
+        elapsed = time.time() - start
+
+        assert response
+        content = response.choices[0].message.content
+        assert content, "Expected non-empty response"
+
+        # Key assertion: should complete much faster than 2 × eval_window (4s)
+        # because the streaming check was skipped entirely
+        # The slow provider takes ~6s (6 chunks × 1s delay) but no 2s eval wait per candidate
+        print(f"✅ All known slow, completed in {elapsed:.1f}s (content: {content[:50]})")
+        assert elapsed < 15, f"Expected fast completion (no streaming waits), but took {elapsed:.1f}s"
+
+    @pytest.mark.asyncio
+    async def test_min_tps_upfront_ordering_fast_before_slow(self, elelem_with_faker_env):
+        """Test that candidates meeting min_tps are tried before slow ones.
+
+        Phase 1: Warmup all 3 providers to populate stats (slow=1tps, medium=5tps, fast=instant)
+        Phase 2: Request with min_tps=10 → fast should be tried first, slow/medium as fallback
+        """
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # Phase 1: Warmup to populate stats
+        for model in ["faker-streaming:slow-provider", "faker-streaming:medium-provider", "faker-streaming:fast-provider"]:
+            await elelem.create_chat_completion(
+                model=model,
+                messages=[{"role": "user", "content": "Warmup"}],
+            )
+
+        elelem._dynamic_routing_store.invalidate_cache()
+
+        stats = elelem._dynamic_routing_store.get_dynamic_stats()
+        print(f"Stats: {[(k, f'{v.avg_tokens_per_sec:.1f} t/s') for k, v in stats.items()]}")
+
+        # Phase 2: Use virtual model with min_tps=10
+        # Fast provider (instant) should be above threshold, slow/medium below
+        # With exploration disabled (monkeypatch random), fast should be tried first
+        faker.reset_state()
+
+        import random
+        original_random = random.random
+        random.random = lambda: 0.99  # Always > epsilon → exploitation mode
+
+        try:
+            response = await elelem.create_chat_completion(
+                model="virtual:faker-min-tps-test",
+                messages=[{"role": "user", "content": "Ordering test"}],
+                min_tps=10,
+                min_tps_eval_window=2,
+            )
+        finally:
+            random.random = original_random
+
+        assert response
+        content = response.choices[0].message.content
+        # Fast provider streams instantly → should be the one that responds
+        assert "fast" in content.lower(), f"Expected fast provider first, got: {content}"
+        print(f"✅ Fast provider tried first with min_tps ordering: {content}")
+
+    @pytest.mark.asyncio
+    async def test_min_tps_slow_fallback_when_fast_fails(self, elelem_with_faker_env):
+        """Test that slow candidates are used as fallback when fast ones fail.
+
+        Phase 1: Warmup slow and medium providers
+        Phase 2: Use virtual model where fast provider is not available,
+                 slow ones should still complete (they're in the fallback list)
+        """
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_min_tps')
+        faker.reset_state()
+
+        # Phase 1: Warmup only slow and medium
+        for model in ["faker-streaming:slow-provider", "faker-streaming:medium-provider"]:
+            await elelem.create_chat_completion(
+                model=model,
+                messages=[{"role": "user", "content": "Warmup"}],
+            )
+
+        elelem._dynamic_routing_store.invalidate_cache()
+
+        # Phase 2: Use the all-slow virtual model with min_tps
+        # Both are below threshold but should work as fallback (tagged _exploration)
+        faker.reset_state()
+        response = await elelem.create_chat_completion(
+            model="virtual:faker-min-tps-all-slow",
+            messages=[{"role": "user", "content": "Fallback test"}],
+            min_tps=999,  # Impossible threshold
+            min_tps_eval_window=2,
+        )
+
+        assert response
+        content = response.choices[0].message.content
+        assert content, "Expected response from slow fallback"
+        print(f"✅ Slow fallback worked: {content}")

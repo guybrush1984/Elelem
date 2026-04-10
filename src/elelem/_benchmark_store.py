@@ -138,11 +138,11 @@ def reorder_candidates_by_benchmark(
         log.info(f"{log_prefix}🎲 Exploration mode (ε={epsilon:.0%}, coverage={coverage_pct:.0f}%): randomizing candidate order")
 
     # Group candidates by priority and score
-    always_first = []  # priority: always_first
-    scored = []        # Have dynamic score
-    unscored = []      # No performance data
-    filtered_out = []  # Below min_tokens_per_sec threshold
-    always_last = []   # priority: always_last (fallbacks)
+    always_first = []   # priority: always_first
+    fast_enough = []    # Meet min_tps threshold, sorted by value
+    too_slow = []       # Below min_tps threshold, sorted by value (fallback)
+    unscored = []       # No performance data
+    always_last = []    # priority: always_last (fallbacks)
 
     for idx, candidate in enumerate(candidates):
         priority = (candidate.get('priority') or '').lower()
@@ -177,11 +177,6 @@ def reorder_candidates_by_benchmark(
             sample_count = stats.sample_count
             tps = stats.avg_tokens_per_sec
 
-            # Check minimum speed threshold
-            if min_tokens_per_sec > 0 and tps < min_tokens_per_sec:
-                filtered_out.append((idx, candidate, model_ref))
-                continue
-
         # Calculate value score if we have dynamic data
         if tps is not None and tps > 0:
             # Value = speed^weight / cost
@@ -195,34 +190,26 @@ def reorder_candidates_by_benchmark(
             candidate['_value_score'] = value_score
             candidate['_tps'] = tps
             candidate['_sample_count'] = sample_count
-            scored.append((value_score, sample_count, idx, candidate))
+
+            # Sort into fast_enough vs too_slow based on min_tps threshold
+            if min_tokens_per_sec > 0 and tps < min_tokens_per_sec:
+                candidate['_skip_min_tps'] = True  # Known slow — don't waste time on streaming speed check
+                too_slow.append((value_score, sample_count, idx, candidate))
+            else:
+                fast_enough.append((value_score, sample_count, idx, candidate))
         else:
             unscored.append((idx, candidate))
 
-    # Check if ALL routable candidates were filtered out - fallback to YAML order
-    if filtered_out and not scored and not unscored:
-        log.warning(
-            f"{log_prefix}All {len(filtered_out)} routable candidates below {min_tokens_per_sec} t/s threshold, "
-            f"falling back to YAML order for non-priority candidates"
-        )
-        result = [c for (_, c) in always_first]
-        for idx, candidate in enumerate(candidates):
-            priority = (candidate.get('priority') or '').lower()
-            if priority not in ('always_first', 'always_last'):
-                result.append(candidate)
-        result.extend([c for (_, c) in always_last])
-        return result
+    # Sort each scored group by value (descending - higher is better)
+    fast_enough.sort(key=lambda x: x[0], reverse=True)
+    too_slow.sort(key=lambda x: x[0], reverse=True)
 
-    # Log filtering (only if some were filtered but not all)
-    if filtered_out:
-        filtered_refs = [ref for (_, _, ref) in filtered_out]
-        log.debug(f"{log_prefix}Filtered out {len(filtered_out)} candidates below {min_tokens_per_sec} t/s: {filtered_refs}")
+    if too_slow:
+        slow_refs = [c.get('original_model_ref', '?') for (_, _, _, c) in too_slow]
+        log.debug(f"{log_prefix}Below {min_tokens_per_sec} t/s (fallback): {slow_refs}")
 
-    # Sort scored candidates by value score (descending - higher is better)
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    # Combine scored and unscored for the routable middle section
-    routable = [c for (_, _, _, c) in scored] + [c for (_, c) in unscored]
+    # Combine: fast_enough by value → too_slow by value → unscored
+    routable = [c for (_, _, _, c) in fast_enough] + [c for (_, _, _, c) in too_slow] + [c for (_, c) in unscored]
 
     # Epsilon-greedy exploration: favor models with fewer samples
     if explore_this_request and routable:

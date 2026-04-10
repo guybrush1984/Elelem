@@ -427,6 +427,10 @@ class Elelem:
             stream=kwargs.get("stream", False)
         )
         
+        # Extract Elelem-specific parameters early (needed for routing decisions)
+        min_tps = kwargs.pop("min_tps", None)
+        min_tps_eval_window = kwargs.pop("min_tps_eval_window", 10)
+
         # Get model configuration and candidates
         try:
             model_config = self.config.get_model_config(model)
@@ -457,7 +461,9 @@ class Elelem:
             routing = model_config.get('routing')
             if routing:
                 speed_weight = routing.get('speed_weight', 1.0)
-                min_tokens_per_sec = routing.get('min_tokens_per_sec', 0.0)
+                # Use the higher of routing config threshold and per-request min_tps
+                config_min_tps = routing.get('min_tokens_per_sec', 0.0)
+                effective_min_tokens = max(config_min_tps, min_tps or 0.0)
 
                 # Get dynamic stats for routing decisions
                 dynamic_stats = self._dynamic_routing_store.get_dynamic_stats()
@@ -468,7 +474,7 @@ class Elelem:
                 candidates = reorder_candidates_by_benchmark(
                     candidates,
                     speed_weight=speed_weight,
-                    min_tokens_per_sec=min_tokens_per_sec,
+                    min_tokens_per_sec=effective_min_tokens,
                     dynamic_stats=dynamic_stats,
                     failed_candidates=failed_candidates,
                     logger=self.logger,
@@ -547,8 +553,6 @@ class Elelem:
         original_temperature = kwargs.get("temperature", 1.0)
 
         # Remove Elelem-specific parameters (if present)
-        min_tps = kwargs.pop("min_tps", None)
-        min_tps_eval_window = kwargs.pop("min_tps_eval_window", 10)
         if "json_schema" in kwargs:
             kwargs.pop("json_schema")
         if "yaml_schema" in kwargs:
@@ -595,7 +599,6 @@ class Elelem:
         # Track failed model_references to skip candidates with the same underlying model
         failed_model_refs = set()
         last_error = None
-        too_slow_best = None  # (candidate, observed_tps) — fastest too-slow candidate for fallback
         cumulative_path = []  # Track full journey across all candidates
 
         for candidate_idx, candidate in enumerate(candidates):
@@ -606,8 +609,11 @@ class Elelem:
                 continue
 
             try:
-                # Only enforce min_tps when there are other candidates to fall back to
-                effective_min_tps = min_tps if len(candidates) > 1 else None
+                # Skip min_tps for: single candidate (no fallback) or exploration picks (measuring speed)
+                if len(candidates) <= 1 or candidate.get('_skip_min_tps'):
+                    effective_min_tps = None
+                else:
+                    effective_min_tps = min_tps
                 return await self._attempt_candidate(
                     candidate, candidate_idx + 1, len(candidates),
                     messages, model, model_config, request_id,
@@ -620,9 +626,6 @@ class Elelem:
                 cumulative_path.append("NEXT_CANDIDATE")
                 request_tracker.record_retry("candidate_iterations")
                 last_error = e
-                # Track the fastest too-slow candidate for fallback
-                if not too_slow_best or e.observed_tps > too_slow_best[1]:
-                    too_slow_best = (candidate, e.observed_tps)
                 # No cooldown — provider works fine, just too slow for this request
                 # Record partial tps observation so dynamic routing learns the speed
                 candidate_ref = candidate.get('original_model_ref')
@@ -657,34 +660,6 @@ class Elelem:
                     # No model_reference - can't do model-level failover, raise immediately
                     request_tracker.finalize_failure(self._metrics_store, "ModelError", str(e))
                     raise e
-
-        # All candidates too slow — retry the full chain without min_tps
-        if too_slow_best and isinstance(last_error, TooSlowError):
-            self.logger.warning(f"[{request_id}] 🐢→🔄 All candidates too slow (fastest: {too_slow_best[1]:.1f} tps), retrying without min_tps")
-            for candidate_idx, candidate in enumerate(candidates):
-                candidate_model_ref = candidate.get('model_reference')
-                if candidate_model_ref and candidate_model_ref in failed_model_refs:
-                    continue
-                try:
-                    return await self._attempt_candidate(
-                        candidate, candidate_idx + 1, len(candidates),
-                        messages, model, model_config, request_id,
-                        format_handler, format_schema,
-                        original_temperature, tags, cache, cache_key, start_time, request_tracker,
-                        cumulative_path=cumulative_path, min_tps=None, **kwargs
-                    )
-                except InfrastructureError as e:
-                    cumulative_path.append("NEXT_CANDIDATE")
-                    last_error = e
-                    if candidate.get('original_model_ref'):
-                        self._dynamic_routing_store.mark_failed(candidate['original_model_ref'])
-                    continue
-                except ModelError as e:
-                    if candidate_model_ref:
-                        failed_model_refs.add(candidate_model_ref)
-                    last_error = e
-                    cumulative_path.append("SKIP_MODEL")
-                    continue
 
         # All candidates exhausted (either tried or skipped)
         if last_error:

@@ -19,7 +19,7 @@ from ._request_state import (
 )
 from ._exceptions import InfrastructureError, ModelError, TooSlowError
 from ._reasoning_tokens import extract_token_counts, extract_reasoning_content
-from ._response_processing import process_response_content, ChunkTimeoutError, StreamingAbortError, StreamingTooSlowError
+from ._response_processing import process_response_content, ChunkTimeoutError, StreamingAbortError, StreamingFormatMismatchError, StreamingTooSlowError
 from ._output_formats import FormatParseError, FormatSchemaError
 from ._format_fixer import call_format_fixer
 
@@ -155,7 +155,16 @@ class RequestStateMachine:
                 )
             )
 
+        except StreamingFormatMismatchError as e:
+            # Output matches a different known format (e.g., CSV when JSON requested)
+            # This is a prompt/format configuration error — fail immediately.
+            # No point trying other candidates, they'll all produce the same output.
+            raise ValueError(
+                f"Format configuration error: {e}"
+            )
+
         except StreamingAbortError as e:
+            # Unrecognizable output (garbage) — try next provider, with cooldown
             return StateTransition(
                 RequestState.NEXT_CANDIDATE,
                 error=InfrastructureError(

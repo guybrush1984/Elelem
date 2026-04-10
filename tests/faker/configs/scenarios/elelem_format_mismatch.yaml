@@ -1,0 +1,15 @@
+scenario: "elelem_format_mismatch"
+description: "Test format mismatch detection - output matches a known format but not the requested one"
+type: "fixed"
+
+response:
+  type: "streaming"
+  chunks:
+    - delta: {"content": "###TABLE:story\ncharacter"}
+    - delta: {"content": ";character_id;name;role\n"}
+    - delta: {"content": "Léa;char-001;Léa;protagonist\n"}
+    - delta: {"content": "Paco;char-002;Paco;companion\n"}
+    - finish_reason: "stop"
+  tokens:
+    input: 50
+    output: 30

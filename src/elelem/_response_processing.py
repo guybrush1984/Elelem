@@ -64,6 +64,18 @@ class StreamingAbortError(Exception):
     pass
 
 
+class StreamingFormatMismatchError(Exception):
+    """Raised when output matches a known Elelem format but not the requested one.
+
+    This indicates a prompt/format configuration error (e.g., prompt says CSV
+    but response_format says JSON), not a provider or model failure.
+    """
+    def __init__(self, message: str, expected_format: str = None, detected_format: str = None):
+        super().__init__(message)
+        self.expected_format = expected_format
+        self.detected_format = detected_format
+
+
 class StreamingTooSlowError(Exception):
     """Raised when streaming tps is below the min_tps threshold after evaluation window."""
     def __init__(self, message: str, observed_tps: float = 0, elapsed: float = 0):
@@ -72,11 +84,35 @@ class StreamingTooSlowError(Exception):
         self.elapsed = elapsed
 
 
+def _detect_format(stripped: str) -> Optional[str]:
+    """Detect which known Elelem format the content looks like.
+
+    Returns 'json', 'csv', 'yaml', or None if unrecognizable.
+    """
+    import re
+
+    first_char = stripped[0] if stripped else ''
+    first_line = stripped.split('\n', 1)[0].strip()
+
+    if first_char in ('{', '['):
+        return "json"
+    if first_line.startswith('###TABLE:'):
+        return "csv"
+    if (re.match(r'^[\w"\'][\w\s"\'.-]*:', first_line)
+            or first_line.startswith('- ')
+            or first_line.startswith('---')):
+        return "yaml"
+    return None
+
+
 def _validate_format_start(content: str, format_name: str) -> Optional[str]:
     """Check if streaming content starts appropriately for the expected format.
 
     Returns error message if content is obviously wrong format, None if OK or
     not enough content to judge yet.
+
+    Raises StreamingFormatMismatchError if the output matches a *different*
+    known Elelem format (likely a prompt/format configuration error).
     """
     import re
 
@@ -98,11 +134,25 @@ def _validate_format_start(content: str, format_name: str) -> Optional[str]:
     if format_name == "json":
         # JSON must start with { or [ (or backtick for markdown-wrapped)
         if first_char not in ('{', '[', '`'):
+            detected = _detect_format(stripped)
+            if detected:
+                raise StreamingFormatMismatchError(
+                    f"Output is {detected.upper()} but JSON was requested — check your prompt/schema configuration. Got: {stripped[:80]!r}",
+                    expected_format=format_name,
+                    detected_format=detected,
+                )
             return f"Expected JSON (must start with {{/[) but got: {stripped[:80]!r}"
 
     elif format_name == "csv":
         first_line = stripped.split('\n', 1)[0].strip()
         if not first_line.startswith('###TABLE:'):
+            detected = _detect_format(stripped)
+            if detected:
+                raise StreamingFormatMismatchError(
+                    f"Output is {detected.upper()} but CSV was requested — check your prompt/schema configuration. Got: {stripped[:80]!r}",
+                    expected_format=format_name,
+                    detected_format=detected,
+                )
             return f"Expected CSV (must start with ###TABLE:) but got: {stripped[:80]!r}"
 
     elif format_name == "yaml":
@@ -115,6 +165,13 @@ def _validate_format_start(content: str, format_name: str) -> Optional[str]:
             or first_line.startswith('`')                     # markdown wrapper
         )
         if not yaml_start:
+            detected = _detect_format(stripped)
+            if detected:
+                raise StreamingFormatMismatchError(
+                    f"Output is {detected.upper()} but YAML was requested — check your prompt/schema configuration. Got: {stripped[:80]!r}",
+                    expected_format=format_name,
+                    detected_format=detected,
+                )
             return f"Expected YAML (must start with key:/- /---) but got: {stripped[:80]!r}"
 
     return None

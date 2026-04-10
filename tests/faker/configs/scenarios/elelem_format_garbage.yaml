@@ -1,0 +1,14 @@
+scenario: "elelem_format_garbage"
+description: "Test format abort on unrecognizable garbage output"
+type: "fixed"
+
+response:
+  type: "streaming"
+  chunks:
+    - delta: {"content": "<html><head><title>Error</title>"}
+    - delta: {"content": "</head><body>500 Internal Server"}
+    - delta: {"content": " Error</body></html>"}
+    - finish_reason: "stop"
+  tokens:
+    input: 50
+    output: 20

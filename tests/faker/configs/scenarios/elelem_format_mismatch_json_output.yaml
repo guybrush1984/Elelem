@@ -1,0 +1,14 @@
+scenario: "elelem_format_mismatch_json_output"
+description: "Model outputs JSON when CSV was requested"
+type: "fixed"
+
+response:
+  type: "streaming"
+  chunks:
+    - delta: {"content": "{\"characters\": [{\"name\": \"Léa\""}
+    - delta: {"content": ", \"role\": \"protagonist\"}, {\"name\":"}
+    - delta: {"content": " \"Paco\", \"role\": \"companion\"}]}"}
+    - finish_reason: "stop"
+  tokens:
+    input: 50
+    output: 25

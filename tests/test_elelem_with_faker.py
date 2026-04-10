@@ -2061,3 +2061,74 @@ class TestElelemWithFaker:
         content = response.choices[0].message.content
         assert "slow" in content.lower(), f"Expected slow provider response, got: {content}"
         print(f"✅ No min_tps, slow provider completed: {content}")
+
+    # =========================================================================
+    # FORMAT MISMATCH TESTS — Detect prompt/format configuration errors
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_format_mismatch_csv_when_json_requested(self, elelem_with_faker_env):
+        """Test that outputting CSV when JSON is requested is detected as a format mismatch.
+
+        This should fail fast with ModelError (no cooldown, no point trying other providers)
+        because the issue is a prompt/format configuration error.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_format_mismatch')
+        faker.reset_state()
+
+        # Request JSON but faker returns CSV content — should fail immediately with ValueError
+        with pytest.raises(ValueError) as exc_info:
+            await elelem.create_chat_completion(
+                model="faker-streaming:streaming-test",
+                messages=[{"role": "user", "content": "Generate a story"}],
+                response_format={"type": "json_object"},
+            )
+
+        assert "format configuration error" in str(exc_info.value).lower()
+        assert "CSV" in str(exc_info.value)
+        print(f"✅ Format mismatch detected immediately: {exc_info.value}")
+
+    @pytest.mark.asyncio
+    async def test_format_garbage_triggers_infra_error(self, elelem_with_faker_env):
+        """Test that unrecognizable garbage output triggers InfrastructureError with cooldown.
+
+        Unlike format mismatch, garbage means something is wrong with the provider.
+        """
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_format_garbage')
+        faker.reset_state()
+
+        from elelem._exceptions import InfrastructureError
+
+        # Request JSON but faker returns HTML garbage
+        with pytest.raises(InfrastructureError) as exc_info:
+            await elelem.create_chat_completion(
+                model="faker-streaming:streaming-test",
+                messages=[{"role": "user", "content": "Generate something"}],
+                response_format={"type": "json_object"},
+            )
+
+        assert "streaming aborted" in str(exc_info.value).lower()
+        print(f"✅ Garbage detected as infra error: {exc_info.value}")
+
+    @pytest.mark.asyncio
+    async def test_format_mismatch_json_when_csv_requested(self, elelem_with_faker_env):
+        """Test that outputting JSON when CSV is requested is detected as format mismatch."""
+        elelem, faker = elelem_with_faker_env
+
+        faker.configure_scenario('elelem_format_mismatch_json_output')
+        faker.reset_state()
+
+        with pytest.raises(ValueError) as exc_info:
+            await elelem.create_chat_completion(
+                model="faker-streaming:streaming-test",
+                messages=[{"role": "user", "content": "Generate a story"}],
+                csv_schema={"tables": {"story": {"columns": {"name": {"type": "string"}}}}},
+            )
+
+        assert "format configuration error" in str(exc_info.value).lower()
+        assert "JSON" in str(exc_info.value)
+        print(f"✅ JSON→CSV mismatch detected: {exc_info.value}")

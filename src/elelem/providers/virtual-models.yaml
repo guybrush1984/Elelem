@@ -83,6 +83,7 @@ models:
       - model: "novita:deepseek/deepseek-v4-flash"
       - model: "openrouter:deepseek/deepseek-v4-flash"
       - model: "virtual:deepseek-v3.2"
+        priority: always_last
       - model: "openai:openai/gpt-4.1"
         priority: always_last
 
@@ -109,6 +110,7 @@ models:
       - model: "novita:deepseek/deepseek-v4-flash?reasoning"
       - model: "openrouter:deepseek/deepseek-v4-flash?reasoning"
       - model: "virtual:deepseek-v3.2?reasoning"
+        priority: always_last
       - model: "openai:openai/gpt-4.1"
         priority: always_last
 
@@ -139,6 +141,7 @@ models:
       - model: "fireworks:deepseek/deepseek-v4-pro"
       - model: "openrouter:deepseek/deepseek-v4-pro"
       - model: "virtual:deepseek-v3.2"
+        priority: always_last
       - model: "openai:openai/gpt-4.1"
         priority: always_last
 
@@ -166,6 +169,7 @@ models:
       - model: "fireworks:deepseek/deepseek-v4-pro?reasoning"
       - model: "openrouter:deepseek/deepseek-v4-pro?reasoning"
       - model: "virtual:deepseek-v3.2?reasoning"
+        priority: always_last
       - model: "openai:openai/gpt-4.1"
         priority: always_last
 

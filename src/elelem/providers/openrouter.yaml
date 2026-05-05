@@ -135,3 +135,63 @@ models:
       supports_temperature: true
       supports_system: true
     cost: runtime
+
+  "openrouter:deepseek/deepseek-v4-flash":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+    provider: openrouter
+    model_id: deepseek/deepseek-v4-flash
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+    extra_body:
+      reasoning:
+        enabled: false
+
+  "openrouter:deepseek/deepseek-v4-flash?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+      model_configuration: "reasoning"
+    provider: openrouter
+    model_id: deepseek/deepseek-v4-flash
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+    extra_body:
+      reasoning:
+        enabled: true
+
+  "openrouter:deepseek/deepseek-v4-pro":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+    provider: openrouter
+    model_id: deepseek/deepseek-v4-pro
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+    extra_body:
+      reasoning:
+        enabled: false
+
+  "openrouter:deepseek/deepseek-v4-pro?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+      model_configuration: "reasoning"
+    provider: openrouter
+    model_id: deepseek/deepseek-v4-pro
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost: runtime
+    extra_body:
+      reasoning:
+        enabled: true

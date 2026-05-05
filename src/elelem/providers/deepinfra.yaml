@@ -225,6 +225,86 @@ models:
       reasoning:
         enabled: true
 
+  "deepinfra:deepseek/deepseek-v4-flash":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V4-Flash
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.14
+      output_cost_per_1m: 0.28
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: false
+
+  "deepinfra:deepseek/deepseek-v4-flash?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+      model_configuration: "reasoning"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V4-Flash
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.14
+      output_cost_per_1m: 0.28
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: true
+
+  "deepinfra:deepseek/deepseek-v4-pro":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V4-Pro
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.74
+      output_cost_per_1m: 3.48
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: false
+
+  "deepinfra:deepseek/deepseek-v4-pro?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+      model_configuration: "reasoning"
+    provider: deepinfra
+    model_id: deepseek-ai/DeepSeek-V4-Pro
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.74
+      output_cost_per_1m: 3.48
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      reasoning:
+        enabled: true
+
   "deepinfra:moonshotai/kimi-k2-instruct":
     metadata:
       model_reference: "moonshot_kimi_k2"

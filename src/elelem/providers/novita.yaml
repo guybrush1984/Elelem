@@ -123,6 +123,78 @@ models:
     extra_body:
       enable_thinking: true
 
+  "novita:deepseek/deepseek-v4-flash":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+    provider: novita
+    model_id: deepseek/deepseek-v4-flash
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.14
+      output_cost_per_1m: 0.28
+      currency: USD
+    extra_body:
+      enable_thinking: false
+
+  "novita:deepseek/deepseek-v4-flash?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+      model_configuration: "reasoning"
+    provider: novita
+    model_id: deepseek/deepseek-v4-flash
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 0.14
+      output_cost_per_1m: 0.28
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      enable_thinking: true
+
+  "novita:deepseek/deepseek-v4-pro":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+    provider: novita
+    model_id: deepseek/deepseek-v4-pro
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.74
+      output_cost_per_1m: 3.48
+      currency: USD
+    extra_body:
+      enable_thinking: false
+
+  "novita:deepseek/deepseek-v4-pro?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+      model_configuration: "reasoning"
+    provider: novita
+    model_id: deepseek/deepseek-v4-pro
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.74
+      output_cost_per_1m: 3.48
+      currency: USD
+    default_params:
+      stream: true
+    extra_body:
+      enable_thinking: true
+
   "novita:moonshotai/kimi-k2-instruct":
     metadata:
       model_reference: "moonshot_kimi_k2"

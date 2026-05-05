@@ -176,6 +176,42 @@ models:
     default_params:
       reasoning_effort: medium
 
+  # DeepSeek V4 Pro - non-reasoning (reasoning_effort=none disables reasoning for V4)
+  "fireworks:deepseek/deepseek-v4-pro":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v4-pro
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.74
+      output_cost_per_1m: 3.48
+      currency: USD
+    default_params:
+      reasoning_effort: "none"
+
+  # DeepSeek V4 Pro - reasoning enabled
+  "fireworks:deepseek/deepseek-v4-pro?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+      model_configuration: "reasoning"
+    provider: fireworks
+    model_id: accounts/fireworks/models/deepseek-v4-pro
+    timeout: 300
+    capabilities:
+      supports_json_mode: false
+      supports_temperature: true
+      supports_system: true
+    cost:
+      input_cost_per_1m: 1.74
+      output_cost_per_1m: 3.48
+      currency: USD
+    default_params:
+      reasoning_effort: medium
+
   "fireworks:moonshotai/kimi-k2-instruct":
     metadata:
       model_reference: "moonshot_kimi_k2"

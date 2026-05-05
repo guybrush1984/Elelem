@@ -70,6 +70,118 @@ models:
       - model: "virtual:deepseek-v3.2?reasoning"
 
   # ===========================================================================
+  # DEEPSEEK V4 FLASH
+  # ===========================================================================
+
+  "virtual:deepseek-v4-flash":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-v4-flash"
+      - model: "parasail:deepseek/deepseek-v4-flash"
+      - model: "novita:deepseek/deepseek-v4-flash"
+      - model: "openrouter:deepseek/deepseek-v4-flash"
+      - model: "virtual:deepseek-v3.2"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last
+
+  "virtual:deepseek-v4-flash-cheap":
+    routing:
+      speed_weight: 0.3
+    candidates:
+      - model: "virtual:deepseek-v4-flash"
+
+  "virtual:deepseek-v4-flash-quick":
+    routing:
+      speed_weight: 2.0
+    candidates:
+      - model: "virtual:deepseek-v4-flash"
+
+  "virtual:deepseek-v4-flash?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_flash"
+      model_configuration: "reasoning"
+    timeout: 300s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-v4-flash?reasoning"
+      - model: "parasail:deepseek/deepseek-v4-flash?reasoning"
+      - model: "novita:deepseek/deepseek-v4-flash?reasoning"
+      - model: "openrouter:deepseek/deepseek-v4-flash?reasoning"
+      - model: "virtual:deepseek-v3.2?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last
+
+  "virtual:deepseek-v4-flash-cheap?reasoning":
+    routing:
+      speed_weight: 0.3
+    candidates:
+      - model: "virtual:deepseek-v4-flash?reasoning"
+
+  "virtual:deepseek-v4-flash-quick?reasoning":
+    routing:
+      speed_weight: 2.0
+    candidates:
+      - model: "virtual:deepseek-v4-flash?reasoning"
+
+  # ===========================================================================
+  # DEEPSEEK V4 PRO
+  # ===========================================================================
+
+  "virtual:deepseek-v4-pro":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+    timeout: 120s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-v4-pro"
+      - model: "parasail:deepseek/deepseek-v4-pro"
+      - model: "novita:deepseek/deepseek-v4-pro"
+      - model: "fireworks:deepseek/deepseek-v4-pro"
+      - model: "openrouter:deepseek/deepseek-v4-pro"
+      - model: "virtual:deepseek-v3.2"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last
+
+  "virtual:deepseek-v4-pro-cheap":
+    routing:
+      speed_weight: 0.3
+    candidates:
+      - model: "virtual:deepseek-v4-pro"
+
+  "virtual:deepseek-v4-pro-quick":
+    routing:
+      speed_weight: 2.0
+    candidates:
+      - model: "virtual:deepseek-v4-pro"
+
+  "virtual:deepseek-v4-pro?reasoning":
+    metadata:
+      model_reference: "deepseek_v4_pro"
+      model_configuration: "reasoning"
+    timeout: 300s
+    candidates:
+      - model: "deepinfra:deepseek/deepseek-v4-pro?reasoning"
+      - model: "parasail:deepseek/deepseek-v4-pro?reasoning"
+      - model: "novita:deepseek/deepseek-v4-pro?reasoning"
+      - model: "fireworks:deepseek/deepseek-v4-pro?reasoning"
+      - model: "openrouter:deepseek/deepseek-v4-pro?reasoning"
+      - model: "virtual:deepseek-v3.2?reasoning"
+      - model: "openai:openai/gpt-4.1"
+        priority: always_last
+
+  "virtual:deepseek-v4-pro-cheap?reasoning":
+    routing:
+      speed_weight: 0.3
+    candidates:
+      - model: "virtual:deepseek-v4-pro?reasoning"
+
+  "virtual:deepseek-v4-pro-quick?reasoning":
+    routing:
+      speed_weight: 2.0
+    candidates:
+      - model: "virtual:deepseek-v4-pro?reasoning"
+
+  # ===========================================================================
   # DEEPSEEK 3.1
   # ===========================================================================
 

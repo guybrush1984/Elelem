@@ -44,6 +44,20 @@ model_metadata:
     license: "MIT"
     reasoning: "no"
 
+  deepseek_v4_flash: &deepseek-v4-flash
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-v4-flash"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash"
+    license: "MIT"
+    reasoning: "no"
+
+  deepseek_v4_pro: &deepseek-v4-pro
+    model_owner: "DeepSeek"
+    model_nickname: "deepseek-v4-pro"
+    model_page: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro"
+    license: "MIT"
+    reasoning: "no"
+
   deepseek_r1: &deepseek-r1
     model_owner: "DeepSeek"
     model_nickname: "deepseek-r1"
